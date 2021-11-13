@@ -1,4 +1,4 @@
-#Ergo SmartPool Contracts
+# Ergo SmartPool Contracts
 This repository serves as an initial version for SmartPooling contracts.
 These contracts will allow a mining pool to operate its payment processing on-chain, in
 an open and honest way. The project was designed to be modular and to allow more complex
