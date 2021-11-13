@@ -140,7 +140,7 @@ in R4 of the Command Box.
 Each holding box script is tied to a Metadata Box whose propBytes are hardcoded into the contract
 on creation.
 
-#The Consensus Transaction
+# The Consensus Transaction
 This is the main transaction that distributes payouts to each SmartPool Member.
 We may also refer to this transaction as a payout cycle or epoch. Each
 transaction destroys an old metadata box and creates a new one with the same
