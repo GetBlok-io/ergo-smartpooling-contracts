@@ -103,7 +103,7 @@ of the pool operator. Like with the members list, the "name" field here is not e
 What the Pool Operators truly represent is a collection of valid propositional bytes for any command
 box .
 
-#The Command Box
+## The Command Box
 The Command Box will have the same register layout as the Metadata Box. This is because
 the registers present in the Command Box must be present in the new Metadata Box that
 is outputted in the consensus transaction. Only two fields of the Command Box are used 
@@ -132,7 +132,7 @@ consensus.
 
 
 
-#The Holding Box
+## The Holding Box
 The Holding Box has no specific registers. Its main jobs are to verify that it is being spent
 with a Metadata and Command Box, and that the transactions outputs follow the consensus laid out
 in R4 of the Command Box.
