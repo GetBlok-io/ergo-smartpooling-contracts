@@ -200,6 +200,7 @@ create an Output Box in each consensus transaction that has the same value as th
 Command Box and is also protected by their P2PK script. In this way, no funds are injected 
 into the SmartPool.
 
+When funds *are* injected using the command box, the possibilities are endless.
 Imagine a SmartPool which wishes to add an automatic block bounty, where the miner who finds
 the block gets an extra reward of 5 ERG. We may create a Command Box script that takes some miner's P2PK script as an input
 and requires that a transaction spending the Command Box has an output box of 5 ERG protected by the miner's script.
