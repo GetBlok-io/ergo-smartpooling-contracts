@@ -53,7 +53,11 @@ information about the SmartPool by searching for it on the Ergo Blockchain.
 
 R4 Of the Metadata Box holds information about the last consensus. We define a consensus
 to be a mapping that takes the propositional bytes of some script protecting a box, and maps
-it to the number of shares that that box provided. R4 therefore stores the information
+it to the number of shares that that box provided. Each consensus value is of type:
+```scala
+(Coll[Byte], Long)
+```
+R4 therefore stores the information
 that was used to determine each SmartPool member's payment during the last epoch.
 By storing this information on-chain, a SmartPool's payments can be monitored and validated.
 This information will be important when share-verification is acheived using oracle pools, as per
