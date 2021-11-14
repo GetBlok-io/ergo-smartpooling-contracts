@@ -57,7 +57,8 @@ it to the number of shares that that box provided. R4 therefore stores the infor
 that was used to determine each SmartPool member's payment during the last epoch.
 By storing this information on-chain, a SmartPool's payments can be monitored and validated.
 This information will be important when share-verification is acheived using oracle pools, as per
-the original ErgoSmartPool's design.
+the [original ErgoSmartPool's design](https://github.com/WilfordGrimley/ErgoSmartPools
+).
 
 R5 Of the Metadata Box holds the member list. We define a SmartPool member to be
 a 
