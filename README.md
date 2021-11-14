@@ -145,13 +145,13 @@ to the consensus given. The following diagram is a simplistic model of a
 consensus transaction. It assumes that there are no Pool Fees boxes to output to.
 ![Consensus Tx](spec/ConsensusTx.png)
 
-#Building Complex Payment Schemes On Top Of the SmartPool
+# Building Complex Payment Schemes On Top Of the SmartPool
 The modular nature of the SmartPool allows for complex payment schemes to be used.
 
 There are 3 different payment operations that may use any script to build more
 complex payment schemes from.
 
-###Pool Fees
+### Pool Fees
 Pool Fees are fees taken out of the total payout before it is distributed. Pool
 fees may take a minimum of 0.1% or (0.001 * totalPayout). We may use pool fees
 to tax money from all members of the SmartPool. The simplest form of a pool fee
@@ -168,7 +168,7 @@ gets the fund. The SmartPool operator may then pass the public key of the develo
 to the Smart Contract, which will ensure a box owned by the developer is created
 and has the correct value.
 
-###Member Payouts
+### Member Payouts
 Member Payouts are the output boxes of each consensus transaction whose value
 was determined by the holding box script. We may use Member Payouts to give ERG
 to specific members or scripts representing members. As with the other payment schemes,
@@ -182,7 +182,7 @@ These subpools would allow miners to dictate how they each individually get paid
 We may also use scripts that allow SmartPool members to receive tokens,
 lock funds, or more.
 
-###Command Box
+### Command Box
 The Command Box allows us even more flexibility in payment schemes. The Command Box
 will allow SmartPool Operators to inject extra funds into the SmartPool to perform
 even more complex payments. Another important part of the Command Box is that it
