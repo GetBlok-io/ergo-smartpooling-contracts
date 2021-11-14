@@ -60,7 +60,11 @@ This information will be important when share-verification is acheived using ora
 the original ErgoSmartPool's design.
 
 R5 Of the Metadata Box holds the member list. We define a SmartPool member to be
-a ```(Coll[Byte], Coll[Byte])```. Therefore, The member list is just a collection that maps the propositional
+a 
+```scala
+(Coll[Byte], Coll[Byte])
+```
+Therefore, The member list is just a collection that maps the propositional
 bytes of some member's box to that member's "name". A name here is just any collection of bytes.
 The SmartPool script does not perform any verification about what a name constitutes, just
 that it is mapped to the propositional bytes of some member's script. While there is no verification,
@@ -131,7 +135,7 @@ in R4 of the Command Box and the Pool Fees in R6 of the Metadata Box.
 Each holding box script is tied to a Metadata Box whose propBytes are hardcoded into the contract
 on creation.
 
-#The Consensus Transaction
+# The Consensus Transaction
 This is the main transaction that distributes payouts to each SmartPool Member.
 We may also refer to this transaction as a payout cycle or epoch. Each
 transaction destroys an old metadata box and creates a new one with the same
