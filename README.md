@@ -203,7 +203,7 @@ into the SmartPool.
 
 When funds *are* injected using the command box, the possibilities are endless.
 Imagine a SmartPool which wishes to add an automatic block bounty, where the miner who finds
-the block gets an extra reward of 5 ERG. We may create a Command Box script that takes some miner's P2PK script as an input
+the block gets an extra reward of 5 ERG. We may create a Command Box script that takes some miner's P2PK script bytes as an input
 and requires that a transaction spending the Command Box has an output box of 5 ERG protected by the miner's script.
 When a block is found, we may pass the block finder's propBytes to the Command Box script and create
 a Command Box with a value of 5 ERG. The SmartPool's consensus transaction will now require that a
