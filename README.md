@@ -212,8 +212,8 @@ consensus. The Block Bounty box will be protected by the Block Finder's P2PK scr
 in the Command Box Contract.
 
 
-## This project was made using Ergo-Appkit
+## This project is made using Ergo-Appkit
 You can find it here: https://github.com/ergoplatform/ergo-appkit
 
-## This project was inspired by ErgoSmartPools
+## This project is based on work from ErgoSmartPools
 https://github.com/WilfordGrimley/ErgoSmartPools
