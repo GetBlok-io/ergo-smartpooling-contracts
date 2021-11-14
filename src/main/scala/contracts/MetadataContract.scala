@@ -157,6 +157,7 @@ object MetadataContract {
 
       if(selfValid){
         // We verify that the metadata box follows the proper consensus
+        // Currently no way to destroy metadata box
         sigmaProp(newMetadataFromCommand)
       }else{
         sigmaProp(true)

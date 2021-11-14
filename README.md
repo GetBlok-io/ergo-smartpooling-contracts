@@ -117,25 +117,16 @@ added or removed by the command box during a consensus transaction.
 
 The Command Box may be protected by any script so long as that script's propositional bytes are
 stored in R8 of the Metadata Box. Since the command box is spent during the consensus transaction, it's
-script must evaluate to true. What this means is that we may build additional operation schemes
-on top of the current SmartPool. 
+script must evaluate to true. What this means is that we may have additional constraints
+that must evaluate to true before performing any consensus transaction.
 
 Another important thing to note about the Command Box is that it's value is not calculated to be a part
-of the total rewards. This allows for even more freedom in how the command box is used. For example,
-imagine a SmartPool which wishes to add an automatic block bounty, where the miner who finds
-the block gets an extra reward of 5 ERG. We may create a Command Box script that takes some script's propBytes as an input
-and requires that a transaction spending that box has an output box of 5 ERG protected by the inputted script.
-When a block is found, we may pass the block finder's propBytes to the Command Box script and create
-a Command Box with a value of 5 ERG. The SmartPool's consensus transaction will now require that a 
-box with the Block Bounty of 5 ERG be created, in addition to the other boxes created during a standard
-consensus.
-
-
+of the total rewards. This allows for even more freedom in how the Command Box's funds is used.
 
 ## The Holding Box
 The Holding Box has no specific registers. Its main jobs are to verify that it is being spent
 with a Metadata and Command Box, and that the transactions outputs follow the consensus laid out
-in R4 of the Command Box.
+in R4 of the Command Box and the Pool Fees in R6 of the Metadata Box.
 
 Each holding box script is tied to a Metadata Box whose propBytes are hardcoded into the contract
 on creation.
@@ -149,6 +140,71 @@ All of the holding boxes are used to create boxes for each member, with values a
 to the consensus given. The following diagram is a simplistic model of a 
 consensus transaction. It assumes that there are no Pool Fees boxes to output to.
 ![Consensus Tx](spec/ConsensusTx.png)
+
+#Building Complex Payment Schemes On Top Of the SmartPool
+The modular nature of the SmartPool allows for complex payment schemes to be used.
+
+There are 3 different payment operations that may use any script to build more
+complex payment schemes from.
+
+###Pool Fees
+Pool Fees are fees taken out of the total payout before it is distributed. Pool
+fees may take a minimum of 0.1% or (0.001 * totalPayout). We may use pool fees
+to tax money from all members of the SmartPool. The simplest form of a pool fee
+would be the proposition bytes for some P2PK address owned by a pool operator.
+Such a pool fee could be used to offset upkeep costs for hosting the stratum server.
+
+More complex scripts could also be used. For example, if a mining pool wished
+to create a community developer fund, it could create a script that holds ERG until
+a public key of some developer is passed to it. The mining pool may then add the 
+proposition bytes of this script to the SmartPool's pool fees. Every consensus
+transaction would take some percentage of the total rewards and store it in the
+developer fund. At the end of every month, members may vote on which developer
+gets the fund. The SmartPool operator may then pass the public key of the developer
+to the Smart Contract, which will ensure a box owned by the developer is created
+and has the correct value.
+
+###Member Payouts
+Member Payouts are the output boxes of each consensus transaction whose value
+was determined by the holding box script. We may use Member Payouts to give ERG
+to specific members or scripts representing members. As with the other payment schemes,
+the simplest form of payment would be to some P2PK address.
+
+We may use Member Payouts to create multiple levels of payment. For example, we may
+create subpools of miners that decide how their own payment is distributed. The only
+thing that the SmartPool does is transfer ERG to each of its direct children/members.
+These subpools would allow miners to dictate how they each individually get paid.
+
+We may also use scripts that allow SmartPool members to receive tokens,
+lock funds, or more.
+
+###Command Box
+The Command Box allows us even more flexibility in payment schemes. The Command Box
+will allow SmartPool Operators to inject extra funds into the SmartPool to perform
+even more complex payments. Another important part of the Command Box is that it
+is inherently spent in the consensus transaction. Unlike the member payouts
+and pool fees, this means that the Command Box directly affects whether or not
+a valid consensus transaction may occur. 
+
+The Command Box is technically an optional payment and it is not a requirement that
+the money it holds is redistributed. For example, if we have a SmartPool with a
+Pool Operator defined as a simple P2PK address's propBytes, what happens with
+the Command Box's funds is up to the Pool Operator. This also means that each
+consensus transaction would have to be signed by the pool operator, since that is
+a requirement for any P2PK script. If the Pool Operator wished, they could simply
+create an Output Box in each consensus transaction that has the same value as the 
+Command Box and is also protected by their P2PK script. In this way, no funds are injected 
+into the SmartPool.
+
+Imagine a SmartPool which wishes to add an automatic block bounty, where the miner who finds
+the block gets an extra reward of 5 ERG. We may create a Command Box script that takes some miner's P2PK script as an input
+and requires that a transaction spending the Command Box has an output box of 5 ERG protected by the miner's script.
+When a block is found, we may pass the block finder's propBytes to the Command Box script and create
+a Command Box with a value of 5 ERG. The SmartPool's consensus transaction will now require that a
+box with the Block Bounty of 5 ERG be created, in addition to the other boxes created during a standard
+consensus. The Block Bounty box will be protected by the Block Finder's P2PK script, as was specified
+in the Command Box Contract.
+
 
 ## This project was made using Ergo-Appkit
 You can find it here: https://github.com/ergoplatform/ergo-appkit
