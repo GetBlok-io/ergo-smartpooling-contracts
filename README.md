@@ -179,8 +179,8 @@ was determined by the holding box script. We may use Member Payouts to give ERG
 to specific members or scripts representing members. As with the other payment schemes,
 the simplest form of payment would be to some P2PK address.
 
-We may use Member Payouts to create multiple levels of payment. For example, we may
-create subpools of miners that decide how their own payment is distributed. The only
+We may use Member Payouts to create multiple levels of decentralized payments. For example, we may
+create subpools of miners that decide how their own payment is distributed using a vote system. The only
 thing that the SmartPool does is transfer ERG to each of its direct children/members.
 These subpools would allow miners to dictate how they each individually get paid.
 
@@ -189,8 +189,8 @@ lock funds, or more.
 
 ### Command Box
 The Command Box allows us even more flexibility in payment schemes. The Command Box
-will allow SmartPool Operators to inject extra funds into the SmartPool to perform
-even more complex payments. Another important part of the Command Box is that it
+will allow SmartPool Operators to inject extra funds into the SmartPool to perform more complex
+payment mechanisms. Another important part of the Command Box is that it
 is inherently spent in the consensus transaction. Unlike the member payouts
 and pool fees, this means that the Command Box directly affects whether or not
 a valid consensus transaction may occur. 
