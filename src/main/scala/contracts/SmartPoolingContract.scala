@@ -13,10 +13,19 @@ object SmartPoolingContract {
   def getSmartPoolingScript: String = {
     /**
      * SmartPool Holding script
-     * - This script requires 1 constant:
+     * - This script requires 3 constants:
      * - Metadata Box Proposition Bytes
-     *    -- Used to verify input 0 as metadata box
-     *    -- Also used to verify input 1 is a box protected by a pool operator(who are stored in R8 of the metadata)
+     *    -- Used to verify input 0 as a metadata box
+     * - Metadata Box id
+     *    -- Used to identify what box a given set of holding boxes is linked to.
+     *    -- We use the id to ensure that each holding address is uniquely linked to
+     *    -- a valid metadata box. This ensures that fake metadata boxes cannot be created
+     *    -- to spend the holding boxes.
+     *    -- Every valid metadata box will have a list of pool operators in R8 that ensures that
+     *    -- the holding boxes may only be spent if certain conditions are met.
+     *    -- We must to create a new holding contract everytime we enter a new epoch to ensure
+     *    -- that funds are not lost. (Maybe add backup spending path in case of mistake?)
+     * - MinTxFee for use in calculation
      *
      * The SmartPool holding script takes information from the metadata box and command box to distribute
      * rewards to members of the smart pool.
@@ -42,6 +51,7 @@ object SmartPoolingContract {
         val metadataExists =
           if(VALID_INPUTS_SIZE){
             INPUTS(0).propositionBytes == const_metadataPropBytes
+            && INPUTS(0).id == const_metadataID
           }else{
             false
           }
@@ -152,15 +162,18 @@ object SmartPoolingContract {
    * @param metadataAddress address of metadata
    * @return Compiled ErgoContract of Holding Smart Contract
    */
-  def generateHoldingContract(ctx: BlockchainContext, metadataAddress: Address): ErgoContract = {
+  def generateHoldingContract(ctx: BlockchainContext, metadataAddress: Address, metadataBox: InputBox): ErgoContract = {
     val metadataPropBytes: Array[Byte] = metadataAddress.getErgoAddress.script.bytes
+    val metadataID: Array[Byte] = metadataBox.getId().getBytes
     val constantsBuilder = ConstantsBuilder.create()
     println("===========Generating Holding Address=============")
-    println("const_metadataPropBytesHashed: " + newColl(metadataPropBytes, ErgoType.byteType()))
+    println("const_metadataPropBytes: " + newColl(metadataPropBytes, ErgoType.byteType()))
+    println("const_metadataID: " + newColl(metadataID, ErgoType.byteType()))
 
     val compiledContract = ctx.compileContract(constantsBuilder
       .item("const_MinTxFee", Parameters.MinFee)
       .item("const_metadataPropBytesHashed", newColl(metadataPropBytes, ErgoType.byteType()))
+      .item("const_metadataID", newColl(metadataID, ErgoType.byteType()))
       .build(), getSmartPoolingScript)
     compiledContract
   }

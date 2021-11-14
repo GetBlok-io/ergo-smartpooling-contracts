@@ -42,8 +42,11 @@ object MetadataContract {
      * If a metadata box is valid, it may spent in a transaction to create a new metadata box. Only the metadata
      * box itself verifies that is is valid and that the transaction has a valid layout according to the smart pool
      * protocol. This is the metadata boxes' unique job during any consensus transaction. It verifies that
-     * input 0 is SELF and has valid registers, input 1 is some command box belonging to a pool operator, and inputs
-     * 2 and onwards are all SmartPool Holding contracts. The metadata box also verifies that a new metadata box with
+     * input 0 is SELF and has valid registers, input 1 is some command box belonging to a pool operator. The
+     * metadata box does not attempt to verify that it is being spent with holding boxes, only that
+     * it is being spent with a command box. This allows a new holding address to be used
+     * for each metadata box.
+     * The metadata box also verifies that a new metadata box with
      * proper registers is created in the outputs.
      *
      * The metadata box does not perform consensus and does not verify any outputs other than there being another

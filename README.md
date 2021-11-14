@@ -46,6 +46,14 @@ are paid and follow the exact pool fees laid out in the current Metadata Box. Po
 calculated using the Command Box. Instead, the Command Box outlines the pool fees for the next epoch.
 The Metadata Box outlines the Pool Fees to be used during the current epoch.
 
+Every new epoch requires a new holding contract to be created. This is because every holding
+box is linked to some instance of a metadata box during its creation. This ensures that
+fake metadata boxes cannot be created to spend a holding box. 
+This also ensures a unique line of metadata boxes from epoch 0 to the current epoch is always
+available to analyze on the blockchain. Since each metadata box will contain information about the 
+last consensus, we will have a complete payment history stored on the Blockchain for any third-party 
+to verify a SmartPool's operation.
+
 ## The Metadata Box
 The Metadata Box is the box that stores information about the current SmartPool on-chain.
 Each Metadata Box will hold key information in its registers that allows anybody to query
