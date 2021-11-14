@@ -61,11 +61,16 @@ information about the SmartPool by searching for it on the Ergo Blockchain.
 
 R4 Of the Metadata Box holds information about the last consensus. We define a consensus
 to be a mapping that takes the propositional bytes of some script protecting a box, and maps
-it to the number of shares that that box provided. R4 therefore stores the information
+it to the number of shares that that box provided. Each consensus value is of type:
+```scala
+(Coll[Byte], Long)
+```
+R4 therefore stores the information
 that was used to determine each SmartPool member's payment during the last epoch.
 By storing this information on-chain, a SmartPool's payments can be monitored and validated.
 This information will be important when share-verification is acheived using oracle pools, as per
-the original ErgoSmartPool's design.
+the [original ErgoSmartPool's design](https://github.com/WilfordGrimley/ErgoSmartPools
+).
 
 R5 Of the Metadata Box holds the member list. We define a SmartPool member to be
 a 
@@ -182,8 +187,8 @@ was determined by the holding box script. We may use Member Payouts to give ERG
 to specific members or scripts representing members. As with the other payment schemes,
 the simplest form of payment would be to some P2PK address.
 
-We may use Member Payouts to create multiple levels of payment. For example, we may
-create subpools of miners that decide how their own payment is distributed. The only
+We may use Member Payouts to create multiple levels of decentralized payments. For example, we may
+create subpools of miners that decide how their own payment is distributed using a vote system. The only
 thing that the SmartPool does is transfer ERG to each of its direct children/members.
 These subpools would allow miners to dictate how they each individually get paid.
 
@@ -192,8 +197,8 @@ lock funds, or more.
 
 ### Command Box
 The Command Box allows us even more flexibility in payment schemes. The Command Box
-will allow SmartPool Operators to inject extra funds into the SmartPool to perform
-even more complex payments. Another important part of the Command Box is that it
+will allow SmartPool Operators to inject extra funds into the SmartPool to perform more complex
+payment mechanisms. Another important part of the Command Box is that it
 is inherently spent in the consensus transaction. Unlike the member payouts
 and pool fees, this means that the Command Box directly affects whether or not
 a valid consensus transaction may occur. 
@@ -210,7 +215,7 @@ into the SmartPool.
 
 When funds *are* injected using the command box, the possibilities are endless.
 Imagine a SmartPool which wishes to add an automatic block bounty, where the miner who finds
-the block gets an extra reward of 5 ERG. We may create a Command Box script that takes some miner's P2PK script as an input
+the block gets an extra reward of 5 ERG. We may create a Command Box script that takes some miner's P2PK script bytes as an input
 and requires that a transaction spending the Command Box has an output box of 5 ERG protected by the miner's script.
 When a block is found, we may pass the block finder's propBytes to the Command Box script and create
 a Command Box with a value of 5 ERG. The SmartPool's consensus transaction will now require that a
@@ -219,8 +224,8 @@ consensus. The Block Bounty box will be protected by the Block Finder's P2PK scr
 in the Command Box Contract.
 
 
-## This project was made using Ergo-Appkit
+## This project is made using Ergo-Appkit
 You can find it here: https://github.com/ergoplatform/ergo-appkit
 
-## This project was inspired by ErgoSmartPools
+## This project is based on work from ErgoSmartPools
 https://github.com/WilfordGrimley/ErgoSmartPools
