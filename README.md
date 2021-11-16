@@ -18,6 +18,8 @@ that each transaction that a SmartPool carries out requires 3 boxes at minimum:
 The Metadata Box, The Command Box, and any number of Holding Boxes. We will get into more
 depth in the following sections, but here is a general idea of the jobs of each box.
 
+##Overview
+
 *Metadata Box* - Stores information about the SmartPool and its last payout on-chain. 
 In a consensus transaction, the Metadata Box's job is to verify that a new Metadata Box
 is created, that the new Box's registers come from the Command Box, and that important
