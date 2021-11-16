@@ -41,6 +41,10 @@ object SmartPoolingContract {
      * integer is expected to be 1 and this is checked by the metadata box. A value of 1 represents 1/1000 of the
      * total value of the consensus transaction. Therefore the minimum pool fee must be 0.1% or 0.001 * the total inputs value.
      *
+     * TODO: Require original epoch 0 box id in Pool Info
+     * TODO: Consider alternate spending path to destroy Smart Pool boxes in case pool shuts down or restarts due to update.
+     * TODO: Consider ways to scan Smart Pool boxes for off chain portion of code to verify box id is correct.
+     * TODO: Allow more than just minimum Tx fee since script may be computationally heavy
      */
     val script: String =
       s"""
