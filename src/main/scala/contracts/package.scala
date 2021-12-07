@@ -1,5 +1,6 @@
 import org.ergoplatform.{ErgoAddressEncoder, Pay2SHAddress}
 import org.ergoplatform.appkit.{Address, ErgoContract, ErgoType, ErgoValue, NetworkType}
+import scalan.RType
 import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.eval.CostingSigmaDslBuilder.proveDlog
 import sigmastate.eval.SigmaDsl
@@ -36,21 +37,26 @@ package object contracts {
     final val POOL_FEE_TYPE = ErgoType.pairType[Coll[Byte], Int](PROPBYTES_TYPE, ErgoType.integerType())
     final val POOL_FEES_LIST_TYPE = ErgoType.collType(POOL_FEE_TYPE)
 
-    final val POOL_INFO_TYPE = ErgoType.collType(ErgoType.integerType())
+    final val POOL_INFO_TYPE = ErgoType.collType(ErgoType.longType())
 
     final val POOL_OPERATORS_TYPE = ErgoType.collType(MEMBER_TYPE)
 
   }
+  // SpType has three values, a normal value (used in offchain code), a conversion value(Used to convert from more traditional types)
+  // and the ergo type value is typically used to reference it.
+  // For types with parameters(like coll) we use the type parameter as the ergo type since this is how it is referenced in most methods
+  case class SpValue[A](nValue: A, cValue: _, eValue: ErgoType[_])
 
-  /**
-   * Returns new collection of type Coll[T] where T must have some corresponding ErgoType ErgoType[T]
-   */
-  def newColl[T](list: List[T], ergoType: ErgoType[T]): Coll[T] = {
-    special.collection.Builder.DefaultCollBuilder.fromItems(list:_*)(ergoType.getRType)
+  final val PROPBYTES_TYPE = new SpType[Coll[Byte]]()
+
+  final val PROPBYTES
+  trait SpContract {
+    val contractScript: String
+    def buildContract: ErgoContract
+
   }
-  def newColl[T](arr: Array[T], ergoType: ErgoType[T]): Coll[T] = {
-    special.collection.Builder.DefaultCollBuilder.fromArray(arr)(ergoType.getRType)
-  }
+
+
 
 
 

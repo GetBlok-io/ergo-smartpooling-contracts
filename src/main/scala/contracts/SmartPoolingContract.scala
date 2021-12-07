@@ -6,7 +6,7 @@ import scorex.crypto.hash.Blake2b256
 import special.collection.Coll
 import special.sigma.{GroupElement, SigmaProp}
 
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 
 object SmartPoolingContract {
 
@@ -41,16 +41,25 @@ object SmartPoolingContract {
      * integer is expected to be 1 and this is checked by the metadata box. A value of 1 represents 1/1000 of the
      * total value of the consensus transaction. Therefore the minimum pool fee must be 0.1% or 0.001 * the total inputs value.
      *
-     * TODO: Require original epoch 0 box id in Pool Info
      * TODO: Consider alternate spending path to destroy Smart Pool boxes in case pool shuts down or restarts due to update.
      * TODO: Consider ways to scan Smart Pool boxes for off chain portion of code to verify box id is correct.
-     * TODO: Allow more than just minimum Tx fee since script may be computationally heavy
+     * TODO: Allow option to choose TxFee
+     * TODO: Do not use total input value, use total value of command box, metadata box, and holding boxes only
+     *       This should allow more freedom in what the command box can do and use from a consensus transaction.
+     *       For example: Block Bounty
      */
     val script: String =
       s"""
       {
         val VALID_INPUTS_SIZE = INPUTS.size > 2
-        val TOTAL_INPUTS_VALUE = INPUTS.fold(0L, {(accum: Long, box:Box) => accum + box.value})
+        val TOTAL_HOLDED_VALUE = INPUTS.fold(0L, {(accum: Long, box:Box) =>
+          if(box.propositionBytes == SELF.propositionBytes)
+            accum + box.value
+          else
+            accum
+        })
+        val MIN_TXFEE = 1000L * 1000L
+
 
         val metadataExists =
           if(VALID_INPUTS_SIZE){
@@ -65,7 +74,7 @@ object SmartPoolingContract {
               INPUTS(0).R4[Coll[(Coll[Byte], Long)]].isDefined,       // Last consensus
               INPUTS(0).R5[Coll[(Coll[Byte], Coll[Byte])]].isDefined, // Current members
               INPUTS(0).R6[Coll[(Coll[Byte], Int)]].isDefined,        // Pool fees
-              INPUTS(0).R7[Coll[Int]].isDefined,                      // Pool Information
+              INPUTS(0).R7[Coll[Long]].isDefined,                     // Pool Information
               INPUTS(0).R8[Coll[(Coll[Byte], Coll[Byte])]].isDefined  // Pool operators
             ))
           }else{
@@ -92,7 +101,7 @@ object SmartPoolingContract {
               INPUTS(1).R4[Coll[(Coll[Byte], Long)]].isDefined,       // New consensus
               INPUTS(1).R5[Coll[(Coll[Byte], Coll[Byte])]].isDefined, // New members list
               INPUTS(1).R6[Coll[(Coll[Byte], Int)]].isDefined,        // New Pool fees
-              INPUTS(1).R7[Coll[Int]].isDefined,                      // New Pool Information
+              INPUTS(1).R7[Coll[Long]].isDefined,                     // New Pool Information
               INPUTS(1).R8[Coll[(Coll[Byte], Coll[Byte])]].isDefined  // New Pool operators
             ))
           }else{
@@ -105,19 +114,17 @@ object SmartPoolingContract {
           if(commandValid){
             val currentConsensus = INPUTS(1).R4[Coll[(Coll[Byte], Long)]].get // New consensus grabbed from current command
             val currentPoolFees = INPUTS(0).R6[Coll[(Coll[Byte], Int)]].get // Pool fees grabbed from current metadata
-
+            val currentTxFee = MIN_TXFEE * currentConsensus.size()
             val feeList: Coll[(Coll[Byte], Long)] = currentPoolFees.map{
               // Pool fee is defined as x/1000 of total inputs value.
-              (poolFee: (Coll[Byte], Int)) => ( poolFee._1 , ((poolFee._2 * TOTAL_INPUTS_VALUE)/1000) )
+              (poolFee: (Coll[Byte], Int)) => ( poolFee._1 , ((poolFee._2 * TOTAL_HOLDED_VALUE)/1000) )
             }
 
-            // Total amount in holding after pool fees, minTxFee, Metadata Box value and command box value.
-            // Freedom of command box ensures that it can be used for anything in the transaction, so long
-            // as the boxes it makes are separate from the consensus outputs and that the box itself is spent
-            // according to whatever script is protecting it.
-            val totalValAfterFees = ((feeList.fold(TOTAL_INPUTS_VALUE, {
+            // Total amount in holding after pool fees and tx fees.
+            // This is the total amount of ERG to be distributed to pool members
+            val totalValAfterFees = ((feeList.fold(TOTAL_HOLDED_VALUE, {
               (accum: Long, poolFeeVal: (Coll[Byte], Long)) => accum - poolFeeVal._2
-            })) - const_MinTxFee) - INPUTS(0).value - INPUTS(1).value
+            })) - currentTxFee)
 
             val totalShares = currentConsensus.fold(0L, {(accum: Long, consVal: (Coll[Byte], Long)) => accum + consVal._2})
 
@@ -175,20 +182,81 @@ object SmartPoolingContract {
     println("const_metadataID: " + newColl(metadataID, ErgoType.byteType()))
 
     val compiledContract = ctx.compileContract(constantsBuilder
-      .item("const_MinTxFee", Parameters.MinFee)
-      .item("const_metadataPropBytesHashed", newColl(metadataPropBytes, ErgoType.byteType()))
+      .item("const_metadataPropBytes", newColl(metadataPropBytes, ErgoType.byteType()))
       .item("const_metadataID", newColl(metadataID, ErgoType.byteType()))
       .build(), getSmartPoolingScript)
     compiledContract
   }
 
   /**
-   * Generates a list of output boxes that follow a consensus from some command box.
+   * Generates a list of output boxes that follow a consensus. Metadata and Command boxes are assumed
+   * to be inputs 0 and 1.
    * @param ctx Blockchain context
    * @return Returns list of output boxes to use in transaction
    */
-  def generateOutputBoxes(ctx: BlockchainContext) = {
+  def generateOutputBoxes(ctx: BlockchainContext, inputBoxes: Array[InputBox], memberAddresses: Array[Address],
+                          feeAddresses: Array[Address], holdingAddress: Address): Array[OutBox] = {
+    val metadataBox = inputBoxes(0)
+    val commandBox = inputBoxes(1)
+    val TOTAL_HOLDED_VALUE = inputBoxes.foldLeft(0L){
+      (accum: Long, box: InputBox) =>
+        if(box.getErgoTree.bytes sameElements holdingAddress.getErgoAddress.script.bytes){
+          accum + box.getValue
+        }else
+          accum
+    }
+    val currentConsensus = commandBox.getRegisters.get(0).getValue.asInstanceOf[Coll[(Coll[Byte], Long)]].toArray
+    val currentPoolFees = metadataBox.getRegisters.get(2).getValue.asInstanceOf[Coll[(Coll[Byte], Int)]].toArray
+    val currentTxFee = Parameters.MinFee * currentConsensus.length
 
+    val feeList: Array[(Coll[Byte], Long)] = currentPoolFees.map{
+      // Pool fee is defined as x/1000 of total inputs value.
+      (poolFee: (Coll[Byte], Int)) => ( poolFee._1 , ((poolFee._2 * TOTAL_HOLDED_VALUE)/1000) )
+    }
+
+    // Total amount in holding after pool fees and tx fees.
+    // This is the total amount of ERG to be distributed to pool members
+    val totalValAfterFees = (feeList.foldLeft(TOTAL_HOLDED_VALUE){
+      (accum: Long, poolFeeVal: (Coll[Byte], Long)) => accum - poolFeeVal._2
+    })- currentTxFee
+
+    val totalShares = currentConsensus.foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Long)) => accum + consVal._2}
+
+    // Returns some value that is a percentage of the total rewards after the fees.
+    // The percentage used is the proportion of the share number passed in over the total number of shares.
+    def getValueFromShare(shareNum: Long) = {
+      val newBoxValue = (((totalValAfterFees) * (shareNum)) / (totalShares))
+      newBoxValue
+    }
+
+    // Maps each propositionBytes stored in the consensus to a value obtained from the shares.
+    val boxValueMap = currentConsensus.map{
+      (consVal: (Coll[Byte], Long)) =>
+        (consVal._1, getValueFromShare(consVal._2))
+    }
+
+    // This verifies that each member of the consensus has some output box
+    // protected by their script and that the value of each box is the
+    // value obtained from consensus.
+    // This boolean value is returned and represents the main sigma proposition of the smartpool holding
+    // contract.
+    // This boolean value also verifies that poolFees are paid and go to the correct boxes.
+    val TxB = ctx.newTxBuilder()
+    val outB = TxB.outBoxBuilder()
+    val outBoxBuffer = ArrayBuffer[OutBox]()
+    memberAddresses.foreach{
+      (addr: Address) =>
+        val boxValue = boxValueMap.filter{consVal: (Coll[Byte], Long) => consVal._1.toArray sameElements addr.getErgoAddress.script.bytes}(0)
+        val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script)).build()
+        outBoxBuffer.append(newOutBox)
+    }
+    feeAddresses.foreach{
+      (addr: Address) =>
+        val boxValue = feeList.filter{poolFeeVal: (Coll[Byte], Long) => poolFeeVal._1.toArray sameElements addr.getErgoAddress.script.bytes}(0)
+        val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script)).build()
+        outBoxBuffer.append(newOutBox)
+    }
+    outBoxBuffer.toArray
   }
 
 

@@ -166,7 +166,7 @@ value. The transaction also spends the command box according to the script prote
 All of the holding boxes are used to create boxes for each member, with values according
 to the consensus given. The following diagram is a simplistic model of a 
 consensus transaction. It assumes that there are no Pool Fees boxes to output to.
-![Consensus Tx](spec/ConsensusTx.png)
+![Consensus Tx](docs/ConsensusTx.png)
 
 # Building Complex Payment Schemes On Top Of the SmartPool
 The modular nature of the SmartPool allows for complex payment schemes to be used.
@@ -232,6 +232,9 @@ a Command Box with a value of 5 ERG. The SmartPool's consensus transaction will 
 box with the Block Bounty of 5 ERG be created, in addition to the other boxes created during a standard
 consensus. The Block Bounty box will be protected by the Block Finder's P2PK script, as was specified
 in the Command Box Contract.
+
+We may also use the command box to create a SmartPool governed by vote. Let us say we have command box
+that requires 50% of the members in the Metadata Box to submit a vote. We define a vote to be some
 
 
 ## This project is made using Ergo-Appkit
