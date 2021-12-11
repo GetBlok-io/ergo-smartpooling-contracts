@@ -32,7 +32,7 @@ class MemberList(normalValue: Coll[(Coll[Byte], Coll[Byte])]) extends RegValue[(
     new MemberList(this.normalValue.append(newColl(Array(unitValue), eType)))
   }
   override def addConversion(member: (Array[Byte], String)): MemberList = {
-    addValue(normalValue(member))
+    addValue(defaultValue(member))
   }
 
   override def removeValue(member: (Coll[Byte], Coll[Byte])): MemberList = {
@@ -40,7 +40,7 @@ class MemberList(normalValue: Coll[(Coll[Byte], Coll[Byte])]) extends RegValue[(
   }
 
   override def removeConversion(member: (Array[Byte], String)): MemberList = {
-    removeValue(normalValue(member))
+    removeValue(defaultValue(member))
   }
 
   override def getValue(idx: Int): (Coll[Byte], Coll[Byte]) = {
@@ -55,8 +55,7 @@ class MemberList(normalValue: Coll[(Coll[Byte], Coll[Byte])]) extends RegValue[(
 }
 
 object MemberList extends RegCompanion[(Coll[Byte], Coll[Byte]), (Array[Byte], String)] {
-  override val eType: ErgoType[(Coll[Byte], Coll[Byte])] = ErgoType.pairType[Coll[Byte], Coll[Byte]]
-  (ErgoType.collType(ErgoType.byteType()), ErgoType.collType(ErgoType.byteType()))
+  override val eType: ErgoType[(Coll[Byte], Coll[Byte])] = ErgoType.pairType[Coll[Byte], Coll[Byte]](ErgoType.collType(ErgoType.byteType()), ErgoType.collType(ErgoType.byteType()))
 
   override def defaultValue(member: (Array[Byte], String)): (Coll[Byte], Coll[Byte]) = {
     (newColl(member._1, ErgoType.byteType()), newColl(member._2.getBytes(StandardCharsets.US_ASCII), ErgoType.byteType()))

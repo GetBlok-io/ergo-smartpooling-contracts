@@ -56,8 +56,8 @@ class PoolOperators(normalValue: Coll[(Coll[Byte], Coll[Byte])]) extends RegValu
 
 object PoolOperators extends RegCompanion[(Coll[Byte], Coll[Byte]), (Array[Byte], String)] {
 
-  override val eType: ErgoType[(Coll[Byte], Coll[Byte])] = ErgoType.pairType[Coll[Byte], Coll[Byte]]
-  (ErgoType.collType(ErgoType.byteType()), ErgoType.collType(ErgoType.byteType()))
+  override val eType: ErgoType[(Coll[Byte], Coll[Byte])] =
+    ErgoType.pairType[Coll[Byte], Coll[Byte]](ErgoType.collType(ErgoType.byteType()), ErgoType.collType(ErgoType.byteType()))
 
   override def defaultValue(member: (Array[Byte], String)): (Coll[Byte], Coll[Byte]) = {
     (newColl(member._1, ErgoType.byteType()), newColl(member._2.getBytes(StandardCharsets.US_ASCII), ErgoType.byteType()))

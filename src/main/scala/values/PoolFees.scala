@@ -26,7 +26,7 @@ class PoolFees(normalValue: Coll[(Coll[Byte], Int)]) extends RegValue[(Coll[Byte
     new PoolFees(this.normalValue.append(newColl(Array(unitValue), eType)))
   }
   override def addConversion(unitValue: (Array[Byte], Int)): PoolFees = {
-    addValue(normalValue(unitValue))
+    addValue(defaultValue(unitValue))
   }
 
   override def removeValue(unitValue: (Coll[Byte], Int)): PoolFees = {
@@ -34,7 +34,7 @@ class PoolFees(normalValue: Coll[(Coll[Byte], Int)]) extends RegValue[(Coll[Byte
   }
 
   override def removeConversion(unitValue: (Array[Byte], Int)): PoolFees = {
-    removeValue(normalValue(unitValue))
+    removeValue(defaultValue(unitValue))
   }
 
   override def getValue(idx: Int): (Coll[Byte], Int) = {
@@ -48,8 +48,7 @@ class PoolFees(normalValue: Coll[(Coll[Byte], Int)]) extends RegValue[(Coll[Byte
 }
 
 object PoolFees extends RegCompanion[(Coll[Byte], Int), (Array[Byte], Int)] {
-  override val eType: ErgoType[(Coll[Byte], Int)] = ErgoType.pairType[Coll[Byte], Int]
-  (ErgoType.collType(ErgoType.byteType()), ErgoType.integerType())
+  override val eType: ErgoType[(Coll[Byte], Int)] = ErgoType.pairType[Coll[Byte], Int](ErgoType.collType(ErgoType.byteType()), ErgoType.integerType())
 
   override def defaultValue(unitValue: (Array[Byte], Int)): (Coll[Byte], Int) = {
     (newColl(unitValue._1, ErgoType.byteType()), unitValue._2)

@@ -41,7 +41,7 @@ class BytesColl(normalValue: Coll[Byte]) extends RegValue[Byte, Byte] {
   }
 
   override def getValue(idx: Int): Byte = {
-    normalValue.getOrElse(idx, null)
+    normalValue.getOrElse(idx, 0)
   }
 
   override def getConversion(idx: Int): Byte = {

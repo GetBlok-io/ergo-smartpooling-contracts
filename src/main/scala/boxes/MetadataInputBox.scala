@@ -15,7 +15,7 @@ import scala.math.BigInt
  */
 class MetadataInputBox(inputBox: InputBox) extends InputBox{
   final val asInput = this.inputBox
-  val shareConsensus: ShareConsensus = new ShareConsensus(this.getRegisters.get(0).getValue.asInstanceOf[Coll[(Coll[Byte], Long)]])
+  val shareConsensus: ShareConsensus = new ShareConsensus(this.getRegisters.get(0).getValue.asInstanceOf[Coll[(Coll[Byte], Coll[Long])]])
   val memberList: MemberList = new MemberList(this.getRegisters.get(1).getValue.asInstanceOf[Coll[(Coll[Byte], Coll[Byte])]])
   val poolFees: PoolFees = new PoolFees(this.getRegisters.get(2).getValue.asInstanceOf[Coll[(Coll[Byte], Int)]])
   val poolInfo: PoolInfo = new PoolInfo(this.getRegisters.get(3).getValue.asInstanceOf[Coll[Long]])
@@ -38,7 +38,7 @@ class MetadataInputBox(inputBox: InputBox) extends InputBox{
 
   def toJson(prettyPrint: Boolean, formatJson: Boolean): String = asInput.toJson(prettyPrint, formatJson)
 
-  def getRawMetaDataInfo: (Coll[(Coll[Byte], Long)], Coll[(Coll[Byte], Coll[Byte])], Coll[(Coll[Byte], Int)], Coll[Long], Coll[(Coll[Byte], Coll[Byte])]) = {
+  def getRawMetaDataInfo: (Coll[(Coll[Byte], Coll[Long])], Coll[(Coll[Byte], Coll[Byte])], Coll[(Coll[Byte], Int)], Coll[Long], Coll[(Coll[Byte], Coll[Byte])]) = {
     (shareConsensus.getNormalValue, memberList.getNormalValue, poolFees.getNormalValue, poolInfo.getNormalValue, poolOps.getNormalValue)
   }
 
@@ -82,11 +82,12 @@ class MetadataInputBox(inputBox: InputBox) extends InputBox{
     Metadata Box Info:
     - Id: ${this.getId.toString}
     - Value: ${this.getValue.toDouble / Parameters.OneErg.toDouble} ERG
+    - SmartPool NFT: ${if(this.getTokens.size() == 1){this.getTokens.get(0).getId}else{"None"}}
     - Epoch: ${this.getCurrentEpoch}
     - Epoch Height: ${this.getCurrentEpochHeight}
     - Creation Height: ${this.getCreationHeight}
     - Creation ID: ${this.getCreationBox}
-    - Last Consensus: ${this.getShareConsensus.getConversionValue.mkString("Array(", ", ", ")")}
+    - Last Consensus: ${this.getShareConsensus.getConversionValue.map { (sc: (Array[Byte], Array[Long])) => (sc._1.mkString("Array(", ", ", ")"), sc._2.mkString("Array(", ", ", ")")) }.mkString("Array(", ", ", ")")}
     - Members List: ${this.getMemberList.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Fees: ${this.getPoolFees.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Ops: ${this.getPoolOperators.getConversionValue.mkString("Array(", ", ", ")")}

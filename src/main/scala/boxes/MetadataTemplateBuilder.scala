@@ -1,6 +1,5 @@
 package boxes
 
-import contracts.SpType
 import org.ergoplatform.appkit._
 import special.collection.Coll
 import values.{MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}

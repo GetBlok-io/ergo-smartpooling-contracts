@@ -41,7 +41,7 @@ class PoolInfo(normalValue: Coll[Long]) extends RegValue[Long, Long] {
   }
 
   override def getValue(idx: Int): Long = {
-    normalValue.getOrElse(idx, null)
+    normalValue.getOrElse(idx, 0L)
   }
 
   override def getConversion(idx: Int): Long = {

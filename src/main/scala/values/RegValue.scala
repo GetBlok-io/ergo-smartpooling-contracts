@@ -21,13 +21,13 @@ trait RegValue[A, B] {
   def getErgoValue: ErgoValue[Coll[A]]
   def getErgoType: ErgoType[A]
 
-  def append(otherNormalValues: Coll[A]): _ >: RegValue[A, B]
+  def append(otherNormalValues: Coll[A]): RegValue[A, B]
 
-  def addValue(unitValue: A): _ >: RegValue[A, B]
-  def addConversion(unitValue: B): _ >: RegValue[A, B]
+  def addValue(unitValue: A): RegValue[A, B]
+  def addConversion(unitValue: B): RegValue[A, B]
 
-  def removeValue(unitValue: A): _ >: RegValue[A, B]
-  def removeConversion(unitValue: B): _ >: RegValue[A, B]
+  def removeValue(unitValue: A): RegValue[A, B]
+  def removeConversion(unitValue: B): RegValue[A, B]
 
   def getValue(idx: Int): A
   def getConversion(idx: Int): B

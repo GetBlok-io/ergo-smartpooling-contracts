@@ -213,28 +213,7 @@ is inherently spent in the consensus transaction. Unlike the member payouts
 and pool fees, this means that the Command Box directly affects whether or not
 a valid consensus transaction may occur. 
 
-The Command Box is technically an optional payment and it is not a requirement that
-the money it holds is redistributed. For example, if we have a SmartPool with a
-Pool Operator defined as a simple P2PK address's propBytes, what happens with
-the Command Box's funds is up to the Pool Operator. This also means that each
-consensus transaction would have to be signed by the pool operator, since that is
-a requirement for any P2PK script. If the Pool Operator wished, they could simply
-create an Output Box in each consensus transaction that has the same value as the 
-Command Box and is also protected by their P2PK script. In this way, no funds are injected 
-into the SmartPool.
 
-When funds *are* injected using the command box, the possibilities are endless.
-Imagine a SmartPool which wishes to add an automatic block bounty, where the miner who finds
-the block gets an extra reward of 5 ERG. We may create a Command Box script that takes some miner's P2PK script bytes as an input
-and requires that a transaction spending the Command Box has an output box of 5 ERG protected by the miner's script.
-When a block is found, we may pass the block finder's propBytes to the Command Box script and create
-a Command Box with a value of 5 ERG. The SmartPool's consensus transaction will now require that a
-box with the Block Bounty of 5 ERG be created, in addition to the other boxes created during a standard
-consensus. The Block Bounty box will be protected by the Block Finder's P2PK script, as was specified
-in the Command Box Contract.
-
-We may also use the command box to create a SmartPool governed by vote. Let us say we have command box
-that requires 50% of the members in the Metadata Box to submit a vote. We define a vote to be some
 
 
 ## This project is made using Ergo-Appkit

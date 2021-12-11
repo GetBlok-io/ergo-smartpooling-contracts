@@ -19,7 +19,7 @@ class MetadataOutBox(outBox: OutBox, shareConsensus: ShareConsensus, memberList:
 
   def convertToInputWith(txId: String, boxIdx: Short) = new MetadataInputBox(asOutBox.convertToInputWith(txId, boxIdx))
 
-  def getRawMetaDataInfo: (Coll[(Coll[Byte], Long)], Coll[(Coll[Byte], Coll[Byte])], Coll[(Coll[Byte], Int)], Coll[Long], Coll[(Coll[Byte], Coll[Byte])]) = {
+  def getRawMetaDataInfo: (Coll[(Coll[Byte], Coll[Long])], Coll[(Coll[Byte], Coll[Byte])], Coll[(Coll[Byte], Int)], Coll[Long], Coll[(Coll[Byte], Coll[Byte])]) = {
     (shareConsensus.getNormalValue, memberList.getNormalValue, poolFees.getNormalValue, poolInfo.getNormalValue, poolOps.getNormalValue)
   }
 
@@ -66,7 +66,7 @@ class MetadataOutBox(outBox: OutBox, shareConsensus: ShareConsensus, memberList:
     - Epoch Height: ${this.getCurrentEpochHeight}
     - Creation Height: ${this.getCreationHeight}
     - Creation ID: ${this.getCreationBox}
-    - Last Consensus: ${this.getShareConsensus.getConversionValue.mkString("Array(", ", ", ")")}
+    - Last Consensus: ${this.getShareConsensus.getConversionValue.map { (sc: (Array[Byte], Array[Long])) => (sc._1.mkString("Array(", ", ", ")"), sc._2.mkString("Array(", ", ", ")")) }.mkString("Array(", ", ", ")")}
     - Members List: ${this.getMemberList.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Fees: ${this.getPoolFees.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Ops: ${this.getPoolOperators.getConversionValue.mkString("Array(", ", ", ")")}
