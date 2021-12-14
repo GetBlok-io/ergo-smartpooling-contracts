@@ -56,74 +56,23 @@ available to analyze on the blockchain. Since each metadata box will contain inf
 last consensus, we will have a complete payment history stored on the Blockchain for any third-party 
 to verify a SmartPool's operation.
 
-## The Metadata Box
+## [The Metadata Box](docs/MetadataBox.MD)
 The Metadata Box is the box that stores information about the current SmartPool on-chain.
 Each Metadata Box will hold key information in its registers that allows anybody to query
-information about the SmartPool by searching for it on the Ergo Blockchain.
+information about the SmartPool by searching for it on the Ergo Blockchain. Metadata boxes keep
+information relating to the SmartPool, it's members, fees, operators, and the last share consensus
+that created the metadata box. The metadata box also holds the Smart Pool NFT, which allows
+the holding box to distinguish between SmartPool's and also gives an easy way for third parties
+to search up history about a given SmartPool.
 
-**R4** Of the Metadata Box holds information about the last consensus. We define a consensus
-to be a mapping that takes the propositional bytes of some script protecting a box, and maps
-it to the number of shares that that box provided. Each consensus value is of type:
-```scala
-(Coll[Byte], Long)
-```
-**R4** therefore stores the information
-that was used to determine each SmartPool member's payment during the last epoch.
-By storing this information on-chain, a SmartPool's payments can be monitored and validated.
-This information will be important when share-verification is acheived using oracle pools, as per
-the [original ErgoSmartPool's design](https://github.com/WilfordGrimley/ErgoSmartPools
-).
+The metadata box may only be spent to create a new metadata box. In this way, we ensure that
+there is an unbroken line of metadata boxes that transfer a certain SmartPool NFT from Epoch 0
+all the way to the current epoch. The metadata box must also be spent with a command box. The reason
+for this is that the command box is used as a template to copy registers from for the next metadata box.
+The command box used must have it's propositonal bytes stored in the pool operators box in order to be spent.
 
-**R5** Of the Metadata Box holds the member list. We define a SmartPool member to be
-a 
-```scala
-(Coll[Byte], Coll[Byte])
-```
-Therefore, The member list is just a collection that maps the propositional
-bytes of some member's box to that member's "name". A name here is just any collection of bytes.
-The SmartPool script does not perform any verification about what a name constitutes, just
-that it is mapped to the propositional bytes of some member's script. While there is no verification,
-we propose a standard such that the "name" field simply be parsed as a String representing the address
-associated with the proposition bytes in field one of the member.
-
-**R6** Of the Metadata Box represents the Pool Fees list. The Pool Fees list is a
-```scala
-Coll[(Coll[Byte], Int)]
-```
-that maps the proposition bytes of some script to an integer. The integer provided represents
-some percentage of the total pool payout that is removed before payout calculations are done.
-The minimum pool fee is 0.1% of the total pool payout. That means that each pool fee may be represented in ERG as:
-```scala
-((poolFee._2 * TOTAL_INPUTS_VALUE)/1000))
-```
-
-**R7** Of the Metadata box represents the Pool Info. The Pool Info list is a collection
-of integers that stores important information about the SmartPool. There are only
-three required fields in the Pool Info collection, any additional information may be
-added and parsed according to the SmartPool operator.
-
-Element 0 of the Pool Info list holds the current pool epoch. An epoch is defined
-as one payout cycle.
-
-Element 1 of the Pool Info list holds the epoch height. The epoch height represents the height
-that the current epoch began. This height must be less than or equal to the current height,
-and greater than the last epoch height.
-
-Element 2 of the Pool Info list holds the creation height. This is the height that epoch
-0 of the SmartPool began in. This value must be preserved during every payout cycle.
-
-Elements 3+ of the Pool Info list are not defined or verified and may be set to be any value.
-
-**R8** Of the Metadata Box represents the Pool Operators collection. The Pool Operators collection
-is a public list of Pool Operators that are able to send commands to the SmartPool. 
-We define a pool operator to be some:
-```scala
-(Coll[Byte], Coll[Byte])
-```
-where field 1 represents the propositional bytes of some script and field 2 represents the "name"
-of the pool operator. Like with the members list, the "name" field here is not explicitly verified.
-What the Pool Operators truly represent is a collection of valid propositional bytes for any command
-box .
+The metadata box does not require that a holding box be present in the transaction. This allows pool operators to change settings
+of the Smart Pool. Because of the holding box's contract, we are ensured that any money sent to it MUST be distributed to it's members properly. 
 
 ## The Command Box
 The Command Box will have the same register layout as the Metadata Box. This is because
@@ -145,18 +94,14 @@ that must evaluate to true before performing any consensus transaction.
 Another important thing to note about the Command Box is that it's value is not calculated to be a part
 of the total rewards. This allows for even more freedom in how the Command Box's funds is used.
 
-## The Holding Box
+## [The Holding Box](docs/HoldingBox.MD)
 The Holding Box has no specific registers. Its main jobs are to verify that it is being spent
 with a Metadata and Command Box, and that the transactions outputs follow the consensus laid out
 in R4 of the Command Box and the Pool Fees in R6 of the Metadata Box.
 
-Each holding box script is tied to a specific box id on creation that represents some
-metadata box. The holding contract ensures that holding boxes may only be spent if 
-`INPUTS(0)` represents a box with the given id, and if that box has 
-the proposition bytes of a metadata box. Although this may complicate some
-of the offchain code(requires changing of holding address after every payout),
-it ensures the security of the protocol along with the open and modular nature
-of it.
+Each holding box script is tied to a specific smart pool id on creation that represents some
+smart pool NFT. The holding contract ensures that holding boxes may only be spent if 
+`INPUTS(0)` represents a metadaat box with the given id. 
 
 # The Consensus Transaction
 This is the main transaction that distributes payouts to each SmartPool Member.
