@@ -1,13 +1,13 @@
 package test
 
 
-import boxes.{MetadataInputBox, MetadataOutBox, MetadataTemplateBuilder}
+import boxes.{MetadataInputBox, MetadataOutBox, MetadataOutputBuilder}
 import contracts._
 import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import contracts.MetadataContract
 import org.ergoplatform.appkit.config.{ApiConfig, ErgoNodeConfig, ErgoToolConfig}
-import values.{MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
+import registers.{MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
 import scala.collection.JavaConverters._
 
 object SmartPool_Test {
@@ -27,7 +27,7 @@ object SmartPool_Test {
   val poolMiner = Address.create("3WwtfPaghPbuPtYQs4Uj9QooYsPYkEZsESjmcR49MB4fs5kEshX7")
   val creationMetadataID = ErgoId.create("8a813c853c118857d7dd6f03fafb50a1549b7451bc7a9494fab61da293039f28")
 
-  val currentMetadataID = "8a813c853c118857d7dd6f03fafb50a1549b7451bc7a9494fab61da293039f28"
+  val currentMetadataID = "707d4739c8388cb45f0cf5323cf5566cda21172c26f09d6016b6691078c94998"
   var currentCommandID = "7db6868062e196afd13e63298c1665110225870854bce61ae4b3cb1da44e22e7"
 
   def main(args: Array[String]): Unit = {
@@ -48,10 +48,11 @@ object SmartPool_Test {
       viewMetadataInfo(ctx, currentCommandID)
       //initialMetadataTx(ctx, poolOpSecret)
       //distributionTxWithoutHolding(ctx, poolOpSecret, currentMetadataID, currentCommandID)
-      //createModifiedCommandBox(ctx, poolOpSecret, currentMetadataID)
-      createDefaultCommandBox(ctx, poolOpSecret, currentMetadataID)
+      createModifiedCommandBox(ctx, poolOpSecret, currentMetadataID)
+      //createDefaultCommandBox(ctx, poolOpSecret, currentMetadataID)
       //miningRewardsToHolding(ctx, rewardsSecret, poolOpSecret, creationMetadataID)
       //distributionTxWithHolding(ctx, poolOpSecret, currentMetadataID, currentCommandID)
+
     })
 
   }
@@ -59,7 +60,7 @@ object SmartPool_Test {
     val rewardsSender = Address.createEip3Address(0, NetworkType.TESTNET, rewardsSecret, SecretString.empty())
     val rewardsProver = ctx.newProverBuilder().withMnemonic(rewardsSecret, SecretString.empty()).withEip3Secret(0).build()
     val poolOperator = Address.createEip3Address(0, NetworkType.TESTNET, creatorSecret, SecretString.empty())
-    val metadataContract = MetadataContract.generateMetadataContract(ctx, poolOperator)
+    val metadataContract = MetadataContract.generateMetadataContract(ctx)
     val metadataAddress = generateContractAddress(metadataContract, NetworkType.TESTNET)
     val holdingContract = SimpleHoldingContract.generateHoldingContract(ctx, metadataAddress, smartPoolId)
     val holdingAddress = generateContractAddress(holdingContract, NetworkType.TESTNET)
@@ -100,7 +101,7 @@ object SmartPool_Test {
     val poolOpProver = ctx.newProverBuilder().withMnemonic(creatorSecret, SecretString.empty()).withEip3Secret(0).build();
     println(s"Pool Operator Address: ${poolOperator}")
 
-    val metadataContract = MetadataContract.generateMetadataContract(ctx, poolOperator)
+    val metadataContract = MetadataContract.generateMetadataContract(ctx)
 
     println(s"Sending ${initValue} ERG to create new Metadata Box\n")
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
@@ -139,7 +140,7 @@ object SmartPool_Test {
    * @return Id of command box
    */
   def createDefaultCommandBox(ctx: BlockchainContext, creatorSecret: SecretString, metadataBoxID: String): String = {
-    val metadataBox = new MetadataInputBox(ctx.getBoxesById(metadataBoxID).head)
+    val metadataBox = new MetadataInputBox(ctx.getBoxesById(metadataBoxID).head, creationMetadataID)
 
     val poolOperator = Address.createEip3Address(0, NetworkType.TESTNET, creatorSecret, SecretString.empty())
     val poolOpProver = ctx.newProverBuilder().withMnemonic(creatorSecret, SecretString.empty()).withEip3Secret(0).build();
@@ -150,7 +151,7 @@ object SmartPool_Test {
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
     val outB = txB.outBoxBuilder()
 
-    // If epoch is 0, lets make sure to explicitly fill epoch 1 with valid values, since dummy values were used before.
+    // If epoch is 0, lets make sure to explicitly fill epoch 1 with valid registers, since dummy registers were used before.
     val commandBox =
     if(metadataBox.getCurrentEpoch == 0) {
       val newConsensus = ShareConsensus.fromConversionValues(Array((poolMiner.getErgoAddress.script.bytes, Array(100L, (1*Parameters.OneErg), 0L))))
@@ -187,7 +188,7 @@ object SmartPool_Test {
   }
 
   def createModifiedCommandBox(ctx: BlockchainContext, creatorSecret: SecretString, metadataBoxID: String) = {
-    val metadataBox = new MetadataInputBox(ctx.getBoxesById(metadataBoxID).head)
+    val metadataBox = new MetadataInputBox(ctx.getBoxesById(metadataBoxID).head, creationMetadataID)
 
     val poolOperator = Address.createEip3Address(0, NetworkType.TESTNET, creatorSecret, SecretString.empty())
     val poolOpProver = ctx.newProverBuilder().withMnemonic(creatorSecret, SecretString.empty()).withEip3Secret(0).build();
@@ -197,10 +198,10 @@ object SmartPool_Test {
     println(s"Sending ${commandValue} ERG to create new Command Box under Pool Operator address\n")
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
     val outB = txB.outBoxBuilder()
-    val smartPoolId = metadataBox.getTokens.get(0).getId
+    val smartPoolId = creationMetadataID
 
     val commandBox = MetadataContract.buildNextCommandOutput(outB, metadataBox, commandContract, commandValue, ctx.getHeight)
-    val metadataContract = MetadataContract.generateMetadataContract(ctx, poolOperator)
+    val metadataContract = MetadataContract.generateMetadataContract(ctx)
     val metadataAddress = generateContractAddress(metadataContract, NetworkType.TESTNET)
     val holdingContract = SimpleHoldingContract.generateHoldingContract(ctx, metadataAddress, smartPoolId)
     val holdingAddress = generateContractAddress(holdingContract, NetworkType.TESTNET)
@@ -243,15 +244,15 @@ object SmartPool_Test {
     val poolOpProver = ctx.newProverBuilder().withMnemonic(creatorSecret, SecretString.empty()).withEip3Secret(0).build();
 
     val inputBoxes = ctx.getBoxesById(metadataBoxId, commandBoxId)
-    val commandBox = new MetadataInputBox(inputBoxes(1))
-    val metadataBox = new MetadataInputBox(inputBoxes(0))
+    val commandBox = new MetadataInputBox(inputBoxes(1), creationMetadataID)
+    val metadataBox = new MetadataInputBox(inputBoxes(0), creationMetadataID)
     val smartPoolId =
       if(metadataBox.getCurrentEpoch == 0){
         metadataBox.getId
       }else{
         metadataBox.getTokens.get(0).getId
       }
-    val metadataContract = MetadataContract.generateMetadataContract(ctx, poolOperator)
+    val metadataContract = MetadataContract.generateMetadataContract(ctx)
 
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
     val outB = txB.outBoxBuilder()
@@ -289,8 +290,8 @@ object SmartPool_Test {
 
 
     val initBoxes = ctx.getBoxesById(metadataBoxId, commandBoxId)
-    val metadataBox = new MetadataInputBox(initBoxes(0))
-    val commandBox = new MetadataInputBox(initBoxes(1))
+    val metadataBox = new MetadataInputBox(initBoxes(0), creationMetadataID)
+    val commandBox = new MetadataInputBox(initBoxes(1), creationMetadataID)
 
     val smartPoolId =
       if(metadataBox.getCurrentEpoch == 0){
@@ -299,7 +300,7 @@ object SmartPool_Test {
         metadataBox.getTokens.get(0).getId
       }
     println(smartPoolId)
-    val metadataContract = MetadataContract.generateMetadataContract(ctx, poolOperator)
+    val metadataContract = MetadataContract.generateMetadataContract(ctx)
     val metadataAddress = generateContractAddress(metadataContract, NetworkType.TESTNET)
     val holdingContract = SimpleHoldingContract.generateHoldingContract(ctx, metadataAddress, smartPoolId)
     val holdingAddress = generateContractAddress(holdingContract, NetworkType.TESTNET)
@@ -336,7 +337,7 @@ object SmartPool_Test {
 
   def viewMetadataInfo(ctx: BlockchainContext, boxId: String): String = {
     val inputBox = ctx.getBoxesById(boxId).head
-    val metadataBox = new MetadataInputBox(inputBox)
+    val metadataBox = new MetadataInputBox(inputBox, creationMetadataID)
     println(metadataBox)
     metadataBox.getId.toString
   }

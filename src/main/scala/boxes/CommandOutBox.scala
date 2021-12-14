@@ -1,26 +1,23 @@
 package boxes
 
 import org.ergoplatform.appkit._
-import sigmastate.Values
-import special.collection.Coll
 import registers._
+import special.collection.Coll
 
-import java.{lang, util}
+import java.lang
 
 /**
- * Wrapper class that wraps output boxes as metadata boxes / command boxes
+ * Wrapper class that wraps output boxes as command boxes
  *
- * @param outBox Out box to wrap as metadata box / command box
+ * @param outBox Out box to wrap as command box
  */
-class MetadataOutBox(outBox: OutBox, metadataRegisters: MetadataRegisters, smartPoolId: ErgoId)
-                     extends OutputTemplate(outBox, metadataRegisters) {
+class CommandOutBox(outBox: OutBox, metadataRegisters: MetadataRegisters)
+                    extends OutputTemplate(outBox, metadataRegisters){
 
-  def getSmartPoolId: ErgoId = this.smartPoolId
   override def toString: String = {
     val asString = s"""
-    Metadata Output Template Info:
+    Command Output Info:
     - Value: ${this.getValue.toDouble / Parameters.OneErg.toDouble} ERG
-    - SmartPool NFT: ${this.getSmartPoolId}
     - Epoch: ${this.getCurrentEpoch}
     - Epoch Height: ${this.getCurrentEpochHeight}
     - Creation Height: ${this.getCreationHeight}

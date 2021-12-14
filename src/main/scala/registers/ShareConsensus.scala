@@ -1,4 +1,4 @@
-package values
+package registers
 
 import org.ergoplatform.appkit.{ErgoType, ErgoValue}
 import special.collection.Coll
@@ -50,6 +50,7 @@ class ShareConsensus(normalValue: Coll[(Coll[Byte], Coll[Long])]) extends RegVal
   override def getConversion(idx: Int): (Array[Byte], Array[Long]) = {
     convertValue(getValue(idx))
   }
+
 
 
 

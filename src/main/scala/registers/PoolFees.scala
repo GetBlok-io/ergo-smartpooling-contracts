@@ -1,4 +1,4 @@
-package values
+package registers
 
 import org.ergoplatform.appkit.{ErgoType, ErgoValue}
 import special.collection.Coll

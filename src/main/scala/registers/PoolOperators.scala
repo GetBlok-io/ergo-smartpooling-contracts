@@ -1,11 +1,12 @@
-package values
+package registers
 
 import org.ergoplatform.appkit.{ErgoType, ErgoValue}
 import special.collection.Coll
+
 import java.nio.charset.StandardCharsets
 
-class MemberList(normalValue: Coll[(Coll[Byte], Coll[Byte])]) extends RegValue[(Coll[Byte], Coll[Byte]), (Array[Byte], String)] {
-  import MemberList._
+class PoolOperators(normalValue: Coll[(Coll[Byte], Coll[Byte])]) extends RegValue[(Coll[Byte], Coll[Byte]), (Array[Byte], String)] {
+  import PoolOperators._
 
   override val nValue: Coll[(Coll[Byte], Coll[Byte])] = normalValue
 
@@ -23,23 +24,22 @@ class MemberList(normalValue: Coll[(Coll[Byte], Coll[Byte])]) extends RegValue[(
 
   override def getErgoType: ErgoType[(Coll[Byte], Coll[Byte])] = eType
 
-
-  override def append(otherNormalValues: Coll[(Coll[Byte], Coll[Byte])]): MemberList = {
-    new MemberList(this.normalValue.append(otherNormalValues))
+  override def append(otherNormalValues: Coll[(Coll[Byte], Coll[Byte])]): PoolOperators = {
+    new PoolOperators(this.normalValue.append(otherNormalValues))
   }
 
-  override def addValue(unitValue: (Coll[Byte], Coll[Byte])): MemberList = {
-    new MemberList(this.normalValue.append(newColl(Array(unitValue), eType)))
+  override def addValue(unitValue: (Coll[Byte], Coll[Byte])): PoolOperators = {
+    new PoolOperators(this.normalValue.append(newColl(Array(unitValue), eType)))
   }
-  override def addConversion(member: (Array[Byte], String)): MemberList = {
+  override def addConversion(member: (Array[Byte], String)): PoolOperators = {
     addValue(defaultValue(member))
   }
 
-  override def removeValue(member: (Coll[Byte], Coll[Byte])): MemberList = {
-    new MemberList(this.normalValue.filter(memVal => memVal != member))
+  override def removeValue(member: (Coll[Byte], Coll[Byte])): PoolOperators = {
+    new PoolOperators(this.normalValue.filter(memVal => memVal != member))
   }
 
-  override def removeConversion(member: (Array[Byte], String)): MemberList = {
+  override def removeConversion(member: (Array[Byte], String)): PoolOperators = {
     removeValue(defaultValue(member))
   }
 
@@ -54,30 +54,30 @@ class MemberList(normalValue: Coll[(Coll[Byte], Coll[Byte])]) extends RegValue[(
 
 }
 
-object MemberList extends RegCompanion[(Coll[Byte], Coll[Byte]), (Array[Byte], String)] {
-  override val eType: ErgoType[(Coll[Byte], Coll[Byte])] = ErgoType.pairType[Coll[Byte], Coll[Byte]](ErgoType.collType(ErgoType.byteType()), ErgoType.collType(ErgoType.byteType()))
+object PoolOperators extends RegCompanion[(Coll[Byte], Coll[Byte]), (Array[Byte], String)] {
+
+  override val eType: ErgoType[(Coll[Byte], Coll[Byte])] =
+    ErgoType.pairType[Coll[Byte], Coll[Byte]](ErgoType.collType(ErgoType.byteType()), ErgoType.collType(ErgoType.byteType()))
 
   override def defaultValue(member: (Array[Byte], String)): (Coll[Byte], Coll[Byte]) = {
     (newColl(member._1, ErgoType.byteType()), newColl(member._2.getBytes(StandardCharsets.US_ASCII), ErgoType.byteType()))
   }
-
   override def convertValue(unitValue: (Coll[Byte], Coll[Byte])): (Array[Byte], String) = {
     (unitValue._1.toArray, new String(unitValue._2.toArray, StandardCharsets.US_ASCII))
   }
 
+  override def fromNormalValues(normalValue: Coll[(Coll[Byte], Coll[Byte])]): PoolOperators = new PoolOperators(normalValue)
 
-  override def fromNormalValues(normalValue: Coll[(Coll[Byte], Coll[Byte])]): MemberList = new MemberList(normalValue)
-
-  override def fromConversionValues(conversionValue: Array[(Array[Byte], String)] ): MemberList = {
-    val propBytesConverted = conversionValue.map{
+  override def fromConversionValues(conversionValue: Array[(Array[Byte], String)] ): PoolOperators = {
+    val bytesConverted = conversionValue.map{
       (memVal: (Array[Byte], String)) =>
         defaultValue(memVal)
     }
-    new MemberList(newColl(propBytesConverted, eType))
+    new PoolOperators(newColl(bytesConverted, eType))
   }
 
-  override def fromErgoValues(ergoValue: ErgoValue[Coll[(Coll[Byte], Coll[Byte])]]): MemberList = {
+  override def fromErgoValues(ergoValue: ErgoValue[Coll[(Coll[Byte], Coll[Byte])]]): PoolOperators = {
     val fromErgVal = ergoValue.getValue
-    new MemberList(fromErgVal)
+    new PoolOperators(fromErgVal)
   }
 }

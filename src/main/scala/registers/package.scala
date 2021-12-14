@@ -1,9 +1,9 @@
 import org.ergoplatform.appkit.ErgoType
 import special.collection.Coll
 
-package object values {
+package object registers {
   /**
-   * This package holds classes used to represent various types and values referenced throughout the rest
+   * This registers holds classes used to represent various types and registers referenced throughout the rest
    * of the project
    */
   /**

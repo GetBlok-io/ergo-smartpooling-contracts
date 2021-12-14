@@ -13,8 +13,8 @@ metadata box.
 The holding box is the address that mining rewards are sent to. Once sent to this address, the ERG is held
 in the holding address until a valid distribution tx occurs. Because the holding contract is separate
 from the consensus contract, we may use any method of distribution by changing the holding script.
-The default holding script pays proportionally to the share values held in the holding box. This allows
-for PROP and PPLNS payment methods by supplying the correct share values to the command box during a
+The default holding script pays proportionally to the share registers held in the holding box. This allows
+for PROP and PPLNS payment methods by supplying the correct share registers to the command box during a
 distribution transaction.
 
 ## Minimum Payouts

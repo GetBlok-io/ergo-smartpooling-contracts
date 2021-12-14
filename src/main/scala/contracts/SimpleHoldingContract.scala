@@ -6,7 +6,7 @@ import org.ergoplatform.appkit.impl.ErgoTreeContract
 import scorex.crypto.hash.Blake2b256
 import special.collection.Coll
 import special.sigma.{GroupElement, SigmaProp}
-import values.{BytesColl, ShareConsensus}
+import registers.{BytesColl, ShareConsensus}
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 

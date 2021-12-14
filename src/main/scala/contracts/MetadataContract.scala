@@ -1,11 +1,13 @@
 package contracts
 
-import boxes.{MetadataInputBox, MetadataOutBox, MetadataTemplateBuilder}
+import app.AppParameters
+import boxes.{MetadataInputBox, MetadataOutBox, MetadataOutputBuilder}
 import org.ergoplatform.appkit._
 import scorex.crypto.hash.Blake2b256
 import special.collection.Coll
 import special.sigma.SigmaProp
-import values.{BytesColl, MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
+import registers.{BytesColl, MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
+import sigmastate.Values
 
 import java.nio.charset.StandardCharsets
 import scala.math.BigInt
@@ -14,53 +16,9 @@ import scala.math.BigInt
 //TODO Fully integrate smart pool nft
 //TODO Fully change into polymorphic contract like metadata
 //TODO ************************
+
+
 object MetadataContract {
-  /**
-   * This is the metadata contract, representing the metadata box associated with the stratum holding contract.
-   *
-   *
-   * R4 Of the metadata box holds a modified version of the last share consensus for this subpool.
-   * -- A share consensus is some Coll[(Coll[Byte], Long)] that maps propBytes to share numbers.
-   * R5 Of the metadata box holds the list of members associated with this subpool.
-   * -- In the Stratum Smart Pool, A member is defined as some (Coll[Byte], Coll[Byte])
-   * ---- member._1 are the proposition bytes for some box. This may be a box protected by a subpool or a box protected.
-   * ---- member._2 represents the name of the member. This may be displayed
-   * -- This flexibility allows us to add any address to the smart pool, whether that be a normal P2PK or a P2S.
-   * -- we can therefore make subpools under the smart pool to allow multiple levels of distribution.
-   * -- this solution may be brought to subpools in the future to allow multiple levels of subpooling.
-   *
-   * R6 Is a collection of pool fees.
-   * -- Each pool fee is some (Coll[Byte], Int) representing some boxes propBytes that receives the Integer value
-   * -- divided by 1000 and multiplied by the total transaction value.
-   *
-   * R7 Is a Coll[Long] representing Pool Information.
-   * -- Element 0 of the collection represents the current Pool Epoch. This value must increase in the spending Tx.
-   * -- Element 1 of the collection represents the height that this Epoch started.
-   * -- Element 2 of the collection represents the height the SmartPool was created.
-   * -- Element 3 of the collection represents the byte of array of the creation box serialized as a long
-   * -- Element 4+ are not looked at or verified. This information may be stored and parsed according to the smart pool owner.
-   *
-   * -- * R8 is a collection members representing the pool operators. Each pool operator may send commands
-   * -- to the pool
-   *
-   * A metadata box is only considered valid if it holds proper values inside its registers. Invalid metadata boxes
-   * may be spent by anybody.
-   *
-   * If a metadata box is valid, it may spent in a transaction to create a new metadata box. Only the metadata
-   * box itself verifies that is is valid and that the transaction has a valid layout according to the smart pool
-   * protocol. This is the metadata boxes' unique job during any consensus transaction. It verifies that
-   * input 0 is SELF and has valid registers, input 1 is some command box belonging to a pool operator. The
-   * metadata box does not attempt to verify that it is being spent with holding boxes, only that
-   * it is being spent with a command box. This allows a new holding address to be used
-   * for each metadata box.
-   * The metadata box also verifies that a new metadata box with
-   * proper registers is created in the outputs.
-   *
-   * The metadata box does not perform consensus and does not verify any outputs other than there being another
-   * valid metadata box in the output. A new valid metadata box is created using information from the old metadata box
-   * and information from the command box. The validity of the command box must therefore also be checked by the metadata
-   * box.
-   */
   val script: String =
     s"""
     {
@@ -195,22 +153,15 @@ object MetadataContract {
     }
       """.stripMargin
 
-
+  private val constants = ConstantsBuilder.create().build()
+  def generateMetadataContract(ctx: BlockchainContext): ErgoContract = {
+    val contract: ErgoContract = ctx.compileContract(constants, script)
+    contract
+  }
   /**
-   * Generates Metadata contract
-   *
-   * @param ctx         Blockchain context used to generate contract
-   * @param poolCreator Pool creator who has ability to delete metadata box
+   * Get Metadata Contract
    * @return Compiled ErgoContract of Metadata Contract
    */
-  def generateMetadataContract(ctx: BlockchainContext, poolCreator: Address): ErgoContract = {
-    val constantsBuilder = ConstantsBuilder.create().item("const_poolCreator", poolCreator.getPublicKey)
-      .build()
-    val compiledContract = ctx.compileContract(constantsBuilder, script)
-    compiledContract
-  }
-
-
   /**
    * Build a metadata box using a pool operator address, initial value
    *
@@ -219,7 +170,7 @@ object MetadataContract {
    * @param poolOp           Address of initial pool operator
    * @param initialValue     initial value to keep in metadata box
    * @param currentHeight    current height from blockchain context
-   * @return OutBox representing new metadata box with initialized values.
+   * @return OutBox representing new metadata box with initialized registers.
    */
   def buildInitialMetadata(outBoxBuilder: OutBoxBuilder, metadataContract: ErgoContract, poolOp: Address, initialValue: Long, currentHeight: Int): MetadataOutBox = {
     val poolOpBytes = poolOp.getErgoAddress.script.bytes
@@ -230,7 +181,7 @@ object MetadataContract {
     // The following info is stored: epoch 0, currentEpochHeight, creationEpochHeight,
     // and a filler value for the box id, since that info can only be obtained after the first spending tx.
     val initialPoolInfo: PoolInfo = PoolInfo.fromConversionValues(Array(0L, currentHeight.toLong, currentHeight.toLong, 0L))
-    val mTB = new MetadataTemplateBuilder(outBoxBuilder)
+    val mTB = new MetadataOutputBuilder(outBoxBuilder)
 
     mTB
       .contract(metadataContract)
@@ -260,7 +211,7 @@ object MetadataContract {
   def buildMetadataBox(outBoxBuilder: OutBoxBuilder, metadataContract: ErgoContract, initialValue: Long,
                        consensus: ShareConsensus, members: MemberList, fees: PoolFees, info: PoolInfo,
                        operators: PoolOperators, smartPoolId: ErgoId, withNFT:Boolean = false): MetadataOutBox = {
-    val mTB = new MetadataTemplateBuilder(outBoxBuilder)
+    val mTB = new MetadataOutputBuilder(outBoxBuilder)
     if(withNFT){
       val smartPoolNFT = new ErgoToken(smartPoolId, 1)
       mTB.tokens(smartPoolNFT)
@@ -283,10 +234,10 @@ object MetadataContract {
    * @param metadataOutBox out box to copy from
    * @param outBoxBuilder       outBoxBuilder to build output from
    * @param metadataContract    Contract to use for metadata-like output
-   * @return New MetadataOutBox with same exact register values
+   * @return New MetadataOutBox with same exact register registers
    */
-  def copyMetadataOutBox(outBoxBuilder: OutBoxBuilder, metadataOutBox: MetadataOutBox, metadataContract: ErgoContract, smartPoolId: ErgoId, withNFT: Boolean = false): MetadataTemplateBuilder = {
-    val mTB = new MetadataTemplateBuilder(outBoxBuilder)
+  def copyMetadataOutBox(outBoxBuilder: OutBoxBuilder, metadataOutBox: MetadataOutBox, metadataContract: ErgoContract, smartPoolId: ErgoId, withNFT: Boolean = false): MetadataOutputBuilder = {
+    val mTB = new MetadataOutputBuilder(outBoxBuilder)
     val smartPoolNFT = new ErgoToken(smartPoolId, 1)
     mTB
       .contract(metadataContract)
@@ -325,7 +276,7 @@ object MetadataContract {
     val updatedPoolInfo = poolInfo.setCurrentEpoch(newEpoch).setCurrentEpochHeight(newEpochHeight)
     val smartPoolNFT = new ErgoToken(smartPoolId, 1)
 
-    val mTB = new MetadataTemplateBuilder(outBoxBuilder)
+    val mTB = new MetadataOutputBuilder(outBoxBuilder)
     mTB
       .value(boxValue)
       .contract(metadataContract)
@@ -361,7 +312,7 @@ object MetadataContract {
     val newEpochHeight = currentHeight
     val updatedPoolInfo = poolInfo.setCurrentEpoch(newEpoch).setCurrentEpochHeight(newEpochHeight)
 
-    val mTB = new MetadataTemplateBuilder(outBoxBuilder)
+    val mTB = new MetadataOutputBuilder(outBoxBuilder)
     mTB
       .value(boxValue)
       .contract(metadataContract)
@@ -373,6 +324,5 @@ object MetadataContract {
       .setMetadata()
       .build()
   }
-
-
 }
+

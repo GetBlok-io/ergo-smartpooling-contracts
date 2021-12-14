@@ -16,7 +16,7 @@ no holding boxes.
 
 The simplest version of a command box contract may be a P2PK contract that ensures that the tx must be signed
 by the owner of the private key. In the context of the command box, this ensures that every distribution tx
-will have register values picked by the owner of the secret key.
+will have register registers picked by the owner of the secret key.
 
 ## Custom Command Boxes
 More complex versions of command contracts may also be created. The Command Box is technically an optional payment and it is not a requirement that

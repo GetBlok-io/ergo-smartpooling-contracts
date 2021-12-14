@@ -2,29 +2,17 @@ package boxes
 
 import app.AppParameters
 import org.ergoplatform.appkit._
-import org.ergoplatform.appkit.impl.ErgoTreeContract
 import sigmastate.Values
-import special.collection.Coll
-import registers.{MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
 import sigmastate.serialization.ErgoTreeSerializer
-import contracts.MetadataContract
-
-import java.nio.charset.StandardCharsets
-import java.{lang, util}
-import scala.math.BigInt
 
 /**
- * Wrapper class that wraps input boxes as metadata boxes / command boxes
- * The metadata input box ensures that token 0 is equal to the smart pool id
- * @param inputBox Input box to wrap as metadata box / command box
+ * Wrapper class that wraps input boxes as command boxes
+ * May have any contract
+ * @param inputBox Input box to wrap as command box
  */
-class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends InputTemplate(inputBox, smartPoolNFTId) {
-  assert(contract.getErgoTree.bytes)
-
-  if(this.getCurrentEpoch != 0)
-    assert(smartPoolNFTId == this.getTokens.get(0).getId)
-  else
-    assert(smartPoolNFTId == this.getId)
+class CommandInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId, commandContract: ErgoContract) extends InputTemplate(inputBox, smartPoolNFTId) {
+  // Explicitly define command contract so as to ensure input box is correct
+  override val contract: ErgoContract = commandContract
   assert(asInput.getErgoTree.bytes sameElements contract.getErgoTree.bytes)
 
   override def toString: String = {
@@ -32,7 +20,7 @@ class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends Input
     //val shareConsensusDeserialized = shareConsensus.cValue.map{(sc) => (serializer.deserializeErgoTree(sc._1), sc._2)}
     //val shareConsensusWithAddress = shareConsensusDeserialized.map{(sc) => (Address.fromErgoTree(sc._1, AppParameters.networkType), sc._2)}
     val asString = s"""
-    Metadata Box Info:
+    Command Box Info:
     - Id: ${this.getId.toString}
     - Value: ${this.getValue.toDouble / Parameters.OneErg.toDouble} ERG
     - SmartPool NFT: ${this.getSmartPoolId}
@@ -41,6 +29,7 @@ class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends Input
     - Creation Height: ${this.getCreationHeight}
     - Creation ID: ${this.getCreationBox}
     - Share Consensus: ${this.getShareConsensus.getConversionValue.map { (sc: (Array[Byte], Array[Long])) => (sc._1, sc._2.mkString("Array(", ", ", ")")) }.mkString("Array(", ", ", ")")}
+    - Share Consensus(DeSerialized): ${this.getShareConsensus.getConversionValue.map { (sc: (Array[Byte], Array[Long])) => (sc._1, sc._2.mkString("Array(", ", ", ")")) }.mkString("Array(", ", ", ")")}
     - Members List: ${this.getMemberList.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Fees: ${this.getPoolFees.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Ops: ${this.getPoolOperators.getConversionValue.mkString("Array(", ", ", ")")}
@@ -50,8 +39,10 @@ class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends Input
 
   override def equals(obj: Any): Boolean = {
     obj match {
-      case box: MetadataInputBox => this.getId.equals(box.getId)
+      case box: CommandInputBox => this.getId.equals(box.getId)
       case _ => false
     }
   }
+
+  override def getErgoTree: Values.ErgoTree = contract.getErgoTree
 }
