@@ -56,16 +56,16 @@ available to analyze on the blockchain. Since each metadata box will contain inf
 last consensus, we will have a complete payment history stored on the Blockchain for any third-party 
 to verify a SmartPool's operation.
 
-## The Metadata Box
+## [The Metadata Box](docs/MetadataBox.MD)
 The Metadata Box is the box that stores information about the current SmartPool on-chain.
 Each Metadata Box will hold key information in its registers that allows anybody to query
 information about the SmartPool by searching for it on the Ergo Blockchain.
 
 **R4** Of the Metadata Box holds information about the last consensus. We define a consensus
 to be a mapping that takes the propositional bytes of some script protecting a box, and maps
-it to the number of shares that that box provided. Each consensus value is of type:
+it to a collection of longs representing information about that miner. Each consensus value is of type:
 ```scala
-(Coll[Byte], Long)
+(Coll[Byte], Coll[Long])
 ```
 **R4** therefore stores the information
 that was used to determine each SmartPool member's payment during the last epoch.
@@ -145,18 +145,14 @@ that must evaluate to true before performing any consensus transaction.
 Another important thing to note about the Command Box is that it's value is not calculated to be a part
 of the total rewards. This allows for even more freedom in how the Command Box's funds is used.
 
-## The Holding Box
+## [The Holding Box](docs/HoldingBox.MD)
 The Holding Box has no specific registers. Its main jobs are to verify that it is being spent
 with a Metadata and Command Box, and that the transactions outputs follow the consensus laid out
 in R4 of the Command Box and the Pool Fees in R6 of the Metadata Box.
 
-Each holding box script is tied to a specific box id on creation that represents some
-metadata box. The holding contract ensures that holding boxes may only be spent if 
-`INPUTS(0)` represents a box with the given id, and if that box has 
-the proposition bytes of a metadata box. Although this may complicate some
-of the offchain code(requires changing of holding address after every payout),
-it ensures the security of the protocol along with the open and modular nature
-of it.
+Each holding box script is tied to a specific smart pool id on creation that represents some
+smart pool NFT. The holding contract ensures that holding boxes may only be spent if 
+`INPUTS(0)` represents a metadaat box with the given id. 
 
 # The Consensus Transaction
 This is the main transaction that distributes payouts to each SmartPool Member.
