@@ -12,19 +12,19 @@ object ConfigBuilder {
   final val defaultConfigName = "subpool_config.json"
 
 
-  def newCustomConfig(walletName: String, params:SubPoolParameters): SmartPoolConfig = {
-    val api = new SubPoolApiConfig(defaultURL, "")
-    val wallet = new SubPoolWalletConfig(walletName)
-    val node = new SubPoolNodeConfig(api, wallet, NetworkType.MAINNET)
-    val config = new SmartPoolConfig(node, params)
-    config
-  }
-
-  def writeConfig(fileName: String, conf: SmartPoolConfig): SmartPoolConfig = {
-    val gson = new GsonBuilder().setPrettyPrinting().create()
-    val fileWriter = new FileWriter(fileName)
-    gson.toJson(conf, fileWriter)
-    fileWriter.close()
-    conf
-  }
+//  def newCustomConfig(walletName: String, params:SubPoolParameters): SmartPoolConfig = {
+//    val api = new SubPoolApiConfig(defaultURL, "")
+//    val wallet = new SubPoolWalletConfig(walletName)
+//    val node = new SubPoolNodeConfig(api, wallet, NetworkType.MAINNET)
+//    val config = new SmartPoolConfig(node, params)
+//    config
+//  }
+//
+//  def writeConfig(fileName: String, conf: SmartPoolConfig): SmartPoolConfig = {
+//    val gson = new GsonBuilder().setPrettyPrinting().create()
+//    val fileWriter = new FileWriter(fileName)
+//    gson.toJson(conf, fileWriter)
+//    fileWriter.close()
+//    conf
+//  }
 }

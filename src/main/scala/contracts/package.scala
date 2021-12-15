@@ -21,10 +21,13 @@ package object contracts {
   def generateContractAddress(contract: ErgoContract, networkType: NetworkType): Address = {
     Address.fromErgoTree(contract.getErgoTree, networkType)
   }
-  def newColl[T](list: List[T], ergoType: ErgoType[T]): Coll[T] = {
+  def Coll[T](list: List[T], ergoType: ErgoType[T]): Coll[T] = {
     special.collection.Builder.DefaultCollBuilder.fromItems(list:_*)(ergoType.getRType)
   }
-  def newColl[T](arr: Array[T], ergoType: ErgoType[T]): Coll[T] = {
+  def Coll[T](arr: Array[T], ergoType: ErgoType[T]): Coll[T] = {
     special.collection.Builder.DefaultCollBuilder.fromArray(arr)(ergoType.getRType)
+  }
+  def Coll[T](elemList: T*)(ergoType: ErgoType[T]): Coll[T] = {
+    special.collection.Builder.DefaultCollBuilder.fromArray(Array[T](elemList))(ergoType.getRType)
   }
 }

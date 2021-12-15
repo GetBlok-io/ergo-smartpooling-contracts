@@ -1,21 +1,18 @@
 package contracts
 
 import app.AppParameters
-import boxes.{MetadataInputBox, MetadataOutBox, MetadataOutputBuilder}
+import boxes.builders.MetadataOutputBuilder
+import boxes.{CommandInputBox, MetadataInputBox, MetadataOutBox}
 import org.ergoplatform.appkit._
 import scorex.crypto.hash.Blake2b256
 import special.collection.Coll
 import special.sigma.SigmaProp
-import registers.{BytesColl, MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
+import registers.{BytesColl, MemberList, MetadataRegisters, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
 import sigmastate.Values
 
 import java.nio.charset.StandardCharsets
 import scala.math.BigInt
 
-//TODO ************************
-//TODO Fully integrate smart pool nft
-//TODO Fully change into polymorphic contract like metadata
-//TODO ************************
 
 
 object MetadataContract {
@@ -158,21 +155,18 @@ object MetadataContract {
     val contract: ErgoContract = ctx.compileContract(constants, script)
     contract
   }
+
   /**
-   * Get Metadata Contract
-   * @return Compiled ErgoContract of Metadata Contract
-   */
-  /**
-   * Build a metadata box using a pool operator address, initial value
+   * Builds genesis box for SmartPool
    *
-   * @param outBoxBuilder    OutBox builder supplied by context
+   * @param mOB    OutBox builder supplied by context
    * @param metadataContract Contract to use for output
    * @param poolOp           Address of initial pool operator
    * @param initialValue     initial value to keep in metadata box
    * @param currentHeight    current height from blockchain context
    * @return OutBox representing new metadata box with initialized registers.
    */
-  def buildInitialMetadata(outBoxBuilder: OutBoxBuilder, metadataContract: ErgoContract, poolOp: Address, initialValue: Long, currentHeight: Int): MetadataOutBox = {
+  def buildGenesisBox(mOB: MetadataOutputBuilder, metadataContract: ErgoContract, poolOp: Address, initialValue: Long, currentHeight: Int): OutBox = {
     val poolOpBytes = poolOp.getErgoAddress.script.bytes
     val initialConsensus: ShareConsensus = ShareConsensus.fromConversionValues(Array((poolOpBytes, Array(0L, (1 * Parameters.OneErg)/10 , 0L))))
     val initialMembers: MemberList = MemberList.fromConversionValues(Array((poolOpBytes, poolOp.toString)))
@@ -181,18 +175,13 @@ object MetadataContract {
     // The following info is stored: epoch 0, currentEpochHeight, creationEpochHeight,
     // and a filler value for the box id, since that info can only be obtained after the first spending tx.
     val initialPoolInfo: PoolInfo = PoolInfo.fromConversionValues(Array(0L, currentHeight.toLong, currentHeight.toLong, 0L))
-    val mTB = new MetadataOutputBuilder(outBoxBuilder)
-
-    mTB
+    val initialMetadata = new MetadataRegisters(initialConsensus, initialMembers, initialPoolFee, initialPoolInfo, initialPoolOp)
+    mOB
       .contract(metadataContract)
       .value(initialValue)
-      .setConsensus(initialConsensus)
-      .setMembers(initialMembers)
-      .setPoolFees(initialPoolFee)
-      .setPoolInfo(initialPoolInfo)
-      .setPoolOps(initialPoolOp)
-      .setMetadata()
-      .build()
+      .creationHeight(currentHeight)
+      .setMetadata(initialMetadata)
+      .buildInitial()
   }
 
   /**
@@ -208,121 +197,32 @@ object MetadataContract {
    * @param operators        Pool Operators
    * @return New MetadataOutBox with given registers and parameters set
    */
-  def buildMetadataBox(outBoxBuilder: OutBoxBuilder, metadataContract: ErgoContract, initialValue: Long,
-                       consensus: ShareConsensus, members: MemberList, fees: PoolFees, info: PoolInfo,
-                       operators: PoolOperators, smartPoolId: ErgoId, withNFT:Boolean = false): MetadataOutBox = {
-    val mTB = new MetadataOutputBuilder(outBoxBuilder)
-    if(withNFT){
-      val smartPoolNFT = new ErgoToken(smartPoolId, 1)
-      mTB.tokens(smartPoolNFT)
-    }
-    mTB
+  def buildMetadataBox(mOB: MetadataOutputBuilder, metadataContract: ErgoContract, initialValue: Long,
+                       metadataRegisters: MetadataRegisters, smartPoolId: ErgoId): MetadataOutBox = {
+    mOB
       .contract(metadataContract)
       .value(initialValue)
-      .setConsensus(consensus)
-      .setMembers(members)
-      .setPoolFees(fees)
-      .setPoolInfo(info)
-      .setPoolOps(operators)
-      .setMetadata()
+      .setSmartPoolId(smartPoolId)
+      .setMetadata(metadataRegisters)
       .build()
   }
 
-  /**
-   * Copy the contents of a metadata outbox into an unbuilt template builder.
-   *
-   * @param metadataOutBox out box to copy from
-   * @param outBoxBuilder       outBoxBuilder to build output from
-   * @param metadataContract    Contract to use for metadata-like output
-   * @return New MetadataOutBox with same exact register registers
-   */
-  def copyMetadataOutBox(outBoxBuilder: OutBoxBuilder, metadataOutBox: MetadataOutBox, metadataContract: ErgoContract, smartPoolId: ErgoId, withNFT: Boolean = false): MetadataOutputBuilder = {
-    val mTB = new MetadataOutputBuilder(outBoxBuilder)
-    val smartPoolNFT = new ErgoToken(smartPoolId, 1)
-    mTB
-      .contract(metadataContract)
-      .value(metadataOutBox.getValue)
-      .setConsensus(metadataOutBox.getShareConsensus)
-      .setMembers(metadataOutBox.getMemberList)
-      .setPoolFees(metadataOutBox.getPoolFees)
-      .setPoolInfo(metadataOutBox.getPoolInfo)
-      .setPoolOps(metadataOutBox.getPoolOperators)
-    if (withNFT)
-      mTB.tokens(smartPoolNFT)
-    mTB
-  }
 
   /**
-   * Build a standard metadata output from a distribution transaction using data from a metadata like input box.
-   * Only epoch and epoch height are updated.
-   * Can also be used to make command boxes following the default transaction.
+   * Build a MetadataOutBox with the given Smart Pool registers and Smart Pool ID
    *
-   * @param metadataTemplateBox metadata-like box to copy from
-   * @param outBoxBuilder       builder to use for metadata template
-   * @param metadataContract    metadata contract to use
-   * @param currentHeight       current blockheight from context
-   * @return MetadataOutBox for the default distribution transaction
+   * @param metadataContract ErgoContract to make metadata template box under
+   * @return New MetadataOutBox with given registers and parameters set
    */
-  def buildNextMetadataOutput(outBoxBuilder: OutBoxBuilder, metadataTemplateBox: MetadataInputBox, metadataContract: ErgoContract,
-                              boxValue: Long, smartPoolId: ErgoId): MetadataOutBox = {
-    val lastConsensus = metadataTemplateBox.getShareConsensus
-    val memberList = metadataTemplateBox.getMemberList
-    val poolFees = metadataTemplateBox.getPoolFees
-    val poolInfo = metadataTemplateBox.getPoolInfo
-    val poolOps = metadataTemplateBox.getPoolOperators
-
-    val newEpoch = metadataTemplateBox.getCurrentEpoch
-    val newEpochHeight = metadataTemplateBox.getCurrentEpochHeight
-    val updatedPoolInfo = poolInfo.setCurrentEpoch(newEpoch).setCurrentEpochHeight(newEpochHeight)
-    val smartPoolNFT = new ErgoToken(smartPoolId, 1)
-
-    val mTB = new MetadataOutputBuilder(outBoxBuilder)
-    mTB
-      .value(boxValue)
+  def buildFromCommandBox(mOB: MetadataOutputBuilder, commandBox: CommandInputBox, metadataContract: ErgoContract,
+                          value: Long, smartPoolId: ErgoId): MetadataOutBox = {
+    mOB
       .contract(metadataContract)
-      .setConsensus(lastConsensus)
-      .setMembers(memberList)
-      .setPoolFees(poolFees)
-      .setPoolInfo(updatedPoolInfo)
-      .setPoolOps(poolOps)
-      .setMetadata()
-      .tokens(smartPoolNFT)
+      .value(value)
+      .setSmartPoolId(smartPoolId)
+      .setMetadata(commandBox.getMetadataRegisters)
       .build()
   }
 
-  /**
-   * Build a standard command output from a metadata template box.
-   * Only epoch and epoch height are updated.
-   *
-   * @param metadataTemplateBox metadata-like box to copy from
-   * @param outBoxBuilder       builder to use for metadata template
-   * @param metadataContract    metadata contract to use
-   * @param currentHeight       current blockheight from context
-   * @return Command box to be used in default distribution transaction
-   */
-  def buildNextCommandOutput(outBoxBuilder: OutBoxBuilder, metadataTemplateBox: MetadataInputBox, metadataContract: ErgoContract,
-                             boxValue: Long, currentHeight: Int): MetadataOutBox = {
-    val lastConsensus = metadataTemplateBox.getShareConsensus
-    val memberList = metadataTemplateBox.getMemberList
-    val poolFees = metadataTemplateBox.getPoolFees
-    val poolInfo = metadataTemplateBox.getPoolInfo
-    val poolOps = metadataTemplateBox.getPoolOperators
-
-    val newEpoch = metadataTemplateBox.getCurrentEpoch + 1
-    val newEpochHeight = currentHeight
-    val updatedPoolInfo = poolInfo.setCurrentEpoch(newEpoch).setCurrentEpochHeight(newEpochHeight)
-
-    val mTB = new MetadataOutputBuilder(outBoxBuilder)
-    mTB
-      .value(boxValue)
-      .contract(metadataContract)
-      .setConsensus(lastConsensus)
-      .setMembers(memberList)
-      .setPoolFees(poolFees)
-      .setPoolInfo(updatedPoolInfo)
-      .setPoolOps(poolOps)
-      .setMetadata()
-      .build()
-  }
 }
 

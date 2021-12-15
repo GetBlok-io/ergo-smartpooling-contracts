@@ -1,6 +1,7 @@
 package boxes
 
 import app.AppParameters
+import boxes.models.InputTemplate
 import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import sigmastate.Values
@@ -18,14 +19,12 @@ import scala.math.BigInt
  * The metadata input box ensures that token 0 is equal to the smart pool id
  * @param inputBox Input box to wrap as metadata box / command box
  */
-class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends InputTemplate(inputBox, smartPoolNFTId) {
-  assert(contract.getErgoTree.bytes)
-
+class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends InputTemplate(inputBox) {
+  val smartPoolId: ErgoId = smartPoolNFTId
   if(this.getCurrentEpoch != 0)
     assert(smartPoolNFTId == this.getTokens.get(0).getId)
   else
     assert(smartPoolNFTId == this.getId)
-  assert(asInput.getErgoTree.bytes sameElements contract.getErgoTree.bytes)
 
   override def toString: String = {
     val serializer = new ErgoTreeSerializer()
@@ -54,4 +53,6 @@ class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends Input
       case _ => false
     }
   }
+
+  def getSmartPoolId: ErgoId = this.smartPoolId
 }

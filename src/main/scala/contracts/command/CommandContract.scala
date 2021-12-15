@@ -1,7 +1,8 @@
-package contracts
+package contracts.command
 
 import app.AppParameters
-import boxes.{CommandOutBox, CommandOutputBuilder, MetadataInputBox}
+import boxes.builders.CommandOutputBuilder
+import boxes.{CommandOutBox, MetadataInputBox}
 import org.ergoplatform.appkit._
 import registers._
 import sigmastate.Values
@@ -20,8 +21,8 @@ abstract class CommandContract(commandContract: ErgoContract) extends ErgoContra
   /**
    * Apply this command contract's effects to an unbuilt command output. Multiple command contracts
    * may apply their effects so as to get the final value of the outputted command box.
-   * @param commandOutputBuilder
-   * @return
+   * @param commandOutputBuilder initialized command output builder
+   * @return Command output builder with desired command effects on the metadata.
    */
   def applyToCommand(commandOutputBuilder: CommandOutputBuilder): CommandOutputBuilder
 }
@@ -57,11 +58,27 @@ object CommandContract {
       .contract(commandContract)
       .value(commandOutBox.getValue)
       .setMetadata(commandOutBox.getMetadataRegisters)
-    cOB
   }
 
-  def initializeOutputBuilder(cOB: CommandOutputBuilder, metadataInputBox: MetadataInputBox): CommandOutputBuilder = {
+  /**
+   * Initialize output builder using metadata input box as a register template. This function automatically increases
+   * the epoch by 1, sets the current epoch height, as well as setting the command box's value and contract.
+   * @param cOB Uninitialized command output builder
+   * @param metadataInputBox metadata box to use as a template
+   * @param currentHeight current height of blockchain
+   * @return Unbuilt command output initialized with information for next transaction.
+   */
+  def initializeOutputBuilder(cOB: CommandOutputBuilder, metadataInputBox: MetadataInputBox,
+                              currentHeight: Int, commandContract: CommandContract, value: Long): CommandOutputBuilder = {
+    val commandRegs = metadataInputBox.getMetadataRegisters
+    val newPoolInfo = commandRegs.poolInfo.setCurrentEpoch(commandRegs.poolInfo.getCurrentEpoch + 1).setCurrentEpochHeight(currentHeight)
 
+    commandRegs.poolInfo = newPoolInfo
+
+    cOB
+      .contract(commandContract)
+      .value(value)
+      .setMetadata(commandRegs)
   }
 
 

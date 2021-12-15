@@ -1,10 +1,8 @@
-package boxes
+package boxes.models
 
 import org.ergoplatform.appkit._
 import registers._
 import special.collection.Coll
-
-import java.lang
 
 /**
  * Wrapper class that wraps output boxes as metadata boxes / command boxes
@@ -28,7 +26,7 @@ abstract class OutputTemplate(outBox: OutBox, metadataRegs: MetadataRegisters) e
     (shareConsensus.getNormalValue, memberList.getNormalValue, poolFees.getNormalValue, poolInfo.getNormalValue, poolOps.getNormalValue)
   }
 
-  override def token(id: ErgoId): ErgoToken = super.token(ErgoId)
+  override def token(id: ErgoId): ErgoToken = asOutBox.token(id)
 
   /**
    * Get copy of metadata registers. Actual MetadataRegisters is not returned since OutBox is immutable
@@ -50,7 +48,7 @@ abstract class OutputTemplate(outBox: OutBox, metadataRegs: MetadataRegisters) e
     poolInfo.getCurrentEpochHeight
   }
 
-  def getCreationHeight: Long ={
+  def getCreationEpochHeight: Long = {
     poolInfo.getCreationHeight
   }
 
@@ -72,6 +70,8 @@ abstract class OutputTemplate(outBox: OutBox, metadataRegs: MetadataRegisters) e
   def getPoolOperators: PoolOperators ={
     poolOps
   }
+
+  override def getCreationHeight: Int = asOutBox.getCreationHeight
 
   override def toString: String = {
     val asString = s"""

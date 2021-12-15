@@ -38,6 +38,7 @@ trait RegValue[N, C] {
 
 /**
  * Static methods and fields for reg value
+ *
  * @tparam N Normal type of RegValue
  * @tparam C Conversion type of RegValue
  */

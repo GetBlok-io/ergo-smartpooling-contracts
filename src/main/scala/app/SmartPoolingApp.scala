@@ -1,7 +1,17 @@
 package app
 
-import app.TxCommand._
+import app.TxCommand.EmptyCommand
+import app.TxCommand.GenerateMetadata
+import app.TxCommand.CommandBox
+import app.TxCommand.SkipEpoch
+import app.TxCommand.Distribute
+
 import config.SmartPoolConfig
+
+object TxCommand extends Enumeration {
+  type TxCommand
+  val EmptyCommand, GenerateMetadata, CommandBox, SkipEpoch, Distribute = Value
+}
 
 object SmartPoolingApp{
     def main(args: Array[String]): Unit = {
@@ -36,7 +46,4 @@ object SmartPoolingApp{
 
 }
 
-object TxCommand extends Enumeration {
-  type TxCommand
-  val EmptyCommand, GenerateMetadata, CommandBox, SkipEpoch, Distribute = Value
-}
+

@@ -1,6 +1,8 @@
 package boxes
 
 import app.AppParameters
+import boxes.models.InputTemplate
+import contracts.command.CommandContract
 import org.ergoplatform.appkit._
 import sigmastate.Values
 import sigmastate.serialization.ErgoTreeSerializer
@@ -10,27 +12,27 @@ import sigmastate.serialization.ErgoTreeSerializer
  * May have any contract
  * @param inputBox Input box to wrap as command box
  */
-class CommandInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId, commandContract: ErgoContract) extends InputTemplate(inputBox, smartPoolNFTId) {
+class CommandInputBox(inputBox: InputBox, commandContract: CommandContract) extends InputTemplate(inputBox) {
   // Explicitly define command contract so as to ensure input box is correct
   override val contract: ErgoContract = commandContract
   assert(asInput.getErgoTree.bytes sameElements contract.getErgoTree.bytes)
 
   override def toString: String = {
-    val serializer = new ErgoTreeSerializer()
-    //val shareConsensusDeserialized = shareConsensus.cValue.map{(sc) => (serializer.deserializeErgoTree(sc._1), sc._2)}
-    //val shareConsensusWithAddress = shareConsensusDeserialized.map{(sc) => (Address.fromErgoTree(sc._1, AppParameters.networkType), sc._2)}
+    def serializer = new ErgoTreeSerializer()
+    val deserializedConsensus = this.shareConsensus.getConversionValue.map((sc) => (Address.fromErgoTree(serializer.deserializeErgoTree(sc._1), NetworkType.TESTNET), sc._2.mkString("Array(", ", ", ")"))).mkString("Array(", ", ", ")")
+    val deserializedMembers = this.memberList.getConversionValue.map((sc) => (Address.fromErgoTree(serializer.deserializeErgoTree(sc._1), NetworkType.TESTNET), sc._2)).mkString("Array(", ", ", ")")
     val asString = s"""
     Command Box Info:
     - Id: ${this.getId.toString}
     - Value: ${this.getValue.toDouble / Parameters.OneErg.toDouble} ERG
-    - SmartPool NFT: ${this.getSmartPoolId}
     - Epoch: ${this.getCurrentEpoch}
     - Epoch Height: ${this.getCurrentEpochHeight}
     - Creation Height: ${this.getCreationHeight}
     - Creation ID: ${this.getCreationBox}
-    - Share Consensus: ${this.getShareConsensus.getConversionValue.map { (sc: (Array[Byte], Array[Long])) => (sc._1, sc._2.mkString("Array(", ", ", ")")) }.mkString("Array(", ", ", ")")}
-    - Share Consensus(DeSerialized): ${this.getShareConsensus.getConversionValue.map { (sc: (Array[Byte], Array[Long])) => (sc._1, sc._2.mkString("Array(", ", ", ")")) }.mkString("Array(", ", ", ")")}
+    - Last Consensus: ${this.getShareConsensus.getConversionValue.map { (sc: (Array[Byte], Array[Long])) => (sc._1.mkString("Array(", ", ", ")"), sc._2.mkString("Array(", ", ", ")")) }.mkString("Array(", ", ", ")")}
+    - Consensus Deserialized: ${deserializedConsensus}
     - Members List: ${this.getMemberList.getConversionValue.mkString("Array(", ", ", ")")}
+    - Members Deserialized: ${deserializedMembers}
     - Pool Fees: ${this.getPoolFees.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Ops: ${this.getPoolOperators.getConversionValue.mkString("Array(", ", ", ")")}
     """
@@ -45,4 +47,5 @@ class CommandInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId, commandContrac
   }
 
   override def getErgoTree: Values.ErgoTree = contract.getErgoTree
+
 }
