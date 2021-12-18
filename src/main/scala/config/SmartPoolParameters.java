@@ -4,7 +4,6 @@ import org.ergoplatform.appkit.ErgoId;
 
 public class SmartPoolParameters {
     private String smartPoolId;
-    private String consensusPath;
     private String holdingAddress;
     private String metadataAddress;
     private String[] poolOperators;
@@ -12,18 +11,23 @@ public class SmartPoolParameters {
     private String[] holdingIds;
     private String commandId;
 
-    private double minimumPayout;
 
-    public SmartPoolParameters(String spId, String consPath, String holdingAddr, String metadataAddr, String[] poolOps, double minPay){
+    private long metadataValue;
+
+
+
+    private long initialTxFee;
+
+    public SmartPoolParameters(String spId, String holdingAddr, String metadataAddr, String[] poolOps){
         smartPoolId = spId;
-        consensusPath = consPath;
         holdingAddress = holdingAddr;
         metadataAddress = metadataAddr;
         poolOperators = poolOps;
-        minimumPayout = minPay;
         metadataId = null;
         holdingIds = null;
         commandId = null;
+        metadataValue = 0;
+
     }
 
     public String getSmartPoolId() {
@@ -58,22 +62,6 @@ public class SmartPoolParameters {
         this.poolOperators = poolOperators;
     }
 
-    public double getMinimumPayout() {
-        return minimumPayout;
-    }
-
-    public void setMinimumPayout(double minimumPayout) {
-        this.minimumPayout = minimumPayout;
-    }
-
-    public String getConsensusPath() {
-        return consensusPath;
-    }
-
-    public void setConsensusPath(String consensusPath) {
-        this.consensusPath = consensusPath;
-    }
-
     public String getMetadataId() {
         return metadataId;
     }
@@ -96,5 +84,33 @@ public class SmartPoolParameters {
 
     public void setCommandId(String commandId) {
         this.commandId = commandId;
+    }
+
+
+    public long getMetadataValue() {
+        return metadataValue;
+    }
+
+    public void setMetadataValue(long metadataValue) {
+        this.metadataValue = metadataValue;
+    }
+
+    public long getInitialTxFee() {
+        return initialTxFee;
+    }
+
+    public void setInitialTxFee(long initialTxFee) {
+        this.initialTxFee = initialTxFee;
+    }
+
+
+    public SmartPoolParameters copy(){
+        SmartPoolParameters sp = new SmartPoolParameters(this.smartPoolId, this.holdingAddress, this.metadataAddress, this.poolOperators);
+        sp.setMetadataId(this.metadataId);
+        sp.setCommandId(this.commandId);
+        sp.setHoldingIds(this.holdingIds);
+        sp.setMetadataValue(this.initialTxFee);
+        sp.setMetadataValue(this.metadataValue);
+        return sp;
     }
 }

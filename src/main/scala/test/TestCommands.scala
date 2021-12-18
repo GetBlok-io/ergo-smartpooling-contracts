@@ -2,13 +2,17 @@ package test
 
 import boxes.builders.{CommandOutputBuilder, MetadataOutputBuilder}
 import boxes.{CommandInputBox, MetadataInputBox, MetadataOutBox}
-import contracts.command.PKContract
+import contracts.command.{CommandContract, MinerPKContract, PKContract}
 import contracts.holding.SimpleHoldingContract
 import contracts.{MetadataContract, generateContractAddress}
 import org.ergoplatform.appkit.impl.ErgoTreeContract
-import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoContract, ErgoId, ErgoProver, ErgoToken, InputBox, NetworkType, OutBox, Parameters, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
+import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoContract, ErgoId, ErgoProver, ErgoToken, InputBox, NetworkType, OutBox, Parameters, PreHeader, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
 import registers.{MemberList, MetadataRegisters, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
-import test.TestParameters.{commandValue, creationMetadataID, currentCommandID, currentMetadataID, holdingAddress, holdingContract, initValue, metadataContract, networkType, poolMiner, poolMinerTwo, poolOpProver, poolOperator, rewardsAddress, rewardsProver, rewardsValue}
+import sigmastate.basics.DLogProtocol.ProveDlog
+import sigmastate.eval.SigmaDsl
+import sigmastate.serialization.GroupElementSerializer
+import test.TestParameters.{commandContract, commandValue, creationMetadataID, currentCommandID, currentMetadataID, holdingAddress, holdingContract, initValue, metadataAddress, metadataContract, networkType, poolMiner, poolMinerTwo, poolOpProver, poolOperator, rewardsAddress, rewardsProver, rewardsValue}
+import transactions.{CreateCommandTx, DistributionTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
@@ -22,12 +26,13 @@ object TestParameters {
   final val networkType = NetworkType.TESTNET
   val poolMiner = Address.create("3WwtfPaghPbuPtYQs4Uj9QooYsPYkEZsESjmcR49MB4fs5kEshX7")
   val poolMinerTwo = Address.create("3WzKopFYhfRGPaUvC7v49DWgeY1efaCD3YpNQ6FZGr2t5mBhWjmw")
-  var creationMetadataID = ErgoId.create("1f378e1d42ee5dd2ff48f79614160993a5cebf124548f38196763584d14fbd0b")
+  var creationMetadataID = ErgoId.create("d9a06b8a5dcbb2f6a400eb581891ca5f1cbd30be0e15d61d7b9cb2d0d864c65a")
 
-  val currentMetadataID = "f4495ebfc9a84c2db6cc77d1bd8f92e9dd1b6ea8bea578191e63ed3acd0be86a"
-  var currentCommandID = "9c65dedcb0d03fd158f1d05f1a89a232343df81ff9794f56dd18396ba8b4179c"
 
-  val poolOpSecret = SecretString.create("A test seed for smart pool operator")
+  val currentMetadataID = "10799205d8cc1117457baa7f155c1a98b5f45cd7160471470a4a48421130a58f"
+  var currentCommandID = "49ff9cbe600063534dfe1f8900b344543d44d68852065e34e3b1a164d81450ed"
+
+  val poolOpSecret = SecretString.create("decade replace tired property draft patch innocent regular habit refuse double hard stick where phrase")
   val rewardsSecret = SecretString.create("A test seed for mining rewards to be sent from")
 
 
@@ -39,6 +44,11 @@ object TestParameters {
   var rewardsProver: ErgoProver = _
   var poolOperator: Address = _
   var poolOpProver: ErgoProver = _
+  var commandContract: CommandContract = _
+
+  val nodePubKey = GroupElementSerializer.parse(BigInt("023fcd666a1289acbd365abfdfc893ad273ec1795c7a72b18598996bb20e1096be", 16).toByteArray)
+  val nodeGE = SigmaDsl.GroupElement(nodePubKey)
+
 
   def initializeParameters(ctx: BlockchainContext): Unit = {
     metadataContract = MetadataContract.generateMetadataContract(ctx)
@@ -53,7 +63,7 @@ object TestParameters {
     rewardsAddress = Address.createEip3Address(0, NetworkType.TESTNET, rewardsSecret, SecretString.empty())
     rewardsProver = ctx.newProverBuilder().withMnemonic(rewardsSecret, SecretString.empty()).withEip3Secret(0).build();
 
-
+    commandContract = new PKContract(poolOperator)
   }
 }
 
@@ -137,23 +147,21 @@ object TestCommands {
    */
   def createDefaultCommandBox(ctx: BlockchainContext, metadataBox: MetadataInputBox) = {
 
-    val commandContract = new PKContract(poolOperator)
 
     println(s"Pool Operator Address: ${poolOperator}")
     println(s"Sending ${commandValue} ERG to create new Command Box under Pool Operator address\n")
 
+    val poolOperatorBoxes = ctx.getCoveringBoxesFor(poolOperator, commandValue + (Parameters.MinFee * 2), List[ErgoToken]().asJava).getBoxes.asScala.toList
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
-    val cOB = new CommandOutputBuilder(txB.outBoxBuilder())
-    CommandContract.initializeOutputBuilder(cOB, metadataBox, ctx.getHeight, commandContract, commandValue)
-    val poolOperatorBoxes = ctx.getCoveringBoxesFor(poolOperator, commandValue + (Parameters.MinFee*2), List[ErgoToken]().toList.asJava)
-    val commandBox = cOB.build()
-    // Create unsigned transaction
-    val tx: UnsignedTransaction = txB
-      .boxesToSpend(poolOperatorBoxes.getBoxes)
-      .outputs(commandBox.asOutBox)
-      .fee(Parameters.MinFee * 2)
-      .sendChangeTo(poolOperator.getErgoAddress)
-      .build()
+    val commandTx = new CreateCommandTx(txB)
+
+    val tx =
+      commandTx
+        .metadataToCopy(metadataBox)
+        .withCommandContract(commandContract)
+        .commandValue(commandValue)
+        .inputBoxes(poolOperatorBoxes: _*)
+        .buildCommandTx()
     println("Command Box Creation Tx Built\n")
     val signed: SignedTransaction = poolOpProver.sign(tx)
     // Submit transaction to node
@@ -162,45 +170,27 @@ object TestCommands {
     println(signed.toJson(true))
     println(s"Command Id: ${signed.getOutputsToSpend.get(0).getId}")
 
-    new CommandInputBox(commandBox.convertToInputWith(txId, 0), commandContract)
+    new CommandInputBox(commandTx.commandOutBox.convertToInputWith(txId, 0), commandContract)
   }
 
   def createModifiedCommandBox(ctx: BlockchainContext, metadataBox: MetadataInputBox) = {
 
-    val commandContract = new PKContract(poolOperator)
+
     val holdingBoxes = ctx.getCoveringBoxesFor(holdingAddress, rewardsValue, List[ErgoToken]().toList.asJava).getBoxes
 
     println(s"Pool Operator Address: ${poolOperator}")
     println(s"Sending ${commandValue} ERG to create new Command Box under Pool Operator address\n")
-
+    val poolOperatorBoxes = ctx.getCoveringBoxesFor(poolOperator, commandValue + (Parameters.MinFee * 2), List[ErgoToken]().asJava).getBoxes.asScala.toList
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
-    val cOB = new CommandOutputBuilder(txB.outBoxBuilder())
-    val outB = txB.outBoxBuilder()
-
-    CommandContract.initializeOutputBuilder(cOB, metadataBox, ctx.getHeight, commandContract, commandValue)
-
-    val simpleHoldingContract = new SimpleHoldingContract(holdingContract)
-
-    simpleHoldingContract.holdingBoxes = holdingBoxes.asScala.toList
-    simpleHoldingContract.metadataBox = metadataBox
-    simpleHoldingContract.applyToCommand(cOB)
-
-    val commandBox = cOB.build()
-
-    println("holding box size" + holdingBoxes.size())
-
-    println("New Command Box created: ")
-    println(commandBox)
-
-    val poolOperatorBoxes = ctx.getCoveringBoxesFor(poolOperator, commandValue + (Parameters.MinFee * 2), List[ErgoToken]().toList.asJava)
-
-    // Create unsigned transaction
-    val tx: UnsignedTransaction = txB
-      .boxesToSpend(poolOperatorBoxes.getBoxes)
-      .outputs(commandBox.asOutBox)
-      .fee(Parameters.MinFee * 2)
-      .sendChangeTo(poolOperator.getErgoAddress)
-      .build()
+    val commandTx = new CreateCommandTx(txB)
+    val tx =
+      commandTx
+        .metadataToCopy(metadataBox)
+        .withCommandContract(commandContract)
+        .commandValue(commandValue)
+        .inputBoxes(poolOperatorBoxes: _*)
+        .withHolding(new SimpleHoldingContract(holdingContract), rewardsValue)
+        .buildCommandTx()
     println("Command Box Creation Tx Built\n")
     val signed: SignedTransaction = poolOpProver.sign(tx)
     // Submit transaction to node
@@ -209,7 +199,7 @@ object TestCommands {
     println(signed.toJson(true))
     println(s"Command Id: ${signed.getOutputsToSpend.get(0).getId}")
 
-    new CommandInputBox(commandBox.convertToInputWith(txId, 0), commandContract)
+    new CommandInputBox(commandTx.commandOutBox.convertToInputWith(txId, 0), commandContract)
   }
 
 
@@ -259,32 +249,16 @@ object TestCommands {
    */
   def distributionTx(ctx: BlockchainContext, metadataBox: MetadataInputBox, commandBox: CommandInputBox) = {
     val p2PKCommandContract = new PKContract(poolOperator)
-    val initBoxes = List(metadataBox.asInput, commandBox.asInput)
-
-
-    val holdingBoxes = ctx.getCoveringBoxesFor(holdingAddress, rewardsValue, List[ErgoToken]().toList.asJava).getBoxes
-    println("Current holding address: " + holdingAddress + " with " + holdingBoxes.size() + " boxes")
-    val inputBoxes = initBoxes++holdingBoxes.asScala
-    println(holdingBoxes.size())
-    holdingBoxes.asScala.toArray.foreach((x: InputBox) => println(x.toJson(true)))
-    val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
-    val outB = txB.outBoxBuilder()
-    val mOB = new MetadataOutputBuilder(outB)
-    val metadataOutBox = MetadataContract.buildFromCommandBox(mOB, commandBox, metadataContract, initValue, creationMetadataID)
-    println("Next Metadata Output Box constructed: ")
-    println(metadataOutBox)
-
-    val holdingOutputs = SimpleHoldingContract.generateOutputBoxes(ctx, inputBoxes.toArray, Array(poolOperator), holdingAddress, creationMetadataID, p2PKCommandContract)
-    val txFee = commandValue + (commandBox.getShareConsensus.nValue.size * Parameters.MinFee)
-    val outputBoxes = List(metadataOutBox.asOutBox)++holdingOutputs.toList
-    outputBoxes.foreach(x => println(x.getValue))
-    val tx = txB
-      .boxesToSpend(inputBoxes.toList.asJava)
-      .outputs(outputBoxes:_*)
-      .fee(txFee)
-      .sendChangeTo(poolOperator.getErgoAddress)
-      .build()
-    val signed: SignedTransaction = poolOpProver.sign(tx)
+    val tx = new DistributionTx(ctx.newTxBuilder())
+    val builtTx =
+      tx
+        .metadataInput(metadataBox)
+        .commandInput(commandBox)
+        .holdingValue(rewardsValue)
+        .holdingContract(new SimpleHoldingContract(holdingContract))
+        .buildMetadataTx()
+    val signed: SignedTransaction = poolOpProver.sign(builtTx)
+    val metadataOutBox = tx.metadataOutBox
     // Submit transaction to node
     val txId: String = ctx.sendTransaction(signed).filter(c => c !='\"')
     println(s"Tx successfully sent with id: ${txId} \n")
@@ -322,17 +296,14 @@ object TestCommands {
 
   def createCustomCommandBox(ctx: BlockchainContext, metadataBox: MetadataInputBox) = {
 
-    val commandContract = new PKContract(poolOperator)
+
     val holdingBoxes = ctx.getCoveringBoxesFor(holdingAddress, rewardsValue, List[ErgoToken]().toList.asJava).getBoxes
 
     println(s"Pool Operator Address: ${poolOperator}")
     println(s"Sending ${commandValue} ERG to create new Command Box under Pool Operator address\n")
 
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
-    val cOB = new CommandOutputBuilder(txB.outBoxBuilder())
-    val outB = txB.outBoxBuilder()
-
-    CommandContract.initializeOutputBuilder(cOB, metadataBox, ctx.getHeight, commandContract, commandValue)
+    val commandTx = new CreateCommandTx(txB)
     val shareCons = ShareConsensus.fromConversionValues(Array(
       (poolMiner.getErgoAddress.script.bytes, Array(240L, Parameters.OneErg*2, 0)),
       (rewardsAddress.getErgoAddress.script.bytes, Array(140L, Parameters.OneErg/8, 0)),
@@ -344,29 +315,21 @@ object TestCommands {
       (poolMinerTwo.getErgoAddress.script.bytes, poolMinerTwo.toString)
 
     ))
-    cOB.setMetadata(new MetadataRegisters(shareCons, memsList, cOB.metadataRegisters.poolFees, cOB.metadataRegisters.poolInfo, cOB.metadataRegisters.poolOps))
-    val simpleHoldingContract = new SimpleHoldingContract(holdingContract)
 
-    simpleHoldingContract.holdingBoxes = holdingBoxes.asScala.toList
-    simpleHoldingContract.metadataBox = metadataBox
-    simpleHoldingContract.applyToCommand(cOB)
+    val poolOperatorBoxes = ctx.getCoveringBoxesFor(poolOperator, commandValue + (Parameters.MinFee * 2), List[ErgoToken]().asJava).getBoxes.asScala.toList
 
-    val commandBox = cOB.build()
+    val tx =
+      commandTx
+      .metadataToCopy(metadataBox)
+      .withCommandContract(commandContract)
+      .commandValue(commandValue)
+      .setConsensus(shareCons)
+      .setMembers(memsList)
+      .inputBoxes(poolOperatorBoxes: _*)
+      .withHolding(new SimpleHoldingContract(holdingContract), rewardsValue)
+      .buildCommandTx()
 
-    println("holding box size" + holdingBoxes.size())
 
-    println("New Command Box created: ")
-    println(commandBox)
-
-    val poolOperatorBoxes = ctx.getCoveringBoxesFor(poolOperator, commandValue + (Parameters.MinFee * 2), List[ErgoToken]().toList.asJava)
-
-    // Create unsigned transaction
-    val tx: UnsignedTransaction = txB
-      .boxesToSpend(poolOperatorBoxes.getBoxes)
-      .outputs(commandBox.asOutBox)
-      .fee(Parameters.MinFee * 2)
-      .sendChangeTo(poolOperator.getErgoAddress)
-      .build()
     println("Command Box Creation Tx Built\n")
     val signed: SignedTransaction = poolOpProver.sign(tx)
     // Submit transaction to node
@@ -375,7 +338,7 @@ object TestCommands {
     println(signed.toJson(true))
     println(s"Command Id: ${signed.getOutputsToSpend.get(0).getId}")
 
-    new CommandInputBox(commandBox.convertToInputWith(txId, 0), commandContract)
+    new CommandInputBox(commandTx.commandOutBox.convertToInputWith(txId, 0), commandContract)
   }
 
 

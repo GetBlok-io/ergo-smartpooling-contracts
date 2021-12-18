@@ -14,17 +14,20 @@ import java.nio.file.Paths;
  * Based off ErgoToolConfig
  * */
 public class SmartPoolConfig {
-    private ErgoNodeConfig node;
+    private SmartPoolNodeConfig node;
+
+    private PersistenceConfig persistence;
     private SmartPoolParameters parameters;
 
-    public SmartPoolConfig(ErgoNodeConfig nodeConf, SmartPoolParameters paramConf){
+    public SmartPoolConfig(SmartPoolNodeConfig nodeConf, SmartPoolParameters paramConf, PersistenceConfig persConfig){
         node = nodeConf;
         parameters = paramConf;
+        persistence = persConfig;
     }
     /**
      * Returns Ergo node configuration
      */
-    public ErgoNodeConfig getNode() {
+    public SmartPoolNodeConfig getNode() {
         return node;
     }
 
@@ -40,8 +43,16 @@ public class SmartPoolConfig {
         this.parameters = parameters;
     }
 
-    public void setNode(ErgoNodeConfig node) {
+    public void setNode(SmartPoolNodeConfig node) {
         this.node = node;
+    }
+
+    public PersistenceConfig getPersistence() {
+        return persistence;
+    }
+
+    public void setPersistence(PersistenceConfig persistence) {
+        this.persistence = persistence;
     }
 
     /**
@@ -77,6 +88,10 @@ public class SmartPoolConfig {
     public static SmartPoolConfig load(String fileName) throws FileNotFoundException {
         File file = Paths.get(fileName).toAbsolutePath().toFile();
         return load(file);
+    }
+
+    public SmartPoolConfig copy() {
+        return new SmartPoolConfig(node, parameters.copy(), persistence);
     }
 
 }

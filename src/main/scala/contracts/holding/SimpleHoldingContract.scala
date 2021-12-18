@@ -1,7 +1,7 @@
 package contracts.holding
 
 import app.AppParameters
-import boxes.builders.CommandOutputBuilder
+import boxes.builders.{CommandOutputBuilder, HoldingOutputBuilder}
 import boxes.{CommandInputBox, MetadataInputBox}
 import contracts.command.CommandContract
 import org.ergoplatform.appkit._
@@ -9,7 +9,10 @@ import org.ergoplatform.appkit.impl.ErgoTreeContract
 import registers.{BytesColl, ShareConsensus}
 import sigmastate.serialization.ErgoTreeSerializer
 import special.collection.Coll
+import transactions.{CreateCommandTx, DistributionTx}
 
+import scala.collection.JavaConverters.seqAsJavaListConverter
+import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -35,8 +38,13 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
     _holdingBoxes = value
   }
 
-  override def applyToCommand(cOB: CommandOutputBuilder): CommandOutputBuilder = {
-    val currentShareConsensus = cOB.metadataRegisters.shareConsensus
+  override def applyToCommand(commandTx: CreateCommandTx): CommandOutputBuilder = {
+    val metadataBox = commandTx.metadataInputBox
+    val holdingBoxes = commandTx.ctx.getCoveringBoxesFor(this.getAddress, commandTx.holdingValue, List[ErgoToken]().asJava).getBoxes
+
+
+
+    val currentShareConsensus = commandTx.cOB.metadataRegisters.shareConsensus
     val lastShareConsensus = metadataBox.shareConsensus
 
     val holdingBoxValues = holdingBoxes.foldLeft(0L){
@@ -97,12 +105,149 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         (consVal._1.toArray, newConsensusInfo)
     }
     val newShareConsensus = ShareConsensus.fromConversionValues(updatedConsensus)
-    val newMetadataRegisters = cOB.metadataRegisters.copy
+    val newMetadataRegisters = commandTx.cOB.metadataRegisters.copy
     newMetadataRegisters.shareConsensus = newShareConsensus
 
-    cOB
+    commandTx.cOB
       .setMetadata(newMetadataRegisters)
   }
+
+  /**
+   * Generates a HoldingOutputBuilder that follows consensus.
+   * @param ctx Blockchain context
+   * @return Returns HoldingOutputBuilder to use in transaction
+   */
+  override def generateInitialOutputs(ctx: BlockchainContext, distributionTx: DistributionTx, holdingBoxes: List[InputBox]): HoldingOutputBuilder = {
+
+    val metadataBox = distributionTx.metadataInputBox
+    val commandBox = distributionTx.commandInputBox
+    val holdingAddress = this.getAddress
+    val initBoxes: List[InputBox] = List(metadataBox.asInput, commandBox.asInput)
+    val inputList = initBoxes++holdingBoxes
+    val inputBoxes: Array[InputBox] = inputList.toArray
+    val serializer = new ErgoTreeSerializer()
+    val feeAddresses = metadataBox.getPoolFees.cValue.map(c => Address.fromErgoTree(serializer.deserializeErgoTree(c._1), ctx.getNetworkType))
+
+    val holdingBytes = BytesColl.fromConversionValues(holdingAddress.getErgoAddress.script.bytes)
+    val TOTAL_HOLDED_VALUE = inputBoxes.foldLeft(0L){
+      (accum: Long, box: InputBox) =>
+        val boxPropBytes = BytesColl.fromConversionValues(box.getErgoTree.bytes)
+        if(boxPropBytes.getNormalValue == holdingBytes.getNormalValue){
+          accum + box.getValue
+        }else
+          accum
+    }
+    val lastShareConsensus = metadataBox.shareConsensus
+    val lastConsensus = metadataBox.getShareConsensus.getNormalValue
+    val currentConsensus = commandBox.getShareConsensus.getNormalValue
+    val currentPoolFees = metadataBox.getPoolFees.getNormalValue
+    val currentTxFee = Parameters.MinFee * currentConsensus.length
+
+    val totalOwedPayouts =
+      lastConsensus.toArray.filter((consVal: (Coll[Byte], Coll[Long])) => consVal._2(2) < consVal._2(1))
+        .foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(2)}
+    val totalRewards = TOTAL_HOLDED_VALUE - totalOwedPayouts
+    val feeList: Coll[(Coll[Byte], Long)] = currentPoolFees.map{
+      // Pool fee is defined as x/1000 of total inputs value.
+      (poolFee: (Coll[Byte], Int)) => ( poolFee._1 , ((poolFee._2 * totalRewards)/1000) )
+    }
+
+    // Total amount in holding after pool fees and tx fees.
+    // This is the total amount of ERG to be distributed to pool members
+    val totalValAfterFees = (feeList.toArray.foldLeft(totalRewards){
+      (accum: Long, poolFeeVal: (Coll[Byte], Long)) => accum - poolFeeVal._2
+    })- currentTxFee
+
+    val totalShares = currentConsensus.toArray.foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(0)}
+
+    // Returns some value that is a percentage of the total rewards after the fees.
+    // The percentage used is the proportion of the share number passed in over the total number of shares.
+    def getValueFromShare(shareNum: Long) = {
+      if(totalShares != 0) {
+        val newBoxValue = (((totalValAfterFees) * (shareNum)) / (totalShares))
+        newBoxValue
+      }else
+        0L
+    }
+
+
+    // Maps each propositionBytes stored in the consensus to a value obtained from the shares.
+    val boxValueMap = currentConsensus.toArray.map{
+      (consVal: (Coll[Byte], Coll[Long])) =>
+
+        val shareNum = consVal._2(0)
+        var currentMinPayout = consVal._2(1)
+        val valueFromShares = getValueFromShare(shareNum)
+        println(consVal)
+        if(lastConsensus.toArray.exists(sc => consVal._1 == sc._1)){
+          val lastConsValues = lastConsensus.toArray.filter(sc => consVal._1 == sc._1).head._2
+          val lastStoredPayout = lastConsValues(2)
+
+          if(lastStoredPayout + valueFromShares >= currentMinPayout) {
+            println("This value was higher than min payout")
+            (consVal._1, lastStoredPayout + valueFromShares)
+          } else{
+            println("This value was lower than min payout")
+            (consVal._1, 0L)
+          }
+        }else{
+          if(valueFromShares >= currentMinPayout) {
+            println("This new value was higher than min payout" + valueFromShares + " | " + currentMinPayout)
+            (consVal._1, valueFromShares)
+          } else{
+            println("This new value was lower than min payout: " + valueFromShares + " | " + currentMinPayout)
+
+            (consVal._1, 0L)
+          }
+        }
+    }
+    val changeValue =
+      currentConsensus.toArray.filter((consVal: (Coll[Byte], Coll[Long])) => consVal._2(2) < consVal._2(1))
+        .foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(2)}
+    // This verifies that each member of the consensus has some output box
+    // protected by their script and that the value of each box is the
+    // value obtained from consensus.
+    // This boolean value is returned and represents the main sigma proposition of the smartpool holding
+    // contract.
+    // This boolean value also verifies that poolFees are paid and go to the correct boxes.
+
+
+    val outBoxBuffer = ArrayBuffer[OutBoxBuilder]()
+    val memberAddresses = commandBox.getMemberList.cValue.map{(a: (Array[Byte], String)) => Address.create(a._2)}
+    boxValueMap.foreach{consVal: (Coll[Byte], Long) => println(Address.fromErgoTree(serializer.deserializeErgoTree(consVal._1.toArray), AppParameters.networkType))}
+    memberAddresses.foreach{
+      (addr: Address) =>
+        val addrBytes = BytesColl.fromConversionValues(addr.getErgoAddress.script.bytes)
+
+        // This should (theoretically) never fail since members list and consensus map to each other properly
+        val boxValue = boxValueMap.filter{consVal: (Coll[Byte], Long) => BytesColl.fromNormalValues(consVal._1).nValue == addrBytes.nValue}(0)
+        println(s" Value from shares for address ${addr}: ${boxValue._2}")
+        if(boxValue._2 > 0) {
+          val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
+          val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
+          outBoxBuffer.append(newOutBox)
+        }
+    }
+    feeAddresses.foreach{
+      (addr: Address) =>
+        val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
+        val addrBytes = BytesColl.fromConversionValues(addr.getErgoAddress.script.bytes)
+        val boxValue = feeList.filter{poolFeeVal: (Coll[Byte], Long) => poolFeeVal._1 == addrBytes.nValue}(0)
+        println(s"Fee Value for address ${addr}: ${boxValue._2}")
+        val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
+        outBoxBuffer.append(newOutBox)
+    }
+
+    if(changeValue > 0) {
+      val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
+      val newOutBox = outB.value(changeValue).contract(new ErgoTreeContract(holdingAddress.getErgoAddress.script))
+      outBoxBuffer.append(newOutBox)
+    }
+    new HoldingOutputBuilder(outBoxBuffer.toList)
+  }
+
+
+
 }
 
 object SimpleHoldingContract {
@@ -362,131 +507,7 @@ object SimpleHoldingContract {
     compiledContract
   }
 
-  /**
-   * Generates a list of output boxes that follow a consensus. Metadata and Command boxes are assumed
-   * to be inputs 0 and 1.
-   * @param ctx Blockchain context
-   * @return Returns list of output boxes to use in transaction
-   */
-  def generateOutputBoxes(ctx: BlockchainContext, inputBoxes: Array[InputBox],
-                          feeAddresses: Array[Address], holdingAddress: Address,
-                          smartPoolId: ErgoId, commandContract: CommandContract): Array[OutBox] = {
 
-    val metadataBox = new MetadataInputBox(inputBoxes(0), smartPoolId)
-    val commandBox = new CommandInputBox(inputBoxes(1), commandContract)
-    val holdingBytes = BytesColl.fromConversionValues(holdingAddress.getErgoAddress.script.bytes)
-    val TOTAL_HOLDED_VALUE = inputBoxes.foldLeft(0L){
-      (accum: Long, box: InputBox) =>
-        val boxPropBytes = BytesColl.fromConversionValues(box.getErgoTree.bytes)
-        if(boxPropBytes.getNormalValue == holdingBytes.getNormalValue){
-          accum + box.getValue
-        }else
-          accum
-    }
-    val lastShareConsensus = metadataBox.shareConsensus
-    val lastConsensus = metadataBox.getShareConsensus.getNormalValue
-    val currentConsensus = commandBox.getShareConsensus.getNormalValue
-    val currentPoolFees = metadataBox.getPoolFees.getNormalValue
-    val currentTxFee = Parameters.MinFee * currentConsensus.length
-
-    val totalOwedPayouts =
-      lastConsensus.toArray.filter((consVal: (Coll[Byte], Coll[Long])) => consVal._2(2) < consVal._2(1))
-        .foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(2)}
-    val totalRewards = TOTAL_HOLDED_VALUE - totalOwedPayouts
-    val feeList: Coll[(Coll[Byte], Long)] = currentPoolFees.map{
-      // Pool fee is defined as x/1000 of total inputs value.
-      (poolFee: (Coll[Byte], Int)) => ( poolFee._1 , ((poolFee._2 * totalRewards)/1000) )
-    }
-
-    // Total amount in holding after pool fees and tx fees.
-    // This is the total amount of ERG to be distributed to pool members
-    val totalValAfterFees = (feeList.toArray.foldLeft(totalRewards){
-      (accum: Long, poolFeeVal: (Coll[Byte], Long)) => accum - poolFeeVal._2
-    })- currentTxFee
-
-    val totalShares = currentConsensus.toArray.foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(0)}
-
-    // Returns some value that is a percentage of the total rewards after the fees.
-    // The percentage used is the proportion of the share number passed in over the total number of shares.
-    def getValueFromShare(shareNum: Long) = {
-      val newBoxValue = (((totalValAfterFees) * (shareNum)) / (totalShares))
-      newBoxValue
-    }
-
-
-    // Maps each propositionBytes stored in the consensus to a value obtained from the shares.
-    val boxValueMap = currentConsensus.toArray.map{
-      (consVal: (Coll[Byte], Coll[Long])) =>
-
-        val shareNum = consVal._2(0)
-        var currentMinPayout = consVal._2(1)
-        val valueFromShares = getValueFromShare(shareNum)
-        println(consVal)
-        if(lastConsensus.toArray.exists(sc => consVal._1 == sc._1)){
-          val lastConsValues = lastConsensus.toArray.filter(sc => consVal._1 == sc._1).head._2
-          val lastStoredPayout = lastConsValues(2)
-
-          if(lastStoredPayout + valueFromShares >= currentMinPayout) {
-            println("This value was higher than min payout")
-            (consVal._1, lastStoredPayout + valueFromShares)
-          } else{
-            println("This value was lower than min payout")
-            (consVal._1, 0L)
-          }
-        }else{
-          if(valueFromShares >= currentMinPayout) {
-            println("This new value was higher than min payout" + valueFromShares + " | " + currentMinPayout)
-            (consVal._1, valueFromShares)
-          } else{
-            println("This new value was lower than min payout: " + valueFromShares + " | " + currentMinPayout)
-
-            (consVal._1, 0L)
-          }
-        }
-    }
-    val changeValue =
-      currentConsensus.toArray.filter((consVal: (Coll[Byte], Coll[Long])) => consVal._2(2) < consVal._2(1))
-        .foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(2)}
-    // This verifies that each member of the consensus has some output box
-    // protected by their script and that the value of each box is the
-    // value obtained from consensus.
-    // This boolean value is returned and represents the main sigma proposition of the smartpool holding
-    // contract.
-    // This boolean value also verifies that poolFees are paid and go to the correct boxes.
-    val TxB = ctx.newTxBuilder()
-    val outB = TxB.outBoxBuilder()
-    val outBoxBuffer = ArrayBuffer[OutBox]()
-    val memberAddresses = commandBox.getMemberList.cValue.map{(a: (Array[Byte], String)) => Address.create(a._2)}
-    val serializer = new ErgoTreeSerializer()
-    boxValueMap.foreach{consVal: (Coll[Byte], Long) => println(Address.fromErgoTree(serializer.deserializeErgoTree(consVal._1.toArray), AppParameters.networkType))}
-    memberAddresses.foreach{
-      (addr: Address) =>
-        val addrBytes = BytesColl.fromConversionValues(addr.getErgoAddress.script.bytes)
-
-        // This should (theoretically) never fail since members list and consensus map to each other properly
-        val boxValue = boxValueMap.filter{consVal: (Coll[Byte], Long) => BytesColl.fromNormalValues(consVal._1).nValue == addrBytes.nValue}(0)
-        println(s" Value from shares for address ${addr}: ${boxValue._2}")
-        if(boxValue._2 > 0) {
-          val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script)).build()
-          outBoxBuffer.append(newOutBox)
-        }
-    }
-    feeAddresses.foreach{
-      (addr: Address) =>
-
-        val addrBytes = BytesColl.fromConversionValues(addr.getErgoAddress.script.bytes)
-        val boxValue = feeList.filter{poolFeeVal: (Coll[Byte], Long) => poolFeeVal._1 == addrBytes.nValue}(0)
-        println(s"Fee Value for address ${addr}: ${boxValue._2}")
-        val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script)).build()
-        outBoxBuffer.append(newOutBox)
-    }
-
-    if(changeValue > 0) {
-      val newOutBox = outB.value(changeValue).contract(new ErgoTreeContract(holdingAddress.getErgoAddress.script)).build()
-      outBoxBuffer.append(newOutBox)
-    }
-    outBoxBuffer.toArray
-  }
 
 
   def getBoxValue(shareNum: Long, totalShares: Long, totalValueAfterFees: Long): Long = {

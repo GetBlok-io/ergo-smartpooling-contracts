@@ -1,23 +1,27 @@
 package app
 
-import app.TxCommand.EmptyCommand
-import app.TxCommand.GenerateMetadata
-import app.TxCommand.CommandBox
-import app.TxCommand.SkipEpoch
-import app.TxCommand.Distribute
-
+import app.AppCommand.EmptyCommand
+import org.slf4j.LoggerFactory
 import config.SmartPoolConfig
+import logging.LoggingHandler
+import org.slf4j.Logger
 
-object TxCommand extends Enumeration {
-  type TxCommand
-  val EmptyCommand, GenerateMetadata, CommandBox, SkipEpoch, Distribute = Value
-}
+import java.io.FileNotFoundException
+
+
 
 object SmartPoolingApp{
+
+  val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_MAIN)
+  LoggingHandler.initiateLogging()
+
     def main(args: Array[String]): Unit = {
-      val usage = "Usage: java -jar SmartPoolingApp.jar -c=smart/pool/path/config.json [-g|-c|-s|-d]"
+      logger.info("Now starting SmartPoolingApp")
+
+      val usage = "Usage: java -jar SmartPoolingApp.jar -c=smart/pool/path/config.json [-p | -f]"
       var txCommand = EmptyCommand
       var config: Option[SmartPoolConfig] = None
+
       for(arg <- args){
         arg match {
           case arg if arg.startsWith("-") =>
@@ -25,22 +29,30 @@ object SmartPoolingApp{
             commandArg match {
               case 'c' =>
                 val commandValue = arg.split("=")(1)
-                config = Some(SmartPoolConfig.load(commandValue))
-              case 'g' =>
-                txCommand = GenerateMetadata
-              case 'c' =>
-                txCommand = CommandBox
-              case 's' =>
-                txCommand = SkipEpoch
-              case 'd' =>
-                txCommand = Distribute
+                try {
+                  config = Some(SmartPoolConfig.load(commandValue))
+                  AppParameters.configFilePath = commandValue
+                } catch {
+                  case fileNotFoundException: FileNotFoundException =>
+                    exit(logger, ExitCodes.CONFIG_NOT_FOUND)
+                  case _ =>
+                    exit(logger, ExitCodes.CONFIG_NOT_FOUND)
+                }
+              case 'p' =>
+                AppParameters.fromPersistence = true
+              case 'f' =>
+                AppParameters.fromFilePath = true
+              case _ =>
+                exit(logger, ExitCodes.INVALID_ARGUMENTS)
             }
+          case _ => exit(logger, ExitCodes.INVALID_ARGUMENTS)
         }
       }
-      txCommand match {
-        case GenerateMetadata =>
 
-      }
+      if(config.isEmpty)
+        exit(logger, ExitCodes.CONFIG_NOT_FOUND)
+
+      logger.info(s"Configuration file and command arguments successfully loaded")
     }
 
 

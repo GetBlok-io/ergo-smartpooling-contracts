@@ -2,14 +2,23 @@ package test
 
 
 import boxes.{MetadataInputBox, MetadataOutBox}
+import org.slf4j.LoggerFactory
 import contracts._
 import org.ergoplatform.appkit._
-import org.ergoplatform.appkit.impl.ErgoTreeContract
+import org.ergoplatform.appkit.impl.{BlockchainContextBuilderImpl, BlockchainContextImpl, ErgoTreeContract, PreHeaderBuilderImpl, PreHeaderImpl}
 import contracts.MetadataContract
+import logging.LoggingHandler
+import org.bouncycastle.math.ec.custom.sec.SecP256K1Point
+import org.ergoplatform.{ErgoAddressEncoder, P2PKAddress}
 import org.ergoplatform.appkit.config.{ApiConfig, ErgoNodeConfig, ErgoToolConfig}
+import org.slf4j.Logger
 import registers.{MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
+import sigmastate.basics.DLogProtocol.ProveDlog
+import sigmastate.eval.SigmaDsl
+import sigmastate.serialization.{GroupElementSerializer, ProveDlogSerializer}
+import special.sigma.GroupElement
 import test.TestCommands.{createCustomCommandBox, createDefaultCommandBox, createModifiedCommandBox, distributionTx, getCurrentCommand, getCurrentMetadata, initialMetadataTx, miningRewardsToHolding, settingsTx, viewCommandInfo, viewMetadataInfo}
-import test.TestParameters.{creationMetadataID, currentCommandID, currentMetadataID}
+import test.TestParameters.{creationMetadataID, currentCommandID, currentMetadataID, nodeGE, poolOperator}
 
 import scala.collection.JavaConverters._
 
@@ -24,10 +33,11 @@ object SmartPool_Test {
    */
 
   // Initial metadata value
-
+  implicit val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_TEST)
+  LoggingHandler.initializeLogger(logger)
 
   def main(args: Array[String]): Unit = {
-    println("SmartPool Test 1: Creation and Normal Operation")
+    logger.info("Starting Smart Pool Test...")
 
     val conf  = ErgoToolConfig.load("smartpoolconfig.json")
 
@@ -40,26 +50,29 @@ object SmartPool_Test {
     // Execute transaction
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
       TestParameters.initializeParameters(ctx)
-//      viewMetadataInfo(ctx)
+      //viewMetadataInfo(ctx)
       //viewCommandInfo(ctx)
-//
+
+      // TODO Try preheader tests out for proof of vote
+      //
+
       var metadataBox = getCurrentMetadata(ctx)
-//      var commandBox = getCurrentCommand(ctx)
+      //var commandBox = getCurrentCommand(ctx)
       //var metadataBox = initialMetadataTx(ctx)
       //metadataBox.toString
-      //var commandBox = createDefaultCommandBox(ctx, metadataBox)
+      //var commandBox = createModifiedCommandBox(ctx, metadataBox)
 
-      //metadataBox = settingsTx(ctx, metadataBox, commandBox)
+      //metadataBox = settingsTx(ctx, metadataBox, commandBox, preHeader)
       //miningRewardsToHolding(ctx)
-      var commandBox = createCustomCommandBox(ctx, metadataBox)
-     metadataBox = distributionTx(ctx, metadataBox, commandBox)
-      println(
-        s"""Current Metadata: ${metadataBox.getId}
-           |Current Command: ${commandBox.getId}
-           |""".stripMargin)
+      //var commandBox = createCustomCommandBox(ctx, metadataBox)
+     //metadataBox = distributionTx(ctx, metadataBox, commandBox, preHeader)
+//      println(
+//        s"""Current Metadata: ${metadataBox.getId}
+//           |Current Command: ${commandBox.getId}
+//           |""".stripMargin)
       metadataBox.getId.toString
     })
-
+    logger.info("Test completed successfully")
   }
 
 

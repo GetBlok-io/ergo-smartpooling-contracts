@@ -14,7 +14,7 @@ import sigmastate.serialization.ErgoTreeSerializer
  */
 class CommandInputBox(inputBox: InputBox, commandContract: CommandContract) extends InputTemplate(inputBox) {
   // Explicitly define command contract so as to ensure input box is correct
-  override val contract: ErgoContract = commandContract
+  override val contract: CommandContract = commandContract
   assert(asInput.getErgoTree.bytes sameElements contract.getErgoTree.bytes)
 
   override def toString: String = {

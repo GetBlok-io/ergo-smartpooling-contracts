@@ -1,7 +1,7 @@
 package contracts.command
 
 import app.AppParameters
-import boxes.builders.CommandOutputBuilder
+import boxes.builders.{CommandOutputBuilder, HoldingOutputBuilder}
 import boxes.{CommandOutBox, MetadataInputBox}
 import org.ergoplatform.appkit._
 import registers._
@@ -25,6 +25,14 @@ abstract class CommandContract(commandContract: ErgoContract) extends ErgoContra
    * @return Command output builder with desired command effects on the metadata.
    */
   def applyToCommand(commandOutputBuilder: CommandOutputBuilder): CommandOutputBuilder
+
+  /**
+   * Apply this command contract's effects to an unbuilt command output. Multiple command contracts
+   * may apply their effects so as to get the final value of the outputted command box.
+   * @param holdingOutputBuilder initialized command output builder
+   * @return Command output builder with desired command effects on the metadata.
+   */
+  def applyToHolding(holdingOutputBuilder: HoldingOutputBuilder): HoldingOutputBuilder
 }
 object CommandContract {
 
@@ -79,6 +87,25 @@ object CommandContract {
       .contract(commandContract)
       .value(value)
       .setMetadata(commandRegs)
+  }
+
+  /**
+   * This function automatically increases
+   * the epoch by 1, sets the current epoch height
+   * @param cOB Uninitialized command output builder
+   * @param metadataInputBox metadata box to use as a template
+   * @param currentHeight current height of blockchain
+   * @return Unbuilt command output initialized with information for next transaction.
+   */
+  def updatePoolInfo(cOB: CommandOutputBuilder, metadataInputBox: MetadataInputBox,
+                              currentHeight: Int): CommandOutputBuilder = {
+    val metadataRegs = metadataInputBox.getMetadataRegisters
+    val newPoolInfo = metadataRegs.poolInfo.setCurrentEpoch(metadataRegs.poolInfo.getCurrentEpoch + 1).setCurrentEpochHeight(currentHeight)
+
+    metadataRegs.poolInfo = newPoolInfo
+
+    cOB
+      .setMetadata(metadataRegs)
   }
 
 

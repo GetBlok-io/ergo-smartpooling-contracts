@@ -27,7 +27,5 @@ package object contracts {
   def Coll[T](arr: Array[T], ergoType: ErgoType[T]): Coll[T] = {
     special.collection.Builder.DefaultCollBuilder.fromArray(arr)(ergoType.getRType)
   }
-  def Coll[T](elemList: T*)(ergoType: ErgoType[T]): Coll[T] = {
-    special.collection.Builder.DefaultCollBuilder.fromArray(Array[T](elemList))(ergoType.getRType)
-  }
+
 }
