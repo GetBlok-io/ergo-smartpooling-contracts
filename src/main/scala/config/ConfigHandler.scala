@@ -20,7 +20,8 @@ object ConfigHandler {
     val wallet = new SmartPoolWalletConfig("wallet_mneumonic", "wallet_password")
     val node = new SmartPoolNodeConfig(api, wallet, NetworkType.TESTNET)
     val persistence = new PersistenceConfig("127.0.0.1", 9000, "db_name", false)
-    val config = new SmartPoolConfig(node, params, persistence)
+    val logging = new LoggingConfig(3, 10000)
+    val config = new SmartPoolConfig(node, params, persistence, logging)
 
     config
   }
