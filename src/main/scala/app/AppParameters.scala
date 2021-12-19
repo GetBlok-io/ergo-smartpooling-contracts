@@ -1,6 +1,6 @@
 package app
 
-import org.ergoplatform.appkit.NetworkType
+import org.ergoplatform.appkit.{NetworkType, Parameters}
 
 import java.util.logging.Level
 
@@ -13,4 +13,7 @@ object AppParameters {
   var fromFilePath = false
   var smartPoolId = ""
   var configFilePath = ""
+
+  var minimumPayout: Long = Parameters.OneErg/10
+  var defaultCommandValue: Long = Parameters.MinFee * 5
 }

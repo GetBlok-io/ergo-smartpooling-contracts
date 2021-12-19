@@ -15,7 +15,7 @@ object LoggingHandler {
     val LOG_TEST = "Test"
 
     val LOG_PERSISTENCE = "Persistence"
-
+    val LOG_PAYMENT_HANDLER = "PaymentHandler"
     val LOG_GEN_METADATA_CMD = "GenerateMetadataCmd"
     val LOG_MODIFY_SMARTPOOL_CMD = "ModifySmartPoolCmd"
     val LOG_DISTRIBUTE_REWARDS_CMD = "DistributeRewardsCmd"
@@ -27,7 +27,7 @@ object LoggingHandler {
 
     val loggerNames = List(
       LOG_MAIN, LOG_TEST,
-      LOG_PERSISTENCE, LOG_GEN_METADATA_CMD, LOG_MODIFY_SMARTPOOL_CMD, LOG_DISTRIBUTE_REWARDS_CMD,
+      LOG_PERSISTENCE, LOG_PAYMENT_HANDLER, LOG_GEN_METADATA_CMD, LOG_MODIFY_SMARTPOOL_CMD, LOG_DISTRIBUTE_REWARDS_CMD,
       LOG_COMMAND_TX, LOG_DIST_TX, LOG_GEN_TX, LOG_MOD_TX
     )
 

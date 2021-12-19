@@ -23,26 +23,9 @@ import scala.collection.mutable.ArrayBuffer
 class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContract(holdingContract) {
   import SimpleHoldingContract._
 
-  private[this] var _holdingBoxes: List[InputBox] = List[InputBox]()
-  private[this] var _metadataBox: MetadataInputBox = _
-
-  def metadataBox: MetadataInputBox = _metadataBox
-
-  def metadataBox_=(value: MetadataInputBox): Unit = {
-    _metadataBox = value
-  }
-
-  def holdingBoxes: List[InputBox] = _holdingBoxes
-
-  def holdingBoxes_=(value: List[InputBox]): Unit = {
-    _holdingBoxes = value
-  }
-
   override def applyToCommand(commandTx: CreateCommandTx): CommandOutputBuilder = {
     val metadataBox = commandTx.metadataInputBox
     val holdingBoxes = commandTx.ctx.getCoveringBoxesFor(this.getAddress, commandTx.holdingValue, List[ErgoToken]().asJava).getBoxes
-
-
 
     val currentShareConsensus = commandTx.cOB.metadataRegisters.shareConsensus
     val lastShareConsensus = metadataBox.shareConsensus

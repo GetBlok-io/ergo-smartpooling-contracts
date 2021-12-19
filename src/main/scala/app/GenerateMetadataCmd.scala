@@ -1,13 +1,16 @@
 package app
 
-import config.{ConfigHandler, SmartPoolConfig, SmartPoolNodeConfig, SmartPoolWalletConfig}
-import contracts.MetadataContract
+import config.{ConfigHandler, SmartPoolConfig}
+import contracts.command.{CommandContract, PKContract}
+import contracts.{MetadataContract, holding}
+import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
 import org.ergoplatform.appkit.config.ErgoNodeConfig
-import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoId, ErgoToken, NetworkType, Parameters, RestApiErgoClient, SecretString}
+import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoId, ErgoToken, ErgoValue, NetworkType, Parameters, RestApiErgoClient, SecretString}
 import org.ergoplatform.restapi.client.{ApiClient, WalletApi}
 import org.slf4j.LoggerFactory
 import retrofit2.RetrofitUtil
+import sigmastate.CreateAvlTree
 import transactions.GenesisTx
 
 import scala.collection.JavaConverters.seqAsJavaListConverter
@@ -19,21 +22,19 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
   private var smartPoolId: ErgoId = _
   private var metadataId: ErgoId = _
   private var metadataAddress: Address = _
+  private var holdingContract: HoldingContract = _
+  private var commandContract: CommandContract = _
 
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
     // Make sure smart pool id is not set
-    assert(config.getParameters.getSmartPoolId == "")
-    assert(config.getParameters.getMetadataId == "")
+    assert(paramsConf.getSmartPoolId == "")
+    assert(metaConf.getMetadataId == "")
 
   }
 
   def executeCommand: Unit = {
     logger.info("Command has begun execution")
-    val apiClient = new ApiClient(nodeConf.getNodeApi.getApiUrl, "ApiKeyAuth", nodeConf.getNodeApi.getApiKey)
-    apiClient.createDefaultAdapter()
-    apiClient.getAdapterBuilder
-
 
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
 
@@ -48,8 +49,8 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
       logger.info(s"Node Address=${nodeAddress}")
       assert(prover.getAddress == nodeAddress)
 
-      val metadataValue = config.getParameters.getMetadataValue
-      val txFee = config.getParameters.getInitialTxFee
+      val metadataValue = metaConf.getMetadataValue
+      val txFee = paramsConf.getInitialTxFee
       val metadataContract = MetadataContract.generateMetadataContract(ctx)
       metadataAddress = Address.fromErgoTree(metadataContract.getErgoTree, nodeConf.getNetworkType)
 
@@ -78,6 +79,11 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
 
       logger.info(s"Tx was successfully sent with id: $txId")
 
+      logger.info("Generating holding contract and address for new SmartPool Id")
+      logger.warn("Currently using default HoldingContract hardcoded into tx, add to config later for more flexibility")
+      holdingContract = new holding.SimpleHoldingContract(SimpleHoldingContract.generateHoldingContract(ctx, metadataAddress, smartPoolId))
+      logger.warn("Currently using default CommandContract hardcoded into tx, add to config later for more flexibility")
+      commandContract = new PKContract(nodeAddress)
       signedTx.toJson(true)
     })
     logger.info("Command has finished execution")
@@ -87,14 +93,20 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
     logger.info("Recording tx info into config...")
 
     logger.info("The following information will be updated:")
-    logger.info(s"SmartPool Id: ${config.getParameters.getSmartPoolId}(old) -> $smartPoolId")
-    logger.info(s"Metadata Id: ${config.getParameters.getMetadataId}(old) -> $metadataId")
-    logger.info(s"Metadata Address: ${config.getParameters.getMetadataAddress}(old) -> $metadataAddress")
+    logger.info(s"SmartPool Id: ${paramsConf.getSmartPoolId}(old) -> $smartPoolId")
+    logger.info(s"Metadata Id: ${metaConf.getMetadataId}(old) -> $metadataId")
+    logger.info(s"Metadata Address: ${metaConf.getMetadataAddress}(old) -> $metadataAddress")
+    logger.info(s"Pool Operators: ${paramsConf.getPoolOperators.mkString("Array(", ", ", ")")}(old) -> ${Array(commandContract.getAddress).mkString("Array(", ", ", ")")}")
+    logger.info(s"Holding Address: ${holdConf.getHoldingAddress}(old) -> ${holdingContract.getAddress}")
+    logger.info(s"Holding Type: ${holdConf.getHoldingType}(old) -> default")
 
     val newConfig = config.copy()
     newConfig.getParameters.setSmartPoolId(smartPoolId.toString)
-    newConfig.getParameters.setMetadataId(metadataId.toString)
-    newConfig.getParameters.setMetadataAddress(metadataAddress.toString)
+    newConfig.getParameters.getMetaConf.setMetadataId(metadataId.toString)
+    newConfig.getParameters.getMetaConf.setMetadataAddress(metadataAddress.toString)
+    newConfig.getParameters.getHoldingConf.setHoldingAddress(holdingContract.getAddress.toString)
+    newConfig.getParameters.setPoolOperators(Array(commandContract.getAddress.toString))
+    newConfig.getParameters.getHoldingConf.setHoldingType("default")
 
     ConfigHandler.writeConfig(AppParameters.configFilePath, newConfig)
     logger.info("Config file has been successfully updated")

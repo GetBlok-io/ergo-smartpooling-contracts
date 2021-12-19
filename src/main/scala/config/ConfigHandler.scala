@@ -1,6 +1,8 @@
 package config
 
 import com.google.gson.GsonBuilder
+import config.node.{SmartPoolAPIConfig, SmartPoolNodeConfig, SmartPoolWalletConfig}
+import config.params.SmartPoolParameters
 import org.ergoplatform.appkit.NetworkType
 import org.ergoplatform.appkit.config.ErgoNodeConfig
 
@@ -12,10 +14,7 @@ object ConfigHandler {
 
 
   def newConfig: SmartPoolConfig = {
-    val params = new SmartPoolParameters("", "", "", Array(""))
-    params.setMetadataId("")
-    params.setCommandId("")
-    params.setHoldingIds(Array(""))
+    val params = new SmartPoolParameters("", "", Array(""))
 
     val api = new SmartPoolAPIConfig(defaultURL, "")
     val wallet = new SmartPoolWalletConfig("wallet_mneumonic", "wallet_password")

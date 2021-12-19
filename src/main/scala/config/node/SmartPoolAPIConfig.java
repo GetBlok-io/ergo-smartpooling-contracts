@@ -1,4 +1,4 @@
-package config;
+package config.node;
 
 public class SmartPoolAPIConfig {
     private String apiUrl;

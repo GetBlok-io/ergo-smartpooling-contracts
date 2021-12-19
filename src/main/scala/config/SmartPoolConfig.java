@@ -2,7 +2,8 @@ package config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import org.ergoplatform.appkit.config.ErgoNodeConfig;
+import config.node.SmartPoolNodeConfig;
+import config.params.SmartPoolParameters;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -15,14 +16,15 @@ import java.nio.file.Paths;
  * */
 public class SmartPoolConfig {
     private SmartPoolNodeConfig node;
-
-    private PersistenceConfig persistence;
     private SmartPoolParameters parameters;
+    private PersistenceConfig persistence;
+    private LoggingConfig logging;
 
-    public SmartPoolConfig(SmartPoolNodeConfig nodeConf, SmartPoolParameters paramConf, PersistenceConfig persConfig){
+    public SmartPoolConfig(SmartPoolNodeConfig nodeConf, SmartPoolParameters paramConf, PersistenceConfig persConfig, LoggingConfig logConf){
         node = nodeConf;
         parameters = paramConf;
         persistence = persConfig;
+        logging = logConf;
     }
     /**
      * Returns Ergo node configuration
@@ -91,7 +93,14 @@ public class SmartPoolConfig {
     }
 
     public SmartPoolConfig copy() {
-        return new SmartPoolConfig(node, parameters.copy(), persistence);
+        return new SmartPoolConfig(node, parameters.copy(), persistence, logging);
     }
 
+    public LoggingConfig getLogging() {
+        return logging;
+    }
+
+    public void setLogging(LoggingConfig logging) {
+        this.logging = logging;
+    }
 }

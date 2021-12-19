@@ -20,6 +20,7 @@ package object app {
     final val INVALID_NODE_ADDRESS = 200
     final val INVALID_NODE_APIKEY = 201
 
+    final val NO_COMMAND_TO_USE = 300
   }
 
   def exit(implicit logger: Logger, exitCode: Int): Nothing = {
