@@ -13,7 +13,7 @@ abstract class CommandTxTemplate(unsignedTxBuilder: UnsignedTransactionBuilder) 
   protected[this] var _commandValue: Long = 0L
   protected[this] var _inputBoxes: List[InputBox] = List[InputBox]()
 
-  val cOB: CommandOutputBuilder = new CommandOutputBuilder(this.outBoxBuilder())
+  var cOB: CommandOutputBuilder = new CommandOutputBuilder(this.outBoxBuilder())
 
   def metadataInputBox: MetadataInputBox = _metadataInputBox
 

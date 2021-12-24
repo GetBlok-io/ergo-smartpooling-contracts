@@ -101,6 +101,7 @@ class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Com
       .contract(commandContract)
       .value(commandValue)
 
+
     this.applyCustomMetadata
     CommandContract.updatePoolInfo(cOB, metadataInputBox, ctx.getHeight)
 
@@ -113,7 +114,7 @@ class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Com
 
     this.asUnsignedTxB
       .boxesToSpend(this._inputBoxes.asJava)
-      .outputs(commandOutBox)
+      .outputs(commandOutBox.asOutBox)
       .fee(txFee)
       .sendChangeTo(commandContract.getAddress.getErgoAddress)
       .build()

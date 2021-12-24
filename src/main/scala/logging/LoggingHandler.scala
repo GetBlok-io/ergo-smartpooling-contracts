@@ -4,7 +4,7 @@ import app.AppParameters
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.Date
-import java.util.logging.{ConsoleHandler, FileHandler, Formatter, Level, LogRecord, SimpleFormatter}
+import java.util.logging.{ConsoleHandler, ErrorManager, FileHandler, Formatter, Level, LogRecord, SimpleFormatter}
 
 object LoggingHandler {
   val fileHandler: FileHandler = new FileHandler("smartpool.%u.%g.log", 1000000, 3, true)
@@ -19,6 +19,7 @@ object LoggingHandler {
     val LOG_GEN_METADATA_CMD = "GenerateMetadataCmd"
     val LOG_MODIFY_SMARTPOOL_CMD = "ModifySmartPoolCmd"
     val LOG_DISTRIBUTE_REWARDS_CMD = "DistributeRewardsCmd"
+    val LOG_NODE_HANDLER = "NodeHandler"
 
     val LOG_COMMAND_TX = "CommandTx"
     val LOG_DIST_TX = "DistributionTx"
@@ -28,6 +29,7 @@ object LoggingHandler {
     val loggerNames = List(
       LOG_MAIN, LOG_TEST,
       LOG_PERSISTENCE, LOG_PAYMENT_HANDLER, LOG_GEN_METADATA_CMD, LOG_MODIFY_SMARTPOOL_CMD, LOG_DISTRIBUTE_REWARDS_CMD,
+      LOG_NODE_HANDLER,
       LOG_COMMAND_TX, LOG_DIST_TX, LOG_GEN_TX, LOG_MOD_TX
     )
 

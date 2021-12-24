@@ -1,0 +1,115 @@
+package app
+
+import boxes.MetadataInputBox
+import config.SmartPoolConfig
+import contracts.holding
+import contracts.holding.SimpleHoldingContract
+import logging.LoggingHandler
+import org.ergoplatform.appkit._
+import org.slf4j.{Logger, LoggerFactory}
+import persistence.PersistenceHandler
+import persistence.queries.BlockByHeightQuery
+
+// TODO: Change how wallet mneumonic is handled in order to be safer against hacks(maybe unlock file from node)
+class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
+  val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_GEN_METADATA_CMD)
+  private var blockReward = 0L
+  val txFee: Long = Parameters.MinFee
+
+  override val appCommand: app.AppCommand.Value = AppCommand.GenerateMetadataCmd
+  def initiateCommand: Unit = {
+    logger.info("Initiating command...")
+    // Basic assertions
+    assert(holdConf.getHoldingAddress != "")
+    assert(holdConf.getHoldingType == "default")
+    assert(paramsConf.getSmartPoolId != "")
+    assert(metaConf.getMetadataId != "")
+
+    logger.info("Creating connection to persistence database")
+    val persistence = new PersistenceHandler(Some(config.getPersistence.getHost), Some(config.getPersistence.getPort), Some(config.getPersistence.getDatabase))
+    persistence.setConnectionProperties(config.getPersistence.getUsername, config.getPersistence.getPassword, config.getPersistence.isSslConnection)
+
+    val dbConn = persistence.connectToDatabase
+    logger.info("Now performing BlockByHeight Query")
+    val blockQuery = new BlockByHeightQuery(dbConn, paramsConf.getPoolId, blockHeight.toLong)
+    val block =  blockQuery.setVariables().execute().getResponse
+    logger.info("Query executed successfully")
+    logger.info(s"Block From Query: ")
+
+    if(block == null){
+      logger.error("Block is null")
+      exit(logger, ExitCodes.COMMAND_FAILED)
+    }
+    try {
+      logger.info(s"Block Height: ${block.blockheight}")
+      logger.info(s"Block Id: ${block.id}")
+      logger.info(s"Block Reward: ${block.reward}")
+      logger.info(s"Block Progress: ${block.confirmationProgress}")
+      logger.info(s"Block Status: ${block.status}")
+      logger.info(s"Block Created: ${block.created}")
+    }catch{
+      case exception: Exception =>
+        logger.error(exception.getMessage)
+        exit(logger, ExitCodes.COMMAND_FAILED)
+    }
+
+    // Block must still be pending
+    assert(block.status == "pending")
+    // Block must have full num of confirmations
+    assert(block.confirmationProgress == 1.0)
+    // Assertions to make sure config is setup for command
+    assert(holdConf.getHoldingAddress != "")
+    // Assume holding type is default for now
+    assert(holdConf.getHoldingType == "default")
+
+    blockReward = (block.reward * Parameters.OneErg).toLong
+
+  }
+
+  def executeCommand: Unit = {
+    logger.info("Command has begun execution")
+
+
+    val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
+      val secretStorage = SecretStorage.loadFrom(walletConf.getSecretStoragePath)
+      secretStorage.unlock(nodeConf.getWallet.getWalletPass)
+
+      val prover = ctx.newProverBuilder().withSecretStorage(secretStorage).withEip3Secret(0).build()
+      val nodeAddress = prover.getEip3Addresses.get(0)
+
+      val holdingContract = SimpleHoldingContract.generateHoldingContract(ctx, Address.create(metaConf.getMetadataAddress), ErgoId.create(paramsConf.getSmartPoolId))
+      val txB = ctx.newTxBuilder()
+      val outB = txB.outBoxBuilder()
+      val inputBoxes = ctx.getWallet.getUnspentBoxes(blockReward + txFee)
+
+      val holdingBox =
+        outB
+        .value(blockReward)
+        .contract(holdingContract)
+        .build()
+
+      val tx: UnsignedTransaction = txB
+        .boxesToSpend(inputBoxes.get)
+        .outputs(holdingBox)
+        .fee(txFee)
+        .sendChangeTo(nodeAddress.getErgoAddress)
+        .build()
+      logger.info("SendToHolding Tx built")
+      val signed: SignedTransaction = prover.sign(tx)
+      logger.info("SendToHolding Tx signed")
+      // Submit transaction to node
+      val txId: String = ctx.sendTransaction(signed)
+      logger.info(s"Tx successfully sent with id: ${txId} \n")
+      signed.toJson(true)
+
+    })
+    logger.info("Command has finished execution")
+  }
+
+  def recordToConfig: Unit = {
+    logger.info("Nothing to record for config")
+  }
+
+
+}
+

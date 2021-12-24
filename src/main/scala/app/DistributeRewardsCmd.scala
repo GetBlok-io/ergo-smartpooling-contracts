@@ -2,7 +2,7 @@ package app
 
 import boxes.{CommandInputBox, MetadataInputBox}
 import config.{ConfigHandler, SmartPoolConfig}
-import contracts.MetadataContract
+import contracts.{MetadataContract, holding}
 import contracts.command.PKContract
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
@@ -52,28 +52,48 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     val blockQuery = new BlockByHeightQuery(dbConn, paramsConf.getPoolId, blockHeight.toLong)
     val block =  blockQuery.setVariables().execute().getResponse
     logger.info("Query executed successfully")
+    logger.info(s"Block From Query: ")
+
+    if(block == null){
+      logger.error("Block is null")
+      exit(logger, ExitCodes.COMMAND_FAILED)
+    }
+    try {
+      logger.info(s"Block Height: ${block.blockheight}")
+      logger.info(s"Block Id: ${block.id}")
+      logger.info(s"Block Reward: ${block.reward}")
+      logger.info(s"Block Progress: ${block.confirmationProgress}")
+      logger.info(s"Block Status: ${block.status}")
+      logger.info(s"Block Created: ${block.created}")
+    }catch{
+      case exception: Exception =>
+        logger.error(exception.getMessage)
+        exit(logger, ExitCodes.COMMAND_FAILED)
+    }
     // Lets ensure that blocks are only set to confirmed once we pay them out.
-    assert(block.status == "pending")
+    // TODO: Renable this for MC
+    assert(block.status == "confirmed")
     // Block must have full num of confirmations
-    assert(block.confirmationProgess == 100.0)
+    assert(block.confirmationProgress == 1.0)
     // Assertions to make sure config is setup for command
     assert(holdConf.getHoldingAddress != "")
     // Assume holding type is default for now
     assert(holdConf.getHoldingType == "default")
 
-    val blockCreated = block.created
     blockReward = (block.reward * Parameters.OneErg).toLong
-    holdingContract = new SimpleHoldingContract(new ErgoTreeContract(Address.create(holdConf.getHoldingAddress).getErgoAddress.script))
+
 
     logger.info("Now performing PPLNS Query")
-    val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockCreated, PPLNS_CONSTANT)
+    val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
     val shares = pplnsQuery.setVariables().execute().getResponse
     logger.info("Query executed successfully")
-    val commandInputs = PaymentHandler.pplnsToConsensus(shares)
+    val commandInputs = PaymentHandler.simplePPLNSToConsensus(shares)
     shareConsensus = commandInputs._1
     memberList = commandInputs._2
 
     logger.info(s"Share consensus and member list with ${shareConsensus.nValue.size} unique addresses have been built")
+    logger.info(shareConsensus.nValue.toString())
+    logger.info(memberList.nValue.toString())
   }
 
   def executeCommand: Unit = {
@@ -81,16 +101,24 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
 
-      val mnemonic = SecretString.create(nodeConf.getWallet.getWalletMneumonic)
-      val password = SecretString.create(nodeConf.getWallet.getWalletPass)
+      val secretStorage = SecretStorage.loadFrom(walletConf.getSecretStoragePath)
+      secretStorage.unlock(nodeConf.getWallet.getWalletPass)
 
-      val prover = ctx.newProverBuilder().withMnemonic(mnemonic, password).build()
-      val nodeAddress = Address.fromMnemonic(nodeConf.getNetworkType, mnemonic, password)
+      val prover = ctx.newProverBuilder().withSecretStorage(secretStorage).withEip3Secret(0).build()
+      val nodeAddress = prover.getEip3Addresses.get(0)
+      holdingContract = new holding.SimpleHoldingContract(SimpleHoldingContract.generateHoldingContract(ctx, Address.create(metaConf.getMetadataAddress), ErgoId.create(paramsConf.getSmartPoolId)))
+      logger.info("Holding Address: " + holdingContract.getAddress.toString)
+      val isHoldingCovered = ctx.getCoveringBoxesFor(holdingContract.getAddress, blockReward, List[ErgoToken]().asJava).isCovered
 
-      logger.info("The following addresses must be exactly the same:")
+      if(!isHoldingCovered){
+        exit(logger, ExitCodes.HOLDING_NOT_COVERED)
+      }else{
+        logger.info("Holding address has enough ERG to cover transaction")
+      }
+
       logger.info(s"Prover Address=${prover.getAddress}")
       logger.info(s"Node Address=${nodeAddress}")
-      assert(prover.getAddress == nodeAddress)
+      //assert(prover.getAddress == nodeAddress)
 
       logger.warn("Using hard-coded PK Command Contract, ensure this value is added to configuration file later for more command box options")
 
@@ -99,7 +127,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
       val commandTx = new CreateCommandTx(ctx.newTxBuilder())
       val commandContract = new PKContract(nodeAddress)
-      val inputBoxes = ctx.getCoveringBoxesFor(nodeAddress, AppParameters.defaultCommandValue + commandTx.txFee, List[ErgoToken]().asJava).getBoxes.asScala.toList
+      val inputBoxes = ctx.getWallet.getUnspentBoxes(cmdConf.getCommandValue + commandTx.txFee).get().asScala.toList
 
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
 
@@ -107,7 +135,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
         commandTx
           .metadataToCopy(metadataBox)
           .withCommandContract(commandContract)
-          .commandValue(AppParameters.defaultCommandValue)
+          .commandValue(cmdConf.getCommandValue)
           .inputBoxes(inputBoxes: _*)
           .withHolding(holdingContract, blockReward)
           .setConsensus(shareConsensus)
@@ -120,6 +148,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
       val commandBox = new CommandInputBox(commandTx.commandOutBox.convertToInputWith(cmdTxId.filter(c => c != '\"'), 0), commandContract)
       logger.info("Now building DistributionTx using new command box...")
+      logger.info(commandBox.toString)
       val distTx = new DistributionTx(ctx.newTxBuilder())
       val unsignedDistTx =
         distTx

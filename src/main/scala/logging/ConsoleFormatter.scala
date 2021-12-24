@@ -7,7 +7,7 @@ class ConsoleFormatter extends Formatter {
   private val pattern = "[%1$tT] [%2$s] [%3$s] %4$s %n"
   private val issuePattern = "[%1$tT] [%2$s] [%3$s] [\"%4$s\"] %5$s %n"
   override def format(record: LogRecord): String = {
-    if(record.getLevel != Level.WARNING && record.getLevel != Level.SEVERE) {
+    if(record.getLevel != Level.FINE) {
       String.format(pattern,
         new Date(record.getMillis),
         record.getLevel.getLocalizedName,

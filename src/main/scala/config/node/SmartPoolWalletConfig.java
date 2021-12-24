@@ -1,19 +1,21 @@
 package config.node;
 
 public class SmartPoolWalletConfig {
-    private String walletMneumonic;
+    private String secretStoragePath;;
     private String walletPass;
 
     public SmartPoolWalletConfig(String name, String pass){
-        walletMneumonic = name;
+        secretStoragePath = name;
         walletPass = pass;
     }
 
-    public String getWalletMneumonic(){
-        return walletMneumonic;
-    }
+
 
     public String getWalletPass() {
         return walletPass;
+    }
+
+    public String getSecretStoragePath() {
+        return secretStoragePath;
     }
 }

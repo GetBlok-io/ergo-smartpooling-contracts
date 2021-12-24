@@ -26,10 +26,10 @@ object TestParameters {
   final val networkType = NetworkType.TESTNET
   val poolMiner = Address.create("3WwtfPaghPbuPtYQs4Uj9QooYsPYkEZsESjmcR49MB4fs5kEshX7")
   val poolMinerTwo = Address.create("3WzKopFYhfRGPaUvC7v49DWgeY1efaCD3YpNQ6FZGr2t5mBhWjmw")
-  var creationMetadataID = ErgoId.create("d9a06b8a5dcbb2f6a400eb581891ca5f1cbd30be0e15d61d7b9cb2d0d864c65a")
+  var creationMetadataID = ErgoId.create("e3755ad2df5886d9bf750a910deb674b73db0df5ec4e586fee7e93022c7a0564")
 
 
-  val currentMetadataID = "10799205d8cc1117457baa7f155c1a98b5f45cd7160471470a4a48421130a58f"
+  val currentMetadataID = "e3755ad2df5886d9bf750a910deb674b73db0df5ec4e586fee7e93022c7a0564"
   var currentCommandID = "49ff9cbe600063534dfe1f8900b344543d44d68852065e34e3b1a164d81450ed"
 
   val poolOpSecret = SecretString.create("decade replace tired property draft patch innocent regular habit refuse double hard stick where phrase")
@@ -62,7 +62,7 @@ object TestParameters {
 
     rewardsAddress = Address.createEip3Address(0, NetworkType.TESTNET, rewardsSecret, SecretString.empty())
     rewardsProver = ctx.newProverBuilder().withMnemonic(rewardsSecret, SecretString.empty()).withEip3Secret(0).build();
-
+    println(holdingAddress)
     commandContract = new PKContract(poolOperator)
   }
 }

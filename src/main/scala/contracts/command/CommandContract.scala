@@ -102,10 +102,10 @@ object CommandContract {
     val metadataRegs = metadataInputBox.getMetadataRegisters
     val newPoolInfo = metadataRegs.poolInfo.setCurrentEpoch(metadataRegs.poolInfo.getCurrentEpoch + 1).setCurrentEpochHeight(currentHeight)
 
-    metadataRegs.poolInfo = newPoolInfo
-
+    val cobMetadata = cOB.metadataRegisters
+    cobMetadata.poolInfo = newPoolInfo
     cOB
-      .setMetadata(metadataRegs)
+      .setMetadata(cobMetadata)
   }
 
 

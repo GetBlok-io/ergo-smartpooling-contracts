@@ -10,6 +10,7 @@ public class SmartPoolParameters {
     private String paymentType;
     private long PPLNS_NUM_SHARES;
 
+
     private MetadataConfig metaConf;
     private CommandConfig commandConf;
     private HoldingConfig holdingConf;
@@ -20,8 +21,9 @@ public class SmartPoolParameters {
         smartPoolId = spId;
         poolId = pId;
         poolOperators = poolOps;
-        initialTxFee = Parameters.OneErg;
+        initialTxFee = Parameters.MinFee;
         paymentType = "PPLNS";
+
         PPLNS_NUM_SHARES = 50000;
         metaConf = new MetadataConfig("", "", "default", 0L);
         commandConf = new CommandConfig("", "", "default", 0L);
@@ -114,4 +116,5 @@ public class SmartPoolParameters {
     public void setMetaConf(MetadataConfig metaConf) {
         this.metaConf = metaConf;
     }
+
 }

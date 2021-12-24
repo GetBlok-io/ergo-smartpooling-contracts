@@ -85,17 +85,6 @@ object MetadataContract {
           // creation epoch height stays same between spending tx
           val creationHeightPreserved = newPoolInfo(2) == currentPoolInfo(2)
 
-          // creation ID represents id of box with epoch 0
-          // If not epoch 0, then new metadata uses creationID stored in current metadata box
-          // If current metadata box is on epoch 0, then we store its id as a long in the new metadata box
-          val creationBoxPreserved =
-          if(currentPoolInfo(0) != 0L){
-            newPoolInfo(3) == currentPoolInfo(3)
-          }else{
-            // newPoolInfo(3) == byteArrayToLong(SELF.id)
-            true
-          }
-
           val smartPoolNFTPreserved =
           if(currentPoolInfo(0) != 0L){
             SELF.tokens(0)._1 == OUTPUTS(0).tokens(0)._1
@@ -103,7 +92,7 @@ object MetadataContract {
             OUTPUTS(0).tokens(0)._1 == SELF.id
           }
 
-          epochIncremented && epochHeightStored && creationHeightPreserved && creationBoxPreserved && smartPoolNFTPreserved
+          epochIncremented && epochHeightStored && creationHeightPreserved && smartPoolNFTPreserved
         }else{
           false
         }
@@ -168,7 +157,7 @@ object MetadataContract {
    */
   def buildGenesisBox(mOB: MetadataOutputBuilder, metadataContract: ErgoContract, poolOp: Address, initialValue: Long, currentHeight: Int): OutBox = {
     val poolOpBytes = poolOp.getErgoAddress.script.bytes
-    val initialConsensus: ShareConsensus = ShareConsensus.fromConversionValues(Array((poolOpBytes, Array(0L, (1 * Parameters.OneErg)/10 , 0L))))
+    val initialConsensus: ShareConsensus = ShareConsensus.fromConversionValues(Array((poolOpBytes, Array(1L, (1 * Parameters.OneErg)/10 , 0L))))
     val initialMembers: MemberList = MemberList.fromConversionValues(Array((poolOpBytes, poolOp.toString)))
     val initialPoolFee: PoolFees = PoolFees.fromConversionValues(Array((poolOpBytes, 1)))
     val initialPoolOp: PoolOperators = PoolOperators.fromConversionValues(Array((poolOpBytes, poolOp.toString)))

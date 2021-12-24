@@ -1,20 +1,22 @@
 package persistence.queries
 
+import logging.LoggingHandler
+import org.slf4j.{Logger, LoggerFactory}
 import persistence.DatabaseConnection
 import persistence.responses.ShareResponse
 
 import java.sql.{Date, PreparedStatement, ResultSet}
 
 // Query the last N shares created before a certain date. Used
-class PPLNSQuery(dbConn: DatabaseConnection, poolId: String, before: Date, numShares: Int) extends DatabaseQuery[Array[ShareResponse]](dbConn) {
+class PPLNSQuery(dbConn: DatabaseConnection, poolId: String, blockHeight: Long, numShares: Int) extends DatabaseQuery[Array[ShareResponse]](dbConn) {
+  val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
   override val queryString: String =
-    """SELECT * FROM shares WHERE poolid = ?
-      | AND created <= ? ORDER BY created DESC FETCH NEXT ? ROWS ONLY""".stripMargin
+    """SELECT * FROM shares WHERE poolid = ? AND blockheight <= ? ORDER BY created DESC FETCH NEXT ? ROWS ONLY""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(queryString)
 
   override def setVariables(): DatabaseQuery[Array[ShareResponse]] = {
     asStatement.setString(1, poolId)
-    asStatement.setDate(2, before)
+    asStatement.setLong(2, blockHeight)
     asStatement.setInt(3, numShares)
 
     this
@@ -29,13 +31,15 @@ class PPLNSQuery(dbConn: DatabaseConnection, poolId: String, before: Date, numSh
     while(rt.next()){
       val asShareResponse =
         ShareResponse(
-          rt.getString(1), rt.getInt(2), rt.getDouble(3),
-          rt.getDouble(4), rt.getString(5),
+          rt.getString(1), rt.getLong(2), rt.getBigDecimal(3),
+          rt.getBigDecimal(4), rt.getString(5),
           rt.getString(9), rt.getDate(10)
         )
 
       newResponse = newResponse++Array(asShareResponse)
     }
+    logger.info(s"PPLNS Response with ${newResponse.length} shares")
+
     _response = newResponse
     this
   }

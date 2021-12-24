@@ -5,15 +5,18 @@ import boxes.builders.{HoldingOutputBuilder, MetadataOutputBuilder}
 import contracts.MetadataContract
 import contracts.command.{CommandContract, PKContract}
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
+import logging.LoggingHandler
 import org.ergoplatform.ErgoAddress
 import org.ergoplatform.appkit.{BlockchainContext, ErgoToken, InputBox, NetworkType, OutBox, OutBoxBuilder, Parameters, PreHeader, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
+import org.slf4j.{Logger, LoggerFactory}
+import spire.compat.numeric
 import transactions.models.{MetadataTxTemplate, TransactionTemplate}
 
 import java.util
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
 class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends MetadataTxTemplate(unsignedTxBuilder) {
-
+  val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DIST_TX)
   private var hOB: HoldingOutputBuilder = _
   private[this] var _mainHoldingContract: HoldingContract = _
   private[this] var _otherCommandContracts: List[CommandContract] = List[CommandContract]()
@@ -23,7 +26,7 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
   private def otherCommandContracts: List[CommandContract] = _otherCommandContracts
 
   private def otherCommandContracts(contracts: List[CommandContract]): Unit = {
-    _otherCommandContracts = contracts.toList
+    _otherCommandContracts = contracts
 
   }
 
@@ -82,12 +85,15 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
 
     val txFee = commandInputBox.getValue + (commandInputBox.getShareConsensus.nValue.size * Parameters.MinFee)
     val outputBoxes = List(metadataOutBox.asOutBox)++(holdingOutputs.map(h => h.asOutBox))
-    outputBoxes.foreach(x => println(x.getValue))
+    logger.info("Distribution Tx built")
+    logger.info("Total Input Value: "+ (inputBoxes.map(x => x.getValue.toLong).sum))
+    logger.info("Total Output Value: "+ outputBoxes.map(x => x.getValue).sum)
+
       this.asUnsignedTxB
       .boxesToSpend(inputBoxes.asJava)
       .outputs(outputBoxes:_*)
       .fee(txFee)
-      .sendChangeTo(commandInputBox.contract.getAddress.getErgoAddress)
+      .sendChangeTo(holdingAddress.getErgoAddress)
       .build()
 
   }

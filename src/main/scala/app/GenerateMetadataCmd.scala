@@ -6,8 +6,8 @@ import contracts.{MetadataContract, holding}
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
 import org.ergoplatform.appkit.config.ErgoNodeConfig
-import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoId, ErgoToken, ErgoValue, NetworkType, Parameters, RestApiErgoClient, SecretString}
-import org.ergoplatform.restapi.client.{ApiClient, WalletApi}
+import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoId, ErgoToken, ErgoValue, NetworkType, Parameters, RestApiErgoClient, SecretStorage, SecretString}
+import org.ergoplatform.restapi.client.{ApiClient, Body3, WalletApi}
 import org.slf4j.LoggerFactory
 import retrofit2.RetrofitUtil
 import sigmastate.CreateAvlTree
@@ -25,29 +25,46 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
   private var holdingContract: HoldingContract = _
   private var commandContract: CommandContract = _
 
+  private var secretStorage: SecretStorage = _
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
     // Make sure smart pool id is not set
     assert(paramsConf.getSmartPoolId == "")
     assert(metaConf.getMetadataId == "")
+    assert(walletConf.getSecretStoragePath != "")
 
+    logger.info(nodeConf.getNodeApi.getApiUrl)
+    logger.info(nodeConf.getNodeApi.getApiKey)
+
+
+    secretStorage = SecretStorage.loadFrom(walletConf.getSecretStoragePath)
+    secretStorage.unlock(nodeConf.getWallet.getWalletPass)
   }
 
   def executeCommand: Unit = {
     logger.info("Command has begun execution")
 
+
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
 
-      val mnemonic = SecretString.create(nodeConf.getWallet.getWalletMneumonic)
-      val password = SecretString.create(nodeConf.getWallet.getWalletPass)
 
-      val prover = ctx.newProverBuilder().withMnemonic(mnemonic, password).build()
-      val nodeAddress = Address.fromMnemonic(nodeConf.getNetworkType, mnemonic, password)
+
+      val prover = ctx.newProverBuilder().withSecretStorage(secretStorage).withEip3Secret(0).build()
+      var nodeAddress = prover.getAddress
+      logger.info("Now printing EIP3 Addresses")
+      for(i <- 0 to 10){
+        try {
+          logger.info(prover.getEip3Addresses.get(i).toString)
+          nodeAddress = prover.getEip3Addresses.get(i)
+        }
+        catch {case exception: Exception => logger.warn(s"Could not find EIP address number $i for node wallet")}
+      }
+
 
       logger.info("The following addresses must be exactly the same:")
       logger.info(s"Prover Address=${prover.getAddress}")
       logger.info(s"Node Address=${nodeAddress}")
-      assert(prover.getAddress == nodeAddress)
+      //assert(prover.getAddress == nodeAddress)
 
       val metadataValue = metaConf.getMetadataValue
       val txFee = paramsConf.getInitialTxFee
@@ -56,7 +73,7 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
 
       logger.info("Parameters given:")
       logger.info(s"MetadataValue=${metadataValue / Parameters.OneErg} ERG")
-      logger.info(s"TxFee=${txFee / Parameters.OneErg} ERG")
+      logger.info(s"TxFee=${txFee.toDouble / Parameters.OneErg} ERG")
       logger.info("Now building transaction...")
 
       val genesisTx = new GenesisTx(ctx.newTxBuilder())
@@ -67,6 +84,10 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
         .metadataValue(metadataValue)
         .txFee(txFee)
         .build()
+      logger.info("Tx has been built")
+
+
+
       logger.info("Tx is now being signed...")
       //TODO check if this works
       val signedTx = prover.sign(unsignedTx)
@@ -90,6 +111,7 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
   }
 
   def recordToConfig: Unit = {
+
     logger.info("Recording tx info into config...")
 
     logger.info("The following information will be updated:")
