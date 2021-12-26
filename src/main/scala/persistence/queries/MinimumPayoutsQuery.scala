@@ -1,37 +1,39 @@
 package persistence.queries
 
 import persistence.DatabaseConnection
-import persistence.responses.BlockResponse
+import persistence.responses.{BlockResponse, SettingsResponse}
 
-import java.sql.PreparedStatement
+import java.sql.{Date, PreparedStatement}
 // Query for minimum payouts to input into command box
 // TODO: Finish this query for usage in mainnet. Currently not necessary for testnet
-class MinimumPayoutsQuery(dbConn: DatabaseConnection, poolId: String, blockheight: Long) extends DatabaseQuery[BlockResponse](dbConn) {
+class MinimumPayoutsQuery(dbConn: DatabaseConnection, poolId: String, address: String) extends DatabaseQuery[SettingsResponse](dbConn) {
   override val queryString: String =
-    """SELECT * FROM miner_settings""".stripMargin
+    """SELECT * FROM miner_settings WHERE poolid = ? AND address = ?""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(queryString)
 
-  override def setVariables(): DatabaseQuery[BlockResponse] = {
+  override def setVariables(): DatabaseQuery[SettingsResponse] = {
     asStatement.setString(1, poolId)
-    asStatement.setLong(2, blockheight)
+    asStatement.setString(2, address)
     this
   }
 
-  private var _response: BlockResponse = _
+  private var _response: SettingsResponse = _
 
-  override def execute(): DatabaseQuery[BlockResponse] = {
+  override def execute(): DatabaseQuery[SettingsResponse] = {
 
     rt = asStatement.executeQuery()
 
-    if(rt.next())
-      _response = BlockResponse(
-        rt.getLong(1), rt.getString(2), rt.getLong(3),
-        rt.getDouble(4), rt.getString(5), rt.getDouble(7),
-        rt.getString(10), rt.getDouble(11), rt.getDate(14)
+    if(rt.next()) {
+      _response = SettingsResponse(
+       rt.getString(1), rt.getString(2), rt.getDouble(3)
       )
+    }else{
+      // We create a default response if no response is found.
+      _response = SettingsResponse(poolId, address, 0.1)
+    }
 
     this
   }
 
-  override def getResponse: BlockResponse = _response
+  override def getResponse: SettingsResponse = _response
 }

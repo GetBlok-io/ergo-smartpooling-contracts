@@ -34,7 +34,7 @@ object SmartPool_Test {
 
   // Initial metadata value
   implicit val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_TEST)
-  LoggingHandler.initializeLogger(logger)
+  //LoggingHandler.initializeLogger(logger)
 
   def main(args: Array[String]): Unit = {
     logger.info("Starting Smart Pool Test...")

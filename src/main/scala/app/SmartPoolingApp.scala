@@ -14,16 +14,17 @@ import scala.util.{Failure, Try}
 object SmartPoolingApp{
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_MAIN)
-  LoggingHandler.initiateLogging()
+
   var cmd: SmartPoolCmd = _
   var config: Try[SmartPoolConfig] = _
   def main(args: Array[String]): Unit = {
     logger.info("Now starting SmartPoolingApp")
 
-    val usage = "Usage: java -jar SmartPoolingApp.jar -c=smart/pool/path/config.json [-v | -g | -d blockHeight | -h blockHeight ]"
+    val usage = "Usage: java -jar SmartPoolingApp.jar -c=smart/pool/path/ [-v | -g | -d blockHeight | -h blockHeight ]"
     var txCommand = EmptyCommand
 
     var blockHeight = 0
+    var blockHeights = Array[Int]()
     for(arg <- args){
       arg match {
         case arg if arg.startsWith("-") =>
@@ -34,10 +35,9 @@ object SmartPoolingApp{
               try {
                 config = Try(SmartPoolConfig.load(commandValue))
                 AppParameters.configFilePath = commandValue
+                LoggingHandler.initiateLogging(config.get)
               } catch {
-                case fileNotFoundException: FileNotFoundException =>
-                  exit(logger, ExitCodes.CONFIG_NOT_FOUND)
-                case _ =>
+                case ex: Exception =>
                   exit(logger, ExitCodes.CONFIG_NOT_FOUND)
               }
             case 'g' =>
@@ -53,6 +53,8 @@ object SmartPoolingApp{
           }
         case arg if arg.forall(c => c.isDigit) =>
           blockHeight = arg.toInt
+        case arg if arg.startsWith("[") && arg.endsWith("]") =>
+          blockHeights = arg.substring(1, arg.length - 1).split(",").map(s => s.toInt)
 
         case _ => exit(logger, ExitCodes.INVALID_ARGUMENTS)
       }
@@ -60,6 +62,7 @@ object SmartPoolingApp{
     if(config == null || config.isFailure) {
       config = Try(SmartPoolConfig.load(ConfigHandler.defaultConfigName))
       AppParameters.configFilePath = ConfigHandler.defaultConfigName
+      LoggingHandler.initiateLogging(config.get)
     }
     if(config.isFailure) {
       logger.warn("A config file could not be found, generating new file under sp_config.json")
@@ -68,6 +71,8 @@ object SmartPoolingApp{
 
       exit(logger, ExitCodes.CONFIG_NOT_FOUND)
     }
+
+
     logger.info(s"Configuration file and command arguments successfully loaded")
 
     logger.info(s"Evaluating SmartPool Command...")
@@ -76,15 +81,25 @@ object SmartPoolingApp{
         cmd = new GenerateMetadataCmd(config.get)
         logger.info(s"SmartPool Command: ${GenerateMetadataCmd.toString}")
       case DistributeRewardsCmd =>
-        assert(blockHeight != 0)
-        cmd = new DistributeRewardsCmd(config.get, blockHeight)
+        if(blockHeight != 0) {
+          cmd = new DistributeRewardsCmd(config.get, blockHeight)
+        }else if(blockHeights.length > 0){
+          cmd = new DistributeMultipleCmd(config.get, blockHeights)
+        }else{
+          exit(logger, ExitCodes.INVALID_ARGUMENTS)
+        }
         logger.info(s"SmartPool Command: ${DistributeRewardsCmd.toString}")
       case ViewMetadataCmd =>
         cmd = new ViewMetadataCmd(config.get)
         logger.info(s"SmartPool Command: ${ViewMetadataCmd.toString}")
       case SendToHoldingCmd =>
-        assert(blockHeight != 0)
-        cmd = new SendToHoldingCmd(config.get, blockHeight)
+        if(blockHeight != 0) {
+          cmd = new SendToHoldingCmd(config.get, blockHeight)
+        } else if(blockHeights.length > 0) {
+          cmd = new SendMultipleToHoldingCmd(config.get, blockHeights)
+        } else {
+          exit(logger, ExitCodes.INVALID_ARGUMENTS)
+        }
         logger.info(s"SmartPool Command: ${SendToHoldingCmd.toString}")
       case _ =>
         exit(logger, ExitCodes.NO_COMMAND_TO_USE)

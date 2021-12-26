@@ -3,6 +3,7 @@ package config;
 public class LoggingConfig {
     private String fileLoggingLevel;
     private String consoleLoggingLevel;
+    private String logPath;
     private int maxNumLogs;
     private int maxLogSizeInBytes;
 
@@ -12,6 +13,7 @@ public class LoggingConfig {
         consoleLoggingLevel = "INFO";
         maxNumLogs = numLogs;
         maxLogSizeInBytes = numBytes;
+        logPath = "";
     }
 
 
@@ -45,5 +47,13 @@ public class LoggingConfig {
 
     public void setMaxLogSizeInBytes(int maxLogSizeInBytes) {
         this.maxLogSizeInBytes = maxLogSizeInBytes;
+    }
+
+    public String getLogPath() {
+        return logPath;
+    }
+
+    public void setLogPath(String logPath) {
+        this.logPath = logPath;
     }
 }

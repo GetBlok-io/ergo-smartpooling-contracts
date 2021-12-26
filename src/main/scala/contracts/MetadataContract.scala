@@ -76,6 +76,37 @@ object MetadataContract {
           val currentPoolInfo = SELF.R7[Coll[Long]].get
           val newPoolInfo = OUTPUTS(0).R7[Coll[Long]].get
 
+          val currentConsensus = SELF.R4[Coll[(Coll[Byte], Coll[Long])]].get
+          val newConsensus = OUTPUTS(0).R4[Coll[(Coll[Byte], Coll[Long])]].get
+
+          val newStoredPayouts = newConsensus.map{
+            (consVal: (Coll[Byte], Coll[Long])) =>
+              consVal._2(2)
+          }
+
+          val newConsensusPropBytes = newConsensus.map{
+            (consVal: (Coll[Byte], Coll[Long])) =>
+              consVal._1
+          }
+
+          // This ensures payouts are preserved during a modification tx (tx without holding contract)
+          // CAUTION: Be careful when adding other boxes to tx inputs if holding contract is not there.
+          // Currently the only supported transactions should always ensure payouts are stored properly,
+          // But could be an issue in the future if other types of transactions are added.
+          val payoutsPreserved =
+            if(INPUTS.size == 2){
+              currentConsensus.forall{
+                (consVal: (Coll[Byte], Coll[Long])) =>
+                  val propBytesIndex = newConsensusPropBytes.indexOf(consVal._1, 0)
+                  if(propBytesIndex != -1){
+                    consVal._2(2) == newStoredPayouts(propBytesIndex)
+                  }else{
+                    true
+                  }
+              }
+            }else{
+              true
+            }
           // verifies that epoch is increased by 1
           val epochIncremented = newPoolInfo(0) == currentPoolInfo(0) + 1L
 
@@ -92,7 +123,7 @@ object MetadataContract {
             OUTPUTS(0).tokens(0)._1 == SELF.id
           }
 
-          epochIncremented && epochHeightStored && creationHeightPreserved && smartPoolNFTPreserved
+          epochIncremented && epochHeightStored && creationHeightPreserved && smartPoolNFTPreserved && payoutsPreserved
         }else{
           false
         }

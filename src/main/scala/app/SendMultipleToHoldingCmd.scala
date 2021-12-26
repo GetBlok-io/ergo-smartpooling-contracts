@@ -1,8 +1,6 @@
 package app
 
-import boxes.MetadataInputBox
 import config.SmartPoolConfig
-import contracts.holding
 import contracts.holding.SimpleHoldingContract
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
@@ -11,12 +9,12 @@ import persistence.PersistenceHandler
 import persistence.queries.BlockByHeightQuery
 
 // TODO: Change how wallet mneumonic is handled in order to be safer against hacks(maybe unlock file from node)
-class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
+class SendMultipleToHoldingCmd(config: SmartPoolConfig, blockHeights: Array[Int]) extends SmartPoolCmd(config) {
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_SEND_TO_HOLDING_CMD)
   private var blockReward = 0L
   val txFee: Long = Parameters.MinFee
 
-  override val appCommand: app.AppCommand.Value = AppCommand.GenerateMetadataCmd
+  override val appCommand: app.AppCommand.Value = AppCommand.SendToHoldingCmd
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
     // Basic assertions
@@ -30,39 +28,38 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
     persistence.setConnectionProperties(config.getPersistence.getUsername, config.getPersistence.getPassword, config.getPersistence.isSslConnection)
 
     val dbConn = persistence.connectToDatabase
-    logger.info("Now performing BlockByHeight Query")
-    val blockQuery = new BlockByHeightQuery(dbConn, paramsConf.getPoolId, blockHeight.toLong)
-    val block =  blockQuery.setVariables().execute().getResponse
-    logger.info("Query executed successfully")
-    logger.info(s"Block From Query: ")
 
-    if(block == null){
-      logger.error("Block is null")
-      exit(logger, ExitCodes.COMMAND_FAILED)
-    }
-    try {
-      logger.info(s"Block Height: ${block.blockheight}")
-      logger.info(s"Block Id: ${block.id}")
-      logger.info(s"Block Reward: ${block.reward}")
-      logger.info(s"Block Progress: ${block.confirmationProgress}")
-      logger.info(s"Block Status: ${block.status}")
-      logger.info(s"Block Created: ${block.created}")
-    }catch{
-      case exception: Exception =>
-        logger.error(exception.getMessage)
+    logger.info(s"Now performing BlockByHeight Query for ${blockHeights.length} blocks")
+    for(blockHeight <- blockHeights) {
+      val blockQuery = new BlockByHeightQuery(dbConn, paramsConf.getPoolId, blockHeight.toLong)
+      val block = blockQuery.setVariables().execute().getResponse
+      logger.info("Query executed successfully")
+      logger.info(s"Block From Query: ")
+
+      if (block == null) {
+        logger.error("Block is null")
         exit(logger, ExitCodes.COMMAND_FAILED)
+      }
+      try {
+        logger.info(s"Block Height: ${block.blockheight}")
+        logger.info(s"Block Id: ${block.id}")
+        logger.info(s"Block Reward: ${block.reward}")
+        logger.info(s"Block Progress: ${block.confirmationProgress}")
+        logger.info(s"Block Status: ${block.status}")
+        logger.info(s"Block Created: ${block.created}")
+      } catch {
+        case exception: Exception =>
+          logger.error(exception.getMessage)
+          exit(logger, ExitCodes.COMMAND_FAILED)
+      }
+
+      // Block must still be pending
+      assert(block.status == "pending")
+      blockReward = blockReward + (block.reward * Parameters.OneErg).toLong
+      // Block must have full num of confirmations
+      //assert(block.confirmationProgress == 1.0)
+      // Assertions to make sure config is setup for command
     }
-
-    // Block must still be pending
-    assert(block.status == "pending")
-    // Block must have full num of confirmations
-    //assert(block.confirmationProgress == 1.0)
-    // Assertions to make sure config is setup for command
-    assert(holdConf.getHoldingAddress != "")
-    // Assume holding type is default for now
-    assert(holdConf.getHoldingType == "default")
-
-    blockReward = (block.reward * Parameters.OneErg).toLong
 
   }
 

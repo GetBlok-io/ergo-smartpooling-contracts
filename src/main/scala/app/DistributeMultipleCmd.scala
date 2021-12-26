@@ -2,32 +2,30 @@ package app
 
 import boxes.{CommandInputBox, MetadataInputBox}
 import config.{ConfigHandler, SmartPoolConfig}
-import contracts.{MetadataContract, holding}
 import contracts.command.PKContract
+import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
-import org.ergoplatform.appkit.impl.ErgoTreeContract
-import org.ergoplatform.restapi.client.ApiClient
 import org.slf4j.{Logger, LoggerFactory}
 import payments.PaymentHandler
-import transactions.{CreateCommandTx, DistributionTx, GenesisTx}
-import persistence.{DatabaseConnection, PersistenceHandler}
 import persistence.queries.{BlockByHeightQuery, MinimumPayoutsQuery, PPLNSQuery}
 import persistence.responses.ShareResponse
+import persistence.{DatabaseConnection, PersistenceHandler}
 import registers.{MemberList, ShareConsensus}
+import transactions.{CreateCommandTx, DistributionTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 import scala.util.Try
 
 
 // TODO: Change how wallet mneumonic is handled in order to be safer against hacks(maybe unlock file from node)
-class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
+class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) extends SmartPoolCmd(config) {
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DISTRIBUTE_REWARDS_CMD)
   final val PPLNS_CONSTANT = 50000
 
-  override val appCommand: app.AppCommand.Value = AppCommand.GenerateMetadataCmd
+  override val appCommand: app.AppCommand.Value = AppCommand.DistributeRewardsCmd
   private var smartPoolId: ErgoId = _
   private var metadataId: ErgoId = _
   private var holdingContract: HoldingContract = _
@@ -49,48 +47,43 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     persistence.setConnectionProperties(config.getPersistence.getUsername, config.getPersistence.getPassword, config.getPersistence.isSslConnection)
 
     val dbConn = persistence.connectToDatabase
-    logger.info("Now performing BlockByHeight Query")
-    val blockQuery = new BlockByHeightQuery(dbConn, paramsConf.getPoolId, blockHeight.toLong)
-    val block =  blockQuery.setVariables().execute().getResponse
-    logger.info("Query executed successfully")
-    logger.info(s"Block From Query: ")
+    logger.info(s"Performing BlockByHeight Query for ${blockHeights.length} blocks")
 
-    if(block == null){
-      logger.error("Block is null")
-      exit(logger, ExitCodes.COMMAND_FAILED)
-    }
-    try {
-      logger.info(s"Block Height: ${block.blockheight}")
-      logger.info(s"Block Id: ${block.id}")
-      logger.info(s"Block Reward: ${block.reward}")
-      logger.info(s"Block Progress: ${block.confirmationProgress}")
-      logger.info(s"Block Status: ${block.status}")
-      logger.info(s"Block Created: ${block.created}")
-    }catch{
-      case exception: Exception =>
-        logger.error(exception.getMessage)
-        exit(logger, ExitCodes.COMMAND_FAILED)
-    }
-    // Lets ensure that blocks are only set to confirmed once we pay them out.
-    // TODO: Renable this for MC
-    assert(block.status == "confirmed")
-    // Block must have full num of confirmations
-    //assert(block.confirmationProgress == 1.0)
     // Assertions to make sure config is setup for command
     assert(holdConf.getHoldingAddress != "")
     // Assume holding type is default for now
     assert(holdConf.getHoldingType == "default")
+    var shareResponseList: Array[Array[ShareResponse]] = Array(Array[ShareResponse]())
+    for(blockHeight <- blockHeights) {
+      val blockQuery = new BlockByHeightQuery(dbConn, paramsConf.getPoolId, blockHeight.toLong)
+      val block = blockQuery.setVariables().execute().getResponse
+      logger.info("Query executed successfully")
+      logger.info(s"Block From Query: ")
 
-    blockReward = (block.reward * Parameters.OneErg).toLong
+      if (block == null) {
+        logger.error("Block is null")
+        exit(logger, ExitCodes.COMMAND_FAILED)
+      }
+      assert(block.status == "confirmed")
+      // Block must have full num of confirmations
+      //assert(block.confirmationProgress == 1.0)
 
 
-    logger.info("Now performing PPLNS Query")
-    val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
-    val shares = pplnsQuery.setVariables().execute().getResponse
-    logger.info("Query executed successfully")
-    val commandInputs = PaymentHandler.simplePPLNSToConsensus(shares)
+      blockReward = (block.reward * Parameters.OneErg).toLong
+
+
+      logger.info("Now performing PPLNS Query")
+      val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
+      val shares: Array[ShareResponse] = pplnsQuery.setVariables().execute().getResponse
+      logger.info("Query executed successfully")
+      shareResponseList = shareResponseList ++ Array(shares)
+    }
+    val commandInputs = PaymentHandler.simpleMultiPPLNSToConsensus(shareResponseList)
     val tempConsensus = commandInputs._1
     memberList = commandInputs._2
+    // Lets ensure that blocks are only set to confirmed once we pay them out.
+    // TODO: Renable this for MC
+
 
     shareConsensus = applyMinimumPayouts(dbConn, memberList, tempConsensus)
 
