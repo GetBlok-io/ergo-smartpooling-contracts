@@ -48,13 +48,6 @@ are paid and follow the exact pool fees laid out in the current Metadata Box. Po
 calculated using the Command Box. Instead, the Command Box outlines the pool fees for the next epoch.
 The Metadata Box outlines the Pool Fees to be used during the current epoch.
 
-Every new epoch requires a new holding contract to be created. This is because every holding
-box is linked to some instance of a metadata box during its creation. This ensures that
-fake metadata boxes cannot be created to spend a holding box. 
-This also ensures a unique line of metadata boxes from epoch 0 to the current epoch is always
-available to analyze on the blockchain. Since each metadata box will contain information about the 
-last consensus, we will have a complete payment history stored on the Blockchain for any third-party 
-to verify a SmartPool's operation.
 
 ## [The Metadata Box](docs/MetadataBox.MD)
 The Metadata Box is the box that stores information about the current SmartPool on-chain.
@@ -103,7 +96,10 @@ Each holding box script is tied to a specific smart pool id on creation that rep
 smart pool NFT. The holding contract ensures that holding boxes may only be spent if 
 `INPUTS(0)` represents a metadaat box with the given id. 
 
-# The Consensus Transaction
+Another job of the HoldingBox is to ensure that payments below each miner's minimum payment level are
+stored in a change box under the holding contract that is outputted during the distribution transaction.
+
+# The Distribution/Consensus Transaction
 This is the main transaction that distributes payouts to each SmartPool Member.
 We may also refer to this transaction as a payout cycle or epoch. Each
 transaction destroys an old metadata box and creates a new one with the same
