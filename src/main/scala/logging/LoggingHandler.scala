@@ -25,12 +25,13 @@ object LoggingHandler {
     val LOG_DIST_TX = "DistributionTx"
     val LOG_GEN_TX = "GenesisTx"
     val LOG_MOD_TX = "ModificationTx"
+    val LOG_BOX_HELPER = "BoxHelper"
 
     val loggerNames = List(
       LOG_MAIN, LOG_TEST,
       LOG_PERSISTENCE, LOG_PAYMENT_HANDLER, LOG_GEN_METADATA_CMD, LOG_MODIFY_SMARTPOOL_CMD, LOG_DISTRIBUTE_REWARDS_CMD,
       LOG_SEND_TO_HOLDING_CMD, LOG_NODE_HANDLER,
-      LOG_COMMAND_TX, LOG_DIST_TX, LOG_GEN_TX, LOG_MOD_TX
+      LOG_COMMAND_TX, LOG_DIST_TX, LOG_GEN_TX, LOG_MOD_TX, LOG_BOX_HELPER
     )
 
   }

@@ -1,4 +1,4 @@
-import app.ExitCodes.{COMMAND_FAILED, CONFIG_NOT_FOUND, HOLDING_NOT_COVERED, INVALID_ARGUMENTS, INVALID_CONFIG, SUCCESS}
+import app.ExitCodes.{COMMAND_FAILED, CONFIG_NOT_FOUND, FAILED_TO_RETRIEVE_METADATA, HOLDING_NOT_COVERED, INVALID_ARGUMENTS, INVALID_CONFIG, SUCCESS}
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.ergoplatform.appkit.NetworkType
@@ -17,13 +17,15 @@ package object app {
     final val NO_CONSENSUS_PATH_IN_CONFIG = 103
     final val NO_WALLET = 104
 
-    final val INVALID_NODE_ADDRESS = 200
-    final val INVALID_NODE_APIKEY = 201
+    final val INVALID_NODE_ADDRESS = 105
+    final val INVALID_NODE_APIKEY = 106
 
-    final val NO_COMMAND_TO_USE = 300
-    final val COMMAND_FAILED = 301
+    final val NO_COMMAND_TO_USE = 200
+    final val COMMAND_FAILED = 201
+    final val LOGGING_INIT_FAILURE = 202
 
-    final val HOLDING_NOT_COVERED = 400
+    final val HOLDING_NOT_COVERED = 203
+    final val FAILED_TO_RETRIEVE_METADATA = 204
   }
 
   def exit(implicit logger: Logger, exitCode: Int): Nothing = {
@@ -40,6 +42,8 @@ package object app {
         logger.error("The holding address did not have enough ERG to cover the transaction")
       case COMMAND_FAILED =>
         logger.error("The command could not proceed due to unknown errors.")
+      case FAILED_TO_RETRIEVE_METADATA =>
+        logger.error("The metadata box could not be retrieved from the blockchain.")
       case _ =>
         logger.error("An unknown error occurred")
     }

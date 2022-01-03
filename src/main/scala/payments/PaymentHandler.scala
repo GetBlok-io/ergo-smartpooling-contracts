@@ -156,8 +156,6 @@ object PaymentHandler {
       logger.warn(s"Using hard-coded constants for ERGO_SHARE_CONSTANT($ERGO_SHARE_CONSTANT)")
       logger.warn(s"Changes to this values in MiningCore will NOT be reflected in payout code.")
 
-
-      logger.info(shareScores(0)._2.toString())
       for (sc <- shareScores) {
         val shScore = sc._2
         if (minerScores.contains(sc._1)) {

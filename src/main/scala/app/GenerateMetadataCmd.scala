@@ -6,7 +6,8 @@ import contracts.{MetadataContract, holding}
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
 import org.ergoplatform.appkit.config.ErgoNodeConfig
-import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoId, ErgoToken, ErgoValue, NetworkType, Parameters, RestApiErgoClient, SecretStorage, SecretString}
+import org.ergoplatform.appkit.impl.ErgoTreeContract
+import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoId, ErgoToken, ErgoValue, NetworkType, Parameters, RestApiErgoClient, SecretStorage, SecretString, UnsignedTransactionBuilder}
 import org.ergoplatform.restapi.client.{ApiClient, Body3, WalletApi}
 import org.slf4j.LoggerFactory
 import retrofit2.RetrofitUtil
@@ -48,7 +49,6 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
 
 
-
       val prover = ctx.newProverBuilder().withSecretStorage(secretStorage).withEip3Secret(0).build()
       var nodeAddress = prover.getAddress
       logger.info("Now printing EIP3 Addresses")
@@ -65,11 +65,37 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
       logger.info(s"Prover Address=${prover.getAddress}")
       logger.info(s"Node Address=${nodeAddress}")
       //assert(prover.getAddress == nodeAddress)
-
       val metadataValue = metaConf.getMetadataValue
       val txFee = paramsConf.getInitialTxFee
       val metadataContract = MetadataContract.generateMetadataContract(ctx)
       metadataAddress = Address.fromErgoTree(metadataContract.getErgoTree, nodeConf.getNetworkType)
+
+
+      val boxesToSpend = ctx.getCoveringBoxesFor(nodeAddress, metadataValue + (txFee * 2), List[ErgoToken]().asJava).getBoxes
+      val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
+      val outB = txB.outBoxBuilder()
+      smartPoolId = boxesToSpend.get(0).getId
+      val smartPoolToken = new ErgoToken(smartPoolId, 1)
+      // TODO: Remove constant values for tokens and place them into config
+      val tokenBox = outB
+        .value(metadataValue + (Parameters.MinFee * 4))
+        .mintToken(smartPoolToken, "GetBlok.io SmartPool Display Token", "This NFT identifies this box to be a part of GetBlok.io's smart-contract based mining pool", 0)
+        .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
+        .build()
+
+      val tokenTx =
+        txB
+          .boxesToSpend(boxesToSpend)
+          .fee(txFee)
+          .outputs(tokenBox)
+          .sendChangeTo(nodeAddress.getErgoAddress)
+          .build()
+
+      val tokenTxSigned = prover.sign(tokenTx)
+      val tokenTxId: String = ctx.sendTransaction(tokenTxSigned).filter(c => c !='\"')
+
+      val tokenInputBox = tokenBox.convertToInputWith(tokenTxId, 0)
+
 
       logger.info("Parameters given:")
       logger.info(s"MetadataValue=${metadataValue / Parameters.OneErg} ERG")
@@ -79,6 +105,8 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
       val genesisTx = new GenesisTx(ctx.newTxBuilder())
       val unsignedTx =
         genesisTx
+        .tokenInputBox(tokenInputBox)
+        .smartPoolNFT(smartPoolToken)
         .creatorAddress(nodeAddress)
         .metadataContract(MetadataContract.generateMetadataContract(ctx))
         .metadataValue(metadataValue)
@@ -95,7 +123,7 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
       logger.info("Tx was successfully signed!")
       val txId = ctx.sendTransaction(signedTx)
 
-      smartPoolId = signedTx.getOutputsToSpend.get(0).getId
+
       metadataId = signedTx.getOutputsToSpend.get(0).getId
 
       logger.info(s"Tx was successfully sent with id: $txId")

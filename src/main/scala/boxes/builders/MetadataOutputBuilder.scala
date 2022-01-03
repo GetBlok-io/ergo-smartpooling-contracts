@@ -63,7 +63,7 @@ class MetadataOutputBuilder(outBoxBuilder: OutBoxBuilder){
   }
 
   def build(): MetadataOutBox = {
-    val completeTokenList = List[ErgoToken](new ErgoToken(smartPoolId, 1L))++tokenList
+    val completeTokenList = List[ErgoToken](new ErgoToken(smartPoolId, 1))++tokenList
 
     asOutBoxBuilder.tokens(completeTokenList:_*)
     asOutBoxBuilder.registers(registerList: _*)
@@ -75,6 +75,18 @@ class MetadataOutputBuilder(outBoxBuilder: OutBoxBuilder){
    * smartpool id is not set and that tokens are not minted.
    */
   def buildInitial(): OutBox = {
+    asOutBoxBuilder.registers(registerList: _*)
+    asOutBoxBuilder.build()
+  }
+
+  /**
+   * Builds the metadata box with a specific SmartPool NFT token, thereby allowing tokens to have custom names
+   * and descriptions according to EIP-004
+   */
+  def buildInitialWithToken(smartPoolNFT: ErgoToken): OutBox = {
+    val completeTokenList = List[ErgoToken](smartPoolNFT)++tokenList
+
+    asOutBoxBuilder.tokens(completeTokenList:_*)
     asOutBoxBuilder.registers(registerList: _*)
     asOutBoxBuilder.build()
   }

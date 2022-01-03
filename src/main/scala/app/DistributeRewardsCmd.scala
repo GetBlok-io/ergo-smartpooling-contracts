@@ -1,6 +1,6 @@
 package app
 
-import boxes.{CommandInputBox, MetadataInputBox}
+import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox}
 import config.{ConfigHandler, SmartPoolConfig}
 import contracts.{MetadataContract, holding}
 import contracts.command.PKContract
@@ -35,6 +35,11 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
   private var memberList: MemberList = _
   private var shareConsensus: ShareConsensus = _
+
+  private var txId: String = _
+  private var nextCommandBox: CommandInputBox = _
+  private var signedTx: SignedTransaction = _
+
 
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
@@ -111,12 +116,15 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       val nodeAddress = prover.getEip3Addresses.get(0)
       holdingContract = new holding.SimpleHoldingContract(SimpleHoldingContract.generateHoldingContract(ctx, Address.create(metaConf.getMetadataAddress), ErgoId.create(paramsConf.getSmartPoolId)))
       logger.info("Holding Address: " + holdingContract.getAddress.toString)
-      val isHoldingCovered = ctx.getCoveringBoxesFor(holdingContract.getAddress, blockReward, List[ErgoToken]().asJava).isCovered
+      val isHoldingCovered = Try(ctx.getCoveringBoxesFor(holdingContract.getAddress, blockReward, List[ErgoToken]().asJava).isCovered)
 
-      if(!isHoldingCovered){
+      if(isHoldingCovered.isFailure){
         exit(logger, ExitCodes.HOLDING_NOT_COVERED)
       }else{
-        logger.info("Holding address has enough ERG to cover transaction")
+        if(isHoldingCovered.get)
+          logger.info("Holding address has enough ERG to cover transaction")
+        else
+          exit(logger, ExitCodes.HOLDING_NOT_COVERED)
       }
 
       logger.info(s"Prover Address=${prover.getAddress}")
@@ -124,16 +132,16 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       //assert(prover.getAddress == nodeAddress)
 
       logger.warn("Using hard-coded PK Command Contract, ensure this value is added to configuration file later for more command box options")
-      var metadataBoxById = Try { ctx.getBoxesById(metadataId.toString).head }
-      if(metadataBoxById.isFailure){
-        metadataBoxById = Try {ctx.getCoveringBoxesFor(Address.create(metaConf.getMetadataAddress), metaConf.getMetadataValue, List[ErgoToken](new ErgoToken(smartPoolId, 1)).asJava).getBoxes.asScala.head}
-      }
-      if(metadataBoxById.isFailure){
-        exit(logger, ExitCodes.NO_SMARTPOOL_ID_IN_CONFIG)
-      }
+      logger.info("Now attempting to retrieve metadata box from blockchain")
+      val selectMetadataBox = Try {BoxHelpers.selectCurrentMetadata(ctx, smartPoolId, Address.create(metaConf.getMetadataAddress), metaConf.getMetadataValue)}
 
-
-      val metadataBox = new MetadataInputBox(metadataBoxById.get, ErgoId.create(paramsConf.getSmartPoolId))
+      if(selectMetadataBox.isFailure){
+        logger.warn("Metadata box could not be retrieved!")
+        exit(logger, ExitCodes.FAILED_TO_RETRIEVE_METADATA)
+      }
+      logger.info("Now creating metadata box...")
+      logger.info(s"Box used to create metadata input: ${selectMetadataBox.get.asInput.toJson(true)}")
+      val metadataBox = selectMetadataBox.get
       logger.info(metadataBox.toString)
 
       val commandTx = new CreateCommandTx(ctx.newTxBuilder())
@@ -171,7 +179,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       val signedDistTx = prover.sign(unsignedDistTx)
       logger.info("Distribution Tx successfully signed.")
       val txId = ctx.sendTransaction(signedDistTx).filter(c => c != '\"')
-      logger.info(s"Tx successfully sent with id: $txId")
+      logger.info(s"Tx successfully sent with id: $txId and cost: ${signedDistTx.getCost}")
       metadataId = signedDistTx.getOutputsToSpend.get(0).getId
       signedDistTx.toJson(true)
     })
@@ -197,11 +205,12 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     for(member <- memberList.cValue){
       val minimumPayoutsQuery = new MinimumPayoutsQuery(dbConn, paramsConf.getPoolId, member._2)
       val settingsResponse = minimumPayoutsQuery.setVariables().execute().getResponse
+      logger.info(s"Minimum Payout For Address ${member._2}: ${settingsResponse.paymentthreshold}")
       if(settingsResponse.paymentthreshold > 0.1){
         val propBytesIndex = newShareConsensus.cValue.map(c => c._1).indexOf(member._1, 0)
         newShareConsensus = ShareConsensus.fromConversionValues(
-          shareConsensus.cValue.updated(propBytesIndex,
-            (member._1, Array(newShareConsensus.cValue(propBytesIndex)._2(0), (settingsResponse.paymentthreshold * Parameters.OneErg).toLong, newShareConsensus.cValue(propBytesIndex)._2(2)))))
+          newShareConsensus.cValue.updated(propBytesIndex,
+            (member._1, Array(newShareConsensus.cValue(propBytesIndex)._2(0), (BigDecimal(settingsResponse.paymentthreshold) * BigDecimal(Parameters.OneErg)).toLong, newShareConsensus.cValue(propBytesIndex)._2(2)))))
       }
     }
     logger.info("Minimum payouts updated for all smart pool members!")

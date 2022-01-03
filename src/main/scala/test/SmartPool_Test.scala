@@ -50,22 +50,22 @@ object SmartPool_Test {
     // Execute transaction
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
       TestParameters.initializeParameters(ctx)
-      viewMetadataInfo(ctx)
+      //viewMetadataInfo(ctx)
       //viewCommandInfo(ctx)
 
       // TODO Try preheader tests out for proof of vote
       //
 
-      var metadataBox = getCurrentMetadata(ctx)
+      //var metadataBox = getCurrentMetadata(ctx)
       //var commandBox = getCurrentCommand(ctx)
       //var metadataBox = initialMetadataTx(ctx)
       //metadataBox.toString
       //var commandBox = createModifiedCommandBox(ctx, metadataBox)
 
       //metadataBox = settingsTx(ctx, metadataBox, commandBox, preHeader)
-      //miningRewardsToHolding(ctx)
-      var commandBox = createCustomCommandBox(ctx, metadataBox)
-     metadataBox = distributionTx(ctx, metadataBox, commandBox)
+      miningRewardsToHolding(ctx)
+      //var commandBox = createCustomCommandBox(ctx, metadataBox)
+      //metadataBox = distributionTx(ctx, metadataBox, commandBox)
 //      println(
 //        s"""Current Metadata: ${metadataBox.getId}
 //           |Current Command: ${commandBox.getId}

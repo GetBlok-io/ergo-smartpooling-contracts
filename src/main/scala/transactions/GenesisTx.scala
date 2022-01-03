@@ -14,6 +14,22 @@ class GenesisTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Transacti
   private[this] var _metadataValue: Long = 0L
   private[this] var _txFee: Long = 0L
   private[this] var _metadataContract: ErgoContract = _
+  private[this] var _smartPoolNFT: ErgoToken = _
+  private[this] var _tokenInputBox: InputBox = _
+
+  def tokenInputBox: InputBox = _tokenInputBox
+
+  def tokenInputBox(value: InputBox): GenesisTx = {
+    _tokenInputBox = value
+    this
+  }
+
+  def smartPoolNFT: ErgoToken = _smartPoolNFT
+
+  def smartPoolNFT(value: ErgoToken): GenesisTx = {
+    _smartPoolNFT = value
+    this
+  }
 
   def creatorAddress: Address = _creatorAddress
 
@@ -44,11 +60,11 @@ class GenesisTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Transacti
   }
 
   override def build(): UnsignedTransaction = {
-    val genesisBox: OutBox = MetadataContract.buildGenesisBox(new MetadataOutputBuilder(this.outBoxBuilder()), metadataContract, creatorAddress, metadataValue, ctx.getHeight)
 
-    val creatorBoxes = ctx.getCoveringBoxesFor(_creatorAddress, _metadataValue + txFee, List[ErgoToken]().asJava).getBoxes
+    val genesisBox: OutBox = MetadataContract.buildGenesisBox(new MetadataOutputBuilder(this.outBoxBuilder()), metadataContract, creatorAddress, metadataValue, ctx.getHeight, smartPoolNFT)
+
     val unsignedTx = asUnsignedTxB
-      .boxesToSpend(creatorBoxes)
+      .boxesToSpend(List[InputBox](tokenInputBox).asJava)
       .fee(txFee)
       .sendChangeTo(_creatorAddress.getErgoAddress)
       .outputs(genesisBox)

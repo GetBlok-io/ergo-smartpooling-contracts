@@ -5,14 +5,16 @@ import boxes.{CommandInputBox, CommandOutBox, MetadataInputBox, MetadataOutBox}
 import contracts.MetadataContract
 import contracts.command.CommandContract
 import contracts.holding.HoldingContract
+import logging.LoggingHandler
 import org.ergoplatform.appkit.{ErgoToken, InputBox, Parameters, UnsignedTransaction, UnsignedTransactionBuilder}
+import org.slf4j.{Logger, LoggerFactory}
 import registers.{MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
 import transactions.models.{CommandTxTemplate, MetadataTxTemplate}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
 class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends CommandTxTemplate(unsignedTxBuilder) {
-
+  val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_COMMAND_TX)
   val txFee: Long = Parameters.MinFee * 2
 
   protected[this] var _mainHoldingContract: HoldingContract = _
@@ -96,12 +98,12 @@ class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Com
    * @return Unsigned Transaction that creates command out box with specified registers and
    */
   override def buildCommandTx(): UnsignedTransaction = {
-
+    logger.info("Building command Tx....")
     cOB
       .contract(commandContract)
       .value(commandValue)
 
-
+    logger.info("Applying custom metadata and updating pool info")
     this.applyCustomMetadata
     CommandContract.updatePoolInfo(cOB, metadataInputBox, ctx.getHeight)
 
@@ -111,7 +113,7 @@ class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Com
     val commandOutBox = cOB.build()
 
     this.commandOutput(commandOutBox)
-
+    logger.info("Now building as unsigned Tx")
     this.asUnsignedTxB
       .boxesToSpend(this._inputBoxes.asJava)
       .outputs(commandOutBox.asOutBox)

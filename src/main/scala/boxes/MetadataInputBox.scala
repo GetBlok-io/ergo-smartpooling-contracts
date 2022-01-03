@@ -22,9 +22,14 @@ import scala.math.BigInt
 class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends InputTemplate(inputBox) {
   val smartPoolId: ErgoId = smartPoolNFTId
   if(this.getCurrentEpoch != 0)
-    assert(smartPoolNFTId == this.getTokens.get(0).getId)
-  else
-    assert(smartPoolNFTId == this.getId)
+    require(smartPoolNFTId == this.getTokens.get(0).getId)
+  else {
+    if(this.getTokens.size() > 0){
+      require(smartPoolNFTId == this.getTokens.get(0).getId)
+    }else {
+      require(smartPoolNFTId == this.getId)
+    }
+  }
 
   override def toString: String = {
     val serializer = new ErgoTreeSerializer()

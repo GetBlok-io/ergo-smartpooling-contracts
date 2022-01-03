@@ -36,6 +36,8 @@ abstract class InputTemplate(inputBox: InputBox) extends InputBox{
 
   def toJson(prettyPrint: Boolean, formatJson: Boolean): String = asInput.toJson(prettyPrint, formatJson)
 
+  override def getCreationHeight: Int = asInput.getCreationHeight
+
   override def getId: ErgoId = asInput.getId
 
   def getPoolInfo: PoolInfo = {
@@ -50,7 +52,7 @@ abstract class InputTemplate(inputBox: InputBox) extends InputBox{
     poolInfo.getCurrentEpochHeight
   }
 
-  def getCreationHeight: Long ={
+  def getCreationEpochHeight: Long ={
     poolInfo.getCreationHeight
   }
 

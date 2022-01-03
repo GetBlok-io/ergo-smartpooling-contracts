@@ -1,8 +1,8 @@
 {
   "node": {
     "nodeApi": {
-      "apiUrl": "http://52.188.110.235:9052/",
-      "apiKey": "thisistestnetnode"
+      "apiUrl": "",
+      "apiKey": ""
     },
     "wallet": {
       "walletName": "wallet1"

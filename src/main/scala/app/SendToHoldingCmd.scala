@@ -54,7 +54,7 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
     }
 
     // Block must still be pending
-    assert(block.status == "pending")
+    //assert(block.status == "pending")
     // Block must have full num of confirmations
     //assert(block.confirmationProgress == 1.0)
     // Assertions to make sure config is setup for command
@@ -99,7 +99,7 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
       logger.info("SendToHolding Tx signed")
       // Submit transaction to node
       val txId: String = ctx.sendTransaction(signed)
-      logger.info(s"Tx successfully sent with id: ${txId} \n")
+      logger.info(s"Tx successfully sent with id: $txId and cost: ${signed.getCost} \n")
       signed.toJson(true)
 
     })

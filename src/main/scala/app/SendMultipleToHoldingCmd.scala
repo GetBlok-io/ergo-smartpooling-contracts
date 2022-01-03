@@ -54,7 +54,7 @@ class SendMultipleToHoldingCmd(config: SmartPoolConfig, blockHeights: Array[Int]
       }
 
       // Block must still be pending
-      assert(block.status == "pending")
+      //assert(block.status == "pending")
       blockReward = blockReward + (block.reward * Parameters.OneErg).toLong
       // Block must have full num of confirmations
       //assert(block.confirmationProgress == 1.0)
@@ -96,7 +96,7 @@ class SendMultipleToHoldingCmd(config: SmartPoolConfig, blockHeights: Array[Int]
       logger.info("SendToHolding Tx signed")
       // Submit transaction to node
       val txId: String = ctx.sendTransaction(signed)
-      logger.info(s"Tx successfully sent with id: ${txId} \n")
+      logger.info(s"Tx successfully sent with id: $txId and cost: ${signed.getCost} \n")
       signed.toJson(true)
 
     })

@@ -20,7 +20,7 @@ object SmartPoolingApp{
   def main(args: Array[String]): Unit = {
     logger.info("Now starting SmartPoolingApp")
 
-    val usage = "Usage: java -jar SmartPoolingApp.jar -c=smart/pool/path/ [-v | -g | -d blockHeight | -h blockHeight ]"
+    val usage = "Usage: java -jar SmartPoolingApp.jar -c=smart/pool/path/config.json [-v | -g | -d blockHeight | -h blockHeight ]"
     var txCommand = EmptyCommand
 
     var blockHeight = 0
@@ -35,7 +35,7 @@ object SmartPoolingApp{
               try {
                 config = Try(SmartPoolConfig.load(commandValue))
                 AppParameters.configFilePath = commandValue
-                LoggingHandler.initiateLogging(config.get)
+
               } catch {
                 case ex: Exception =>
                   exit(logger, ExitCodes.CONFIG_NOT_FOUND)
@@ -62,7 +62,7 @@ object SmartPoolingApp{
     if(config == null || config.isFailure) {
       config = Try(SmartPoolConfig.load(ConfigHandler.defaultConfigName))
       AppParameters.configFilePath = ConfigHandler.defaultConfigName
-      LoggingHandler.initiateLogging(config.get)
+
     }
     if(config.isFailure) {
       logger.warn("A config file could not be found, generating new file under sp_config.json")
@@ -71,61 +71,67 @@ object SmartPoolingApp{
 
       exit(logger, ExitCodes.CONFIG_NOT_FOUND)
     }
-
-
-    logger.info(s"Configuration file and command arguments successfully loaded")
-
-    logger.info(s"Evaluating SmartPool Command...")
-    txCommand match {
-      case GenerateMetadataCmd =>
-        cmd = new GenerateMetadataCmd(config.get)
-        logger.info(s"SmartPool Command: ${GenerateMetadataCmd.toString}")
-      case DistributeRewardsCmd =>
-        if(blockHeight != 0) {
-          cmd = new DistributeRewardsCmd(config.get, blockHeight)
-        }else if(blockHeights.length > 0){
-          cmd = new DistributeMultipleCmd(config.get, blockHeights)
-        }else{
-          exit(logger, ExitCodes.INVALID_ARGUMENTS)
-        }
-        logger.info(s"SmartPool Command: ${DistributeRewardsCmd.toString}")
-      case ViewMetadataCmd =>
-        cmd = new ViewMetadataCmd(config.get)
-        logger.info(s"SmartPool Command: ${ViewMetadataCmd.toString}")
-      case SendToHoldingCmd =>
-        if(blockHeight != 0) {
-          cmd = new SendToHoldingCmd(config.get, blockHeight)
-        } else if(blockHeights.length > 0) {
-          cmd = new SendMultipleToHoldingCmd(config.get, blockHeights)
-        } else {
-          exit(logger, ExitCodes.INVALID_ARGUMENTS)
-        }
-        logger.info(s"SmartPool Command: ${SendToHoldingCmd.toString}")
-      case _ =>
-        exit(logger, ExitCodes.NO_COMMAND_TO_USE)
-    }
     try {
-      cmd.initiateCommand
-      cmd.executeCommand
-      cmd.recordToConfig
+      LoggingHandler.initiateLogging(config.get)
     }catch {
-      case arg: Exception =>
-        logger.error(s"An exception occurred while executing the command $txCommand", arg)
-        if(arg != null && arg.getMessage != null){
-          logger.error(arg.getMessage)
-        }
-
-        for(e <- arg.getStackTrace){
-          logger.error(e.toString)
-        }
-        exit(logger, ExitCodes.COMMAND_FAILED)
+      case ex: Exception =>
+        exit(logger, ExitCodes.LOGGING_INIT_FAILURE)
     }
 
-    logger.info(s"Command successfully completed")
-    exit(logger, ExitCodes.SUCCESS)
-  }
+        logger.info(s"Configuration file and command arguments successfully loaded")
 
+        logger.info(s"Evaluating SmartPool Command...")
+        txCommand match {
+          case GenerateMetadataCmd =>
+            cmd = new GenerateMetadataCmd(config.get)
+            logger.info(s"SmartPool Command: ${GenerateMetadataCmd.toString}")
+          case DistributeRewardsCmd =>
+            if(blockHeight != 0) {
+              cmd = new DistributeRewardsCmd(config.get, blockHeight)
+            }else if(blockHeights.length > 0){
+              cmd = new DistributeMultipleCmd(config.get, blockHeights)
+            }else{
+              exit(logger, ExitCodes.INVALID_ARGUMENTS)
+            }
+            logger.info(s"SmartPool Command: ${DistributeRewardsCmd.toString}")
+          case ViewMetadataCmd =>
+            cmd = new ViewMetadataCmd(config.get)
+            logger.info(s"SmartPool Command: ${ViewMetadataCmd.toString}")
+          case SendToHoldingCmd =>
+            if(blockHeight != 0) {
+              cmd = new SendToHoldingCmd(config.get, blockHeight)
+            } else if(blockHeights.length > 0) {
+              cmd = new SendMultipleToHoldingCmd(config.get, blockHeights)
+            } else {
+              exit(logger, ExitCodes.INVALID_ARGUMENTS)
+            }
+            logger.info(s"SmartPool Command: ${SendToHoldingCmd.toString}")
+          case _ =>
+            exit(logger, ExitCodes.NO_COMMAND_TO_USE)
+        }
+        try {
+          cmd.initiateCommand
+          cmd.executeCommand
+          cmd.recordToConfig
+        }catch {
+          case arg: Exception =>
+            logger.error(s"An exception occurred while executing the command $txCommand", arg)
+            if(arg != null && arg.getMessage != null){
+              logger.error(arg.getMessage)
+            }
 
+            for(e <- arg.getStackTrace){
+              logger.error(e.toString)
+            }
+            exit(logger, ExitCodes.COMMAND_FAILED)
+        }
+
+        logger.info(s"Command successfully completed")
+        exit(logger, ExitCodes.SUCCESS)
+    }
 }
+
+
+
 
 

@@ -26,10 +26,10 @@ object TestParameters {
   final val networkType = NetworkType.TESTNET
   val poolMiner = Address.create("3WwtfPaghPbuPtYQs4Uj9QooYsPYkEZsESjmcR49MB4fs5kEshX7")
   val poolMinerTwo = Address.create("3WzKopFYhfRGPaUvC7v49DWgeY1efaCD3YpNQ6FZGr2t5mBhWjmw")
-  var creationMetadataID = ErgoId.create("e3755ad2df5886d9bf750a910deb674b73db0df5ec4e586fee7e93022c7a0564")
+  var creationMetadataID = ErgoId.create("e3b292373a543bb839aa09c746d8200241ee6f2f8a184c1a69e32ee7662dc088")
 
 
-  val currentMetadataID = "e3755ad2df5886d9bf750a910deb674b73db0df5ec4e586fee7e93022c7a0564"
+  val currentMetadataID = "ffc5e154671951b8a874eaa80e51fbc4f5593d1402bd7849c542dce5a24d8948"
   var currentCommandID = "49ff9cbe600063534dfe1f8900b344543d44d68852065e34e3b1a164d81450ed"
 
   val poolOpSecret = SecretString.create("decade replace tired property draft patch innocent regular habit refuse double hard stick where phrase")
@@ -110,27 +110,43 @@ object TestCommands {
     println(s"Pool Operator Address: ${poolOperator}")
 
     println(s"Sending ${initValue} ERG to create new Metadata Box\n")
-    val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
+    val boxesToSpend = ctx.getCoveringBoxesFor(poolOperator, initValue + (Parameters.MinFee * 11), List[ErgoToken]().asJava).getBoxes
+    var txB: UnsignedTransactionBuilder = ctx.newTxBuilder
+    val outB = txB.outBoxBuilder()
+    val smartPoolToken = new ErgoToken(boxesToSpend.get(0).getId, 1)
+    val tokenBox = outB
+      .value(initValue + (Parameters.MinFee * 4))
+      .mintToken(smartPoolToken, "SmartPool Test Token", "Test Token For SmartPool", 0)
+      .contract(new ErgoTreeContract(poolOperator.getErgoAddress.script))
+      .build()
+
+    val tokenTx = txB.boxesToSpend(boxesToSpend).fee(Parameters.MinFee * 2).outputs(tokenBox).sendChangeTo(poolOperator.getErgoAddress).build()
+    val tokenTxSigned = poolOpProver.sign(tokenTx)
+    val tokenTxId: String = ctx.sendTransaction(tokenTxSigned).filter(c => c !='\"')
+    val smartPoolId = tokenTxSigned.getOutputsToSpend.get(0).getId
+    val tokenInputBox = tokenBox.convertToInputWith(tokenTxId, 0)
+
+    txB = ctx.newTxBuilder()
     val mOB: MetadataOutputBuilder = new MetadataOutputBuilder(txB.outBoxBuilder())
     // Create output holding box
-    val genesisBox: OutBox = MetadataContract.buildGenesisBox(mOB, metadataContract, poolOperator, initValue, ctx.getHeight)
+    val genesisBox: OutBox = MetadataContract.buildGenesisBox(mOB, metadataContract, poolOperator, initValue, ctx.getHeight, smartPoolToken)
 
-    val poolOperatorBoxes = ctx.getCoveringBoxesFor(poolOperator, initValue + (Parameters.MinFee*2), List[ErgoToken]().toList.asJava).getBoxes
+
     println("Generating unspent boxes for pool creator " + poolOperator)
-    println("Current input size: "+ poolOperatorBoxes.size())
+
 
     // Create unsigned transaction
     val tx: UnsignedTransaction = txB
-      .boxesToSpend(poolOperatorBoxes)
+      .boxesToSpend(List(tokenInputBox).asJava)
       .outputs(genesisBox)
-      .fee(Parameters.MinFee * 2)
+      .fee(Parameters.MinFee * 3)
       .sendChangeTo(poolOperator.getErgoAddress)
       .build()
     println("Initial Metadata Tx Built\n")
     val signed: SignedTransaction = poolOpProver.sign(tx)
     // Submit transaction to node
     val txId: String = ctx.sendTransaction(signed).filter(c => c !='\"')
-    val smartPoolId = signed.getOutputsToSpend.get(0).getId
+
     println(s"Tx successfully sent with id: ${txId} \n")
     println(signed.toJson(true))
     println(s"Metadata Id: ${signed.getOutputsToSpend.get(0).getId}")

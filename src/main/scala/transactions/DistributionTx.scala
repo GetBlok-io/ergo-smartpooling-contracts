@@ -1,6 +1,6 @@
 package transactions
 
-import boxes.{CommandInputBox, CommandOutBox, MetadataInputBox, MetadataOutBox}
+import boxes.{BoxHelpers, CommandInputBox, CommandOutBox, MetadataInputBox, MetadataOutBox}
 import boxes.builders.{HoldingOutputBuilder, MetadataOutputBuilder}
 import contracts.MetadataContract
 import contracts.command.{CommandContract, PKContract}
@@ -67,16 +67,23 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
   override def buildMetadataTx(): UnsignedTransaction = {
     val commandContract = commandInputBox.contract
     val holdingAddress = holdingContract.getAddress
-    val holdingBoxes = ctx.getCoveringBoxesFor(holdingAddress, holdingValue, List[ErgoToken]().asJava).getBoxes
+
+    val storedPayouts = metadataInputBox.getShareConsensus.cValue.map(c => c._2(2)).sum
+    logger.info(s"Stored Payouts: $storedPayouts")
+    logger.info(s"Holding Value: $holdingValue")
+    logger.info(s"Total Holding Box Value: ${storedPayouts + holdingValue}")
+
+    val holdingBoxes = BoxHelpers.findIdealHoldingBoxes(ctx, holdingAddress, holdingValue, storedPayouts)
+
     val metadataContract = metadataInputBox.getContract
 
     val initBoxes = List(metadataInputBox.asInput, commandInputBox.asInput)
-    val inputBoxes = initBoxes++holdingBoxes.asScala
+    val inputBoxes = initBoxes++holdingBoxes
 
     metadataOutput(MetadataContract.buildFromCommandBox(mOB, commandInputBox, metadataContract, metadataInputBox.getValue, metadataInputBox.getSmartPoolId))
 
     hOB = holdingContract
-      .generateInitialOutputs(ctx, this, holdingBoxes.asScala.toList)
+      .generateInitialOutputs(ctx, this, holdingBoxes)
       .applyCommandContract(commandContract)
 
     otherCommandContracts.foreach(c => hOB.applyCommandContract(c))

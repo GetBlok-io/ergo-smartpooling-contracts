@@ -76,37 +76,6 @@ object MetadataContract {
           val currentPoolInfo = SELF.R7[Coll[Long]].get
           val newPoolInfo = OUTPUTS(0).R7[Coll[Long]].get
 
-          val currentConsensus = SELF.R4[Coll[(Coll[Byte], Coll[Long])]].get
-          val newConsensus = OUTPUTS(0).R4[Coll[(Coll[Byte], Coll[Long])]].get
-
-          val newStoredPayouts = newConsensus.map{
-            (consVal: (Coll[Byte], Coll[Long])) =>
-              consVal._2(2)
-          }
-
-          val newConsensusPropBytes = newConsensus.map{
-            (consVal: (Coll[Byte], Coll[Long])) =>
-              consVal._1
-          }
-
-          // This ensures payouts are preserved during a modification tx (tx without holding contract)
-          // CAUTION: Be careful when adding other boxes to tx inputs if holding contract is not there.
-          // Currently the only supported transactions should always ensure payouts are stored properly,
-          // But could be an issue in the future if other types of transactions are added.
-          val payoutsPreserved =
-            if(INPUTS.size == 2){
-              currentConsensus.forall{
-                (consVal: (Coll[Byte], Coll[Long])) =>
-                  val propBytesIndex = newConsensusPropBytes.indexOf(consVal._1, 0)
-                  if(propBytesIndex != -1){
-                    consVal._2(2) == newStoredPayouts(propBytesIndex)
-                  }else{
-                    true
-                  }
-              }
-            }else{
-              true
-            }
           // verifies that epoch is increased by 1
           val epochIncremented = newPoolInfo(0) == currentPoolInfo(0) + 1L
 
@@ -120,10 +89,16 @@ object MetadataContract {
           if(currentPoolInfo(0) != 0L){
             SELF.tokens(0)._1 == OUTPUTS(0).tokens(0)._1
           }else{
-            OUTPUTS(0).tokens(0)._1 == SELF.id
+            if(SELF.tokens.size > 0){
+              // This allows premade tokens to serve as the smartPool NFT, so that they can follow
+              // naming standards on the blockchain.
+              SELF.tokens(0)._1 == OUTPUTS(0).tokens(0)._1
+            }else{
+              OUTPUTS(0).tokens(0)._1 == SELF.id
+            }
           }
 
-          epochIncremented && epochHeightStored && creationHeightPreserved && smartPoolNFTPreserved && payoutsPreserved
+          epochIncremented && epochHeightStored && creationHeightPreserved && smartPoolNFTPreserved
         }else{
           false
         }
@@ -186,7 +161,7 @@ object MetadataContract {
    * @param currentHeight    current height from blockchain context
    * @return OutBox representing new metadata box with initialized registers.
    */
-  def buildGenesisBox(mOB: MetadataOutputBuilder, metadataContract: ErgoContract, poolOp: Address, initialValue: Long, currentHeight: Int): OutBox = {
+  def buildGenesisBox(mOB: MetadataOutputBuilder, metadataContract: ErgoContract, poolOp: Address, initialValue: Long, currentHeight: Int, smartPoolNFT: ErgoToken, mintToken: Boolean = false): OutBox = {
     val poolOpBytes = poolOp.getErgoAddress.script.bytes
     val initialConsensus: ShareConsensus = ShareConsensus.fromConversionValues(Array((poolOpBytes, Array(1L, (1 * Parameters.OneErg)/10 , 0L))))
     val initialMembers: MemberList = MemberList.fromConversionValues(Array((poolOpBytes, poolOp.toString)))
@@ -201,7 +176,12 @@ object MetadataContract {
       .value(initialValue)
       .creationHeight(currentHeight)
       .setMetadata(initialMetadata)
-      .buildInitial()
+
+      if(mintToken) {
+        mOB.buildInitial()
+      }else{
+        mOB.buildInitialWithToken(smartPoolNFT)
+      }
   }
 
   /**
