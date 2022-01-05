@@ -1,6 +1,7 @@
 package app
 
-import app.AppCommand.{DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, SendToHoldingCmd, ViewMetadataCmd}
+import app.AppCommand.{CheckAndCleanDbCmd, DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, ResetStatusCmd, SendToHoldingCmd, ViewMetadataCmd}
+import app.commands.{CheckAndCleanDbCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd}
 import org.slf4j.LoggerFactory
 import config.{ConfigHandler, SmartPoolConfig}
 import logging.LoggingHandler
@@ -28,9 +29,9 @@ object SmartPoolingApp{
     for(arg <- args){
       arg match {
         case arg if arg.startsWith("-") =>
-          val commandArg = arg.charAt(1)
+          val commandArg = arg.substring(1)
           commandArg match {
-            case 'c' =>
+            case "c" =>
               val commandValue = arg.split("=")(1)
               try {
                 config = Try(SmartPoolConfig.load(commandValue))
@@ -40,14 +41,18 @@ object SmartPoolingApp{
                 case ex: Exception =>
                   exit(logger, ExitCodes.CONFIG_NOT_FOUND)
               }
-            case 'g' =>
+            case "g" =>
               txCommand = GenerateMetadataCmd
-            case 'd' =>
+            case "d" =>
               txCommand = DistributeRewardsCmd
-            case 'v' =>
+            case "v" =>
               txCommand = ViewMetadataCmd
-            case 'h' =>
+            case "h" =>
               txCommand = SendToHoldingCmd
+            case "r" =>
+              txCommand = ResetStatusCmd
+            case "chcl" =>
+              txCommand = CheckAndCleanDbCmd
             case _ =>
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
           }
@@ -97,6 +102,17 @@ object SmartPoolingApp{
           case ViewMetadataCmd =>
             cmd = new ViewMetadataCmd(config.get)
             logger.info(s"SmartPool Command: ${ViewMetadataCmd.toString}")
+          case ResetStatusCmd =>
+            cmd = new ResetToPendingCmd(config.get)
+            logger.info(s"SmartPool Command: ${ResetStatusCmd.toString}")
+          case CheckAndCleanDbCmd =>
+            if(blockHeight != 0) {
+              cmd = new CheckAndCleanDbCmd(config.get, blockHeight)
+              logger.info(s"SmartPool Command: ${CheckAndCleanDbCmd.toString}")
+            } else {
+              exit(logger, ExitCodes.INVALID_ARGUMENTS)
+            }
+            logger.info(s"SmartPool Command: ${SendToHoldingCmd.toString}")
           case SendToHoldingCmd =>
             if(blockHeight != 0) {
               cmd = new SendToHoldingCmd(config.get, blockHeight)

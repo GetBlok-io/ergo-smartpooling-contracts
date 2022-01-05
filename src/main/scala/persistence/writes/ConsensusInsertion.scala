@@ -1,4 +1,4 @@
-package persistence.insertions
+package persistence.writes
 
 import logging.LoggingHandler
 import org.slf4j.{Logger, LoggerFactory}
@@ -8,7 +8,7 @@ import persistence.entries.{ConsensusEntry, SmartPoolEntry}
 import java.sql.PreparedStatement
 import java.time.LocalDateTime
 
-class ConsensusUpdate(dbConn: DatabaseConnection) extends DatabaseInsertion[ConsensusEntry](dbConn){
+class ConsensusInsertion(dbConn: DatabaseConnection) extends DatabaseWrite[ConsensusEntry](dbConn){
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
 
   override val insertionString: String =
@@ -17,7 +17,7 @@ class ConsensusUpdate(dbConn: DatabaseConnection) extends DatabaseInsertion[Cons
       | VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(insertionString)
 
-  override def setVariables(consensusEntry: ConsensusEntry): DatabaseInsertion[ConsensusEntry] = {
+  override def setVariables(consensusEntry: ConsensusEntry): DatabaseWrite[ConsensusEntry] = {
 
     val localDateTime = LocalDateTime.now()
 
@@ -36,10 +36,10 @@ class ConsensusUpdate(dbConn: DatabaseConnection) extends DatabaseInsertion[Cons
   }
 
   override def execute(): Long = {
-    logger.info("Executing update")
+
     val rowsInserted = asStatement.executeUpdate()
     asStatement.close()
-    logger.info(s"Update executed. ${rowsInserted} Rows inserted into db.")
+
     rowsInserted
   }
 }

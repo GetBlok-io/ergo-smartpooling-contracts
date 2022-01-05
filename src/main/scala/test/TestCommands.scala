@@ -11,7 +11,7 @@ import registers.{MemberList, MetadataRegisters, PoolFees, PoolInfo, PoolOperato
 import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.eval.SigmaDsl
 import sigmastate.serialization.GroupElementSerializer
-import test.TestParameters.{commandContract, commandValue, creationMetadataID, currentCommandID, currentMetadataID, holdingAddress, holdingContract, initValue, metadataAddress, metadataContract, networkType, poolMiner, poolMinerTwo, poolOpProver, poolOperator, rewardsAddress, rewardsProver, rewardsValue}
+import test.TestParameters.{commandContract, commandValue, creationMetadataID, currentCommandID, currentMetadataID, holdingAddress, holdingContract, holdingInputs, initValue, metadataAddress, metadataContract, networkType, poolMiner, poolMinerTwo, poolOpProver, poolOperator, rewardsAddress, rewardsProver, rewardsValue}
 import transactions.{CreateCommandTx, DistributionTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
@@ -26,10 +26,10 @@ object TestParameters {
   final val networkType = NetworkType.TESTNET
   val poolMiner = Address.create("3WwtfPaghPbuPtYQs4Uj9QooYsPYkEZsESjmcR49MB4fs5kEshX7")
   val poolMinerTwo = Address.create("3WzKopFYhfRGPaUvC7v49DWgeY1efaCD3YpNQ6FZGr2t5mBhWjmw")
-  var creationMetadataID = ErgoId.create("e3b292373a543bb839aa09c746d8200241ee6f2f8a184c1a69e32ee7662dc088")
+  var creationMetadataID = ErgoId.create("7750730c2d0490145780984c02152eaefc16390461c2e34960212d956085c093")
+  var holdingInputs = List("7ad1bf36908fd07eabb00706bada3f6cdb7d15f6d44cc8d32b60ae076c42ee1d", "3e76e81425fe02766da9c10f40aa5db18eaa6110aa4df2202dd91633d4719cb0")
 
-
-  val currentMetadataID = "ffc5e154671951b8a874eaa80e51fbc4f5593d1402bd7849c542dce5a24d8948"
+  val currentMetadataID = "82bec9b154cbe45b5722a2ef8f43e9ea4605025cd43b774b515978285a298759"
   var currentCommandID = "49ff9cbe600063534dfe1f8900b344543d44d68852065e34e3b1a164d81450ed"
 
   val poolOpSecret = SecretString.create("decade replace tired property draft patch innocent regular habit refuse double hard stick where phrase")
@@ -98,6 +98,43 @@ object TestCommands {
     signed.getOutputsToSpend.get(0).getId.toString
   }
 
+  def regroupHolding(ctx: BlockchainContext) = {
+    val holdingInput = ctx.getBoxesById(holdingInputs: _*)
+    val rewardBoxes = ctx.getCoveringBoxesFor(rewardsAddress, Parameters.MinFee*2, List[ErgoToken]().toList.asJava).getBoxes
+    val outB = ctx.newTxBuilder().outBoxBuilder()
+    val holdingOutput1 = outB
+      .contract(holdingContract)
+      .value(rewardsValue/3)
+      .build()
+    val holdingOutput2 = outB
+      .contract(holdingContract)
+      .value(rewardsValue/3)
+      .build()
+    val rewardsOutput3 = ctx.newTxBuilder().outBoxBuilder()
+      .contract(new ErgoTreeContract(rewardsAddress.getErgoAddress.script))
+      .value(rewardsValue/3)
+      .build()
+    val holdingOutput3 = ctx.newTxBuilder().outBoxBuilder()
+      .contract(holdingContract)
+      .value(rewardsValue/3)
+      .build()
+
+    val txB = ctx.newTxBuilder()
+
+
+    val unsigned = txB.boxesToSpend((holdingInput.toList++rewardBoxes.asScala).asJava)
+      .fee(Parameters.MinFee*2)
+      .outputs(holdingOutput1, holdingOutput2, holdingOutput3)
+      .sendChangeTo(rewardsAddress.getErgoAddress)
+      .build()
+
+    val signed = rewardsProver.sign(unsigned)
+    val txId = ctx.sendTransaction(signed)
+    println(signed.toJson(true))
+    println(txId)
+
+  }
+
 
   /**
    * Creator address sends some ERG to a metadata box while setting it's initial
@@ -123,7 +160,7 @@ object TestCommands {
     val tokenTx = txB.boxesToSpend(boxesToSpend).fee(Parameters.MinFee * 2).outputs(tokenBox).sendChangeTo(poolOperator.getErgoAddress).build()
     val tokenTxSigned = poolOpProver.sign(tokenTx)
     val tokenTxId: String = ctx.sendTransaction(tokenTxSigned).filter(c => c !='\"')
-    val smartPoolId = tokenTxSigned.getOutputsToSpend.get(0).getId
+    val smartPoolId = boxesToSpend.get(0).getId
     val tokenInputBox = tokenBox.convertToInputWith(tokenTxId, 0)
 
     txB = ctx.newTxBuilder()

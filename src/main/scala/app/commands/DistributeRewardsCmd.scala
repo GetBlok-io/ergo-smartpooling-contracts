@@ -1,6 +1,7 @@
-package app
+package app.commands
 
-import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox}
+import app.{AppCommand, AppParameters, ExitCodes, exit}
+import boxes.{BoxHelpers, CommandInputBox}
 import config.{ConfigHandler, SmartPoolConfig}
 import contracts.command.PKContract
 import contracts.holding
@@ -9,10 +10,7 @@ import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.slf4j.{Logger, LoggerFactory}
 import payments.PaymentHandler
-import persistence.entries.{ConsensusEntry, SmartPoolEntry}
-import persistence.insertions.{ConsensusUpdate, SmartPoolDataUpdate}
 import persistence.queries.{BlockByHeightQuery, MinimumPayoutsQuery, PPLNSQuery}
-import persistence.responses.ShareResponse
 import persistence.{DatabaseConnection, PersistenceHandler}
 import registers.{MemberList, ShareConsensus}
 import transactions.{CreateCommandTx, DistributionTx}
@@ -22,7 +20,7 @@ import scala.util.Try
 
 
 // TODO: Change how wallet mneumonic is handled in order to be safer against hacks(maybe unlock file from node)
-class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) extends SmartPoolCmd(config) {
+class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DISTRIBUTE_REWARDS_CMD)
   final val PPLNS_CONSTANT = 50000
@@ -32,13 +30,15 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
   private var metadataId: ErgoId = _
   private var holdingContract: HoldingContract = _
   private var blockReward: Long = 0L
-  private var dbConn: DatabaseConnection = _
+
   private var memberList: MemberList = _
   private var shareConsensus: ShareConsensus = _
 
   private var txId: String = _
   private var nextCommandBox: CommandInputBox = _
   private var signedTx: SignedTransaction = _
+
+
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
     // Make sure smart pool ids are set
@@ -51,45 +51,39 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
     val persistence = new PersistenceHandler(Some(config.getPersistence.getHost), Some(config.getPersistence.getPort), Some(config.getPersistence.getDatabase))
     persistence.setConnectionProperties(config.getPersistence.getUsername, config.getPersistence.getPassword, config.getPersistence.isSslConnection)
 
-    dbConn = persistence.connectToDatabase
-    logger.info(s"Performing BlockByHeight Query for ${blockHeights.length} blocks")
+    val dbConn = persistence.connectToDatabase
+    logger.info("Now performing BlockByHeight Query")
+    val blockQuery = new BlockByHeightQuery(dbConn, paramsConf.getPoolId, blockHeight.toLong)
+    val block =  blockQuery.setVariables().execute().getResponse
+    logger.info("Query executed successfully")
+    logger.info(s"Block From Query: ")
 
+    if(block == null){
+      logger.error("Block is null")
+      exit(logger, ExitCodes.COMMAND_FAILED)
+    }
+
+    // Lets ensure that blocks are only set to confirmed once we pay them out.
+    // TODO: Change assertions to require
+    assert(block.status == "confirmed")
+    // Block must have full num of confirmations
+    //assert(block.confirmationProgress == 1.0)
     // Assertions to make sure config is setup for command
     assert(holdConf.getHoldingAddress != "")
     // Assume holding type is default for now
     assert(holdConf.getHoldingType == "default")
-    var shareResponseList: Array[Array[ShareResponse]] = Array(Array[ShareResponse]())
-    for(blockHeight <- blockHeights) {
-      val blockQuery = new BlockByHeightQuery(dbConn, paramsConf.getPoolId, blockHeight.toLong)
-      val block = blockQuery.setVariables().execute().getResponse
-      logger.info("Query executed successfully")
-      logger.info(s"Block From Query: ")
 
-      if (block == null) {
-        logger.error("Block is null")
-        exit(logger, ExitCodes.COMMAND_FAILED)
-      }
-      assert(block.status == "confirmed")
-      // Block must have full num of confirmations
-      //assert(block.confirmationProgress == 1.0)
+    blockReward = (block.reward * Parameters.OneErg).toLong
 
 
-      blockReward = blockReward + (block.reward * Parameters.OneErg).toLong
-
-
-      logger.info("Now performing PPLNS Query")
-      val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
-      val shares: Array[ShareResponse] = pplnsQuery.setVariables().execute().getResponse
-      logger.info("Query executed successfully")
-      shareResponseList = shareResponseList ++ Array(shares)
-    }
-    val commandInputs = PaymentHandler.simpleMultiPPLNSToConsensus(shareResponseList)
+    logger.info("Now performing PPLNS Query")
+    val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
+    val shares = pplnsQuery.setVariables().execute().getResponse
+    logger.info("Query executed successfully")
+    val commandInputs = PaymentHandler.simplePPLNSToConsensus(shares)
     val tempConsensus = commandInputs._1
     memberList = commandInputs._2
-    // Lets ensure that blocks are only set to confirmed once we pay them out.
-    // TODO: Renable this for MC
 
-    logger.info(s"Total rewards from all blocks: ${blockReward}")
     shareConsensus = applyMinimumPayouts(dbConn, memberList, tempConsensus)
 
     logger.info(s"Share consensus and member list with ${shareConsensus.nValue.size} unique addresses have been built")
@@ -109,7 +103,6 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       val nodeAddress = prover.getEip3Addresses.get(0)
       holdingContract = new holding.SimpleHoldingContract(SimpleHoldingContract.generateHoldingContract(ctx, Address.create(metaConf.getMetadataAddress), ErgoId.create(paramsConf.getSmartPoolId)))
       logger.info("Holding Address: " + holdingContract.getAddress.toString)
-
       val isHoldingCovered = Try(ctx.getCoveringBoxesFor(holdingContract.getAddress, blockReward, List[ErgoToken]().asJava).isCovered)
 
       if(isHoldingCovered.isFailure){
@@ -136,14 +129,11 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       logger.info("Now creating metadata box...")
       logger.info(s"Box used to create metadata input: ${selectMetadataBox.get.asInput.toJson(true)}")
       val metadataBox = selectMetadataBox.get
-
       logger.info(metadataBox.toString)
 
       val commandTx = new CreateCommandTx(ctx.newTxBuilder())
       val commandContract = new PKContract(nodeAddress)
-
       val inputBoxes = ctx.getWallet.getUnspentBoxes(cmdConf.getCommandValue + commandTx.txFee).get().asScala.toList
-
 
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
 
@@ -175,13 +165,9 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
           .buildMetadataTx()
       val signedDistTx = prover.sign(unsignedDistTx)
       logger.info("Distribution Tx successfully signed.")
-
-      txId = ctx.sendTransaction(signedDistTx).filter(c => c != '\"')
-      nextCommandBox = commandBox
-
+      val txId = ctx.sendTransaction(signedDistTx).filter(c => c != '\"')
       logger.info(s"Tx successfully sent with id: $txId and cost: ${signedDistTx.getCost}")
       metadataId = signedDistTx.getOutputsToSpend.get(0).getId
-      signedTx = signedDistTx
       signedDistTx.toJson(true)
     })
     logger.info("Command has finished execution")
@@ -198,49 +184,6 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
 
     ConfigHandler.writeConfig(AppParameters.configFilePath, newConfig)
     logger.info("Config file has been successfully updated")
-    val membersSerialized = nextCommandBox.getMemberList.cValue.map(m => m._2)
-    val feesSerialized = nextCommandBox.getPoolFees.cValue.map(f => f._2.toLong)
-    val opsSerialized = nextCommandBox.getPoolOperators.cValue.map(o => o._2)
-
-
-    logger.info("SmartPool Data now being built and inserted into database.")
-
-    val smartPoolEntry = SmartPoolEntry(config.getParameters.getPoolId, txId, nextCommandBox.getCurrentEpoch,
-      nextCommandBox.getCurrentEpochHeight, membersSerialized, feesSerialized, nextCommandBox.getPoolInfo.cValue,
-      opsSerialized, smartPoolId.toString)
-
-    val consensusEntries = nextCommandBox.getMemberList.cValue.map{
-      (memberVal: (Array[Byte], String)) =>
-        val consensusValues = nextCommandBox.getShareConsensus.cValue.filter{
-          c =>
-            c._1 sameElements memberVal._1
-        }.head
-        ConsensusEntry(config.getParameters.getPoolId, txId, nextCommandBox.getCurrentEpoch, nextCommandBox.getCurrentEpochHeight,
-          smartPoolId.toString, memberVal._2, consensusValues._2(0), consensusValues._2(1), consensusValues._2(2))
-    }
-
-//    val smartPoolDataUpdate = new SmartPoolDataUpdate(dbConn)
-//    smartPoolDataUpdate.setVariables(smartPoolEntry).execute()
-//
-//    consensusEntries.foreach{
-//      ce =>
-//        val consensusUpdate = new ConsensusUpdate(dbConn)
-//        consensusUpdate.setVariables(ce).execute()
-//    }
-//
-//    val txOutputs = signedTx.getOutputsToSpend.asScala
-
-//    val outputMap: Map[Address, Long] = txOutputs.map{
-//      o => (Address.fromErgoTree(o.getErgoTree, nodeConf.getNetworkType), o.getValue.toLong)
-//    }.filter(om => om._1.toString != metaConf.getMetadataAddress).toMap
-
-//    if(outputMap.contains(Address.create(holdConf.getHoldingAddress))){
-//      logger.info("Creating balance for pool under holding address...")
-//
-//    }
-
-    //val minerOutputs = outputMap.filter(om => om._1.toString != holdConf.getHoldingAddress)
-
   }
 
   private def applyMinimumPayouts(dbConn: DatabaseConnection, memberList: MemberList, shareConsensus: ShareConsensus): ShareConsensus ={

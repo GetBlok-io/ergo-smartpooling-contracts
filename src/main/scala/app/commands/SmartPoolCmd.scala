@@ -1,12 +1,11 @@
-package app
+package app.commands
 
-import config.node.{SmartPoolNodeConfig, SmartPoolWalletConfig}
-
-import java.sql._
+import app.{AppCommand, AppParameters}
 import config.SmartPoolConfig
+import config.node.{SmartPoolNodeConfig, SmartPoolWalletConfig}
 import config.params.{CommandConfig, HoldingConfig, MetadataConfig, SmartPoolParameters}
-import contracts.holding.HoldingContract
-import org.ergoplatform.appkit.{ErgoClient, NetworkType, RestApiErgoClient}
+import org.ergoplatform.appkit.RestApiErgoClient
+import org.ergoplatform.explorer.client.ExplorerApiClient
 
 abstract class SmartPoolCmd(config: SmartPoolConfig) {
   val appCommand: AppCommand.Value
@@ -24,6 +23,7 @@ abstract class SmartPoolCmd(config: SmartPoolConfig) {
 
   // Create ErgoClient instance (represents connection to node)
   val ergoClient =  RestApiErgoClient.create(nodeConf.getNodeApi.getApiUrl, nodeConf.getNetworkType, nodeConf.getNodeApi.getApiKey, explorerUrl)
+
 
   AppParameters.networkType = nodeConf.getNetworkType
 

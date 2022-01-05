@@ -5,7 +5,7 @@ import persistence.responses.{BlockResponse, SettingsResponse}
 
 import java.sql.{Date, PreparedStatement}
 // Query for minimum payouts to input into command box
-// TODO: Finish this query for usage in mainnet. Currently not necessary for testnet
+
 class MinimumPayoutsQuery(dbConn: DatabaseConnection, poolId: String, address: String) extends DatabaseQuery[SettingsResponse](dbConn) {
   override val queryString: String =
     """SELECT * FROM miner_settings WHERE poolid = ? AND address = ?""".stripMargin

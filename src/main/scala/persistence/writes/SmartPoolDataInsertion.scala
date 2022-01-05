@@ -1,4 +1,4 @@
-package persistence.insertions
+package persistence.writes
 
 import logging.LoggingHandler
 import org.slf4j.{Logger, LoggerFactory}
@@ -8,7 +8,7 @@ import persistence.entries.SmartPoolEntry
 import java.sql.PreparedStatement
 import java.time.LocalDateTime
 
-class SmartPoolDataUpdate(dbConn: DatabaseConnection) extends DatabaseInsertion[SmartPoolEntry](dbConn){
+class SmartPoolDataInsertion(dbConn: DatabaseConnection) extends DatabaseWrite[SmartPoolEntry](dbConn){
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
 
   override val insertionString: String =
@@ -17,12 +17,13 @@ class SmartPoolDataUpdate(dbConn: DatabaseConnection) extends DatabaseInsertion[
       | VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(insertionString)
 
-  override def setVariables(smartPoolEntry: SmartPoolEntry): DatabaseInsertion[SmartPoolEntry] = {
+  override def setVariables(smartPoolEntry: SmartPoolEntry): DatabaseWrite[SmartPoolEntry] = {
 
     val memberArray = dbConn.asConnection.createArrayOf("text",smartPoolEntry.members.map(_.asInstanceOf[AnyRef]))
     val feesArray = dbConn.asConnection.createArrayOf("bigint", smartPoolEntry.fees.map(_.asInstanceOf[AnyRef]))
     val infoArray = dbConn.asConnection.createArrayOf("bigint", smartPoolEntry.info.map(_.asInstanceOf[AnyRef]))
     val opsArray = dbConn.asConnection.createArrayOf("text",smartPoolEntry.operators.map(_.asInstanceOf[AnyRef]))
+
     val localDateTime = LocalDateTime.now()
 
     asStatement.setString(1, smartPoolEntry.poolId)

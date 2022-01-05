@@ -1,5 +1,6 @@
-package app
+package app.commands
 
+import app.{AppCommand, ExitCodes, exit}
 import config.SmartPoolConfig
 import contracts.holding.SimpleHoldingContract
 import logging.LoggingHandler

@@ -1,17 +1,14 @@
-package app
+package app.commands
 
+import app.{AppCommand, AppParameters}
 import config.{ConfigHandler, SmartPoolConfig}
 import contracts.command.{CommandContract, PKContract}
-import contracts.{MetadataContract, holding}
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
+import contracts.{MetadataContract, holding}
 import logging.LoggingHandler
-import org.ergoplatform.appkit.config.ErgoNodeConfig
 import org.ergoplatform.appkit.impl.ErgoTreeContract
-import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoClient, ErgoId, ErgoToken, ErgoValue, NetworkType, Parameters, RestApiErgoClient, SecretStorage, SecretString, UnsignedTransactionBuilder}
-import org.ergoplatform.restapi.client.{ApiClient, Body3, WalletApi}
+import org.ergoplatform.appkit._
 import org.slf4j.LoggerFactory
-import retrofit2.RetrofitUtil
-import sigmastate.CreateAvlTree
 import transactions.GenesisTx
 
 import scala.collection.JavaConverters.seqAsJavaListConverter

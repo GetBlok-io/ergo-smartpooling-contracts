@@ -1,8 +1,8 @@
 {
   "node": {
     "nodeApi": {
-      "apiUrl": "",
-      "apiKey": ""
+      "apiUrl": "http://ergo-node-devnet.getblok.io:9052/",
+      "apiKey": "thisistestnetnode"
     },
     "wallet": {
       "walletName": "wallet1"

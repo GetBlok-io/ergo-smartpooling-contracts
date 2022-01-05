@@ -78,9 +78,8 @@ object BoxHelpers {
             logger.info("Stored Payment Box found!")
             accumulatedValue = accumulatedValue + box.getValue
             storedPaymentBoxes = List(box)
-          }
-          // Try to get exact box for holding value
-          if(box.getValue == holdingValue){
+          }else if(box.getValue == holdingValue){
+            // Try to get exact box for holding value
             logger.info("Exact holding box found!")
             accumulatedValue = accumulatedValue + box.getValue
             boxesToReturn = List(box)
@@ -92,8 +91,10 @@ object BoxHelpers {
                 logger.info("Exact holding input boxes found!")
                 return boxesToReturn++storedPaymentBoxes
               }else{
-                // If we're still less than holding value, then append
-                if(sumBoxes(boxesToReturn) < holdingValue){
+                if(sumBoxes(boxesToReturn) == holdingValue){
+
+                }else if(sumBoxes(boxesToReturn) < holdingValue){
+                  // If we're still less than holding value, then append
                   boxesToReturn = boxesToReturn++List(box)
                   accumulatedValue = accumulatedValue + box.getValue
                 }else if(sumBoxes(boxesToReturn) > holdingValue){

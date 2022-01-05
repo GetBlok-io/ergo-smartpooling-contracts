@@ -1,8 +1,7 @@
-package app
+package app.commands
 
-import boxes.MetadataInputBox
+import app.{AppCommand, ExitCodes, exit}
 import config.SmartPoolConfig
-import contracts.holding
 import contracts.holding.SimpleHoldingContract
 import logging.LoggingHandler
 import org.ergoplatform.appkit._

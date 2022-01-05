@@ -1,14 +1,11 @@
-package app
+package app.commands
 
+import app.AppCommand
 import boxes.MetadataInputBox
-import config.{ConfigHandler, SmartPoolConfig}
-import contracts.command.{CommandContract, PKContract}
-import contracts.holding.{HoldingContract, SimpleHoldingContract}
-import contracts.{MetadataContract, holding}
+import config.SmartPoolConfig
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.slf4j.LoggerFactory
-import transactions.GenesisTx
 
 // TODO: Change how wallet mneumonic is handled in order to be safer against hacks(maybe unlock file from node)
 class ViewMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {

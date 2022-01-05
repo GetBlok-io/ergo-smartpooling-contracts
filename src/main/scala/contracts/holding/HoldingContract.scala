@@ -8,6 +8,9 @@ import transactions.{CreateCommandTx, DistributionTx}
 import transactions.models.CommandTxTemplate
 
 abstract class HoldingContract(holdingContract: ErgoContract) extends ErgoContract {
+
+  def asErgoContract: ErgoContract = holdingContract
+
   override def getConstants: Constants = holdingContract.getConstants
 
   override def getErgoScript: String = holdingContract.getErgoScript

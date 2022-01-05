@@ -268,6 +268,17 @@ object SimpleHoldingContract {
         else
           accum
       })
+
+      val TOTAL_HOLDED_OUTPUTS: Long = OUTPUTS.fold(0L, {(accum: Long, box:Box) =>
+        if(box.propositionBytes == SELF.propositionBytes)
+          accum + box.value
+        else
+          accum
+      })
+      // Alternate spending path that allows holding boxes to be regrouped so long as Total Value Held stays
+      // the same. This ensures exact holding boxes no matter the scenario.
+      val REGROUP_TX = TOTAL_HOLDED_VALUE == TOTAL_HOLDED_OUTPUTS
+
       val MIN_TXFEE: Long = 1000L * 1000L
 
       val metadataExists =
@@ -321,40 +332,55 @@ object SimpleHoldingContract {
       // the pool.
       val consensusValid =
         if(commandValid){
+          val holdingBoxes = INPUTS.filter{(box: Box) => box.propositionBytes == SELF.propositionBytes}
 
-          val poolInfo = INPUTS(0).R7[Coll[Long]].get
-          val lastEpoch = poolInfo(0)
-
-          // Now that we know boxes have the proper register layout, let's confirm that we are working with
-          // with the right metadata box by ensuring the smartPool NFT is present.
-          // If it's epoch 0, let's simply ensure that the box id is equal to the smart pool NFT id
-          val smartPoolNFT =
-            if(lastEpoch != 0){
-              INPUTS(0).tokens(0)._1 == const_smartPoolNFT
+          // Lets ensure that only one holding box performs the consensus calculations to reduce tx cost
+          val calculateConsensus =
+            if(holdingBoxes.size > 1 && holdingBoxes(0).id == SELF.id){
+              true
             }else{
-              if(INPUTS(0).tokens.size > 0){
-                INPUTS(0).tokens(0)._1 == const_smartPoolNFT
+              if(holdingBoxes.size == 1){
+                true
               }else{
-                INPUTS(0).id == const_smartPoolNFT
+                false
               }
             }
-
-          val lastConsensus = INPUTS(0).R4[Coll[(Coll[Byte], Coll[Long])]].get // old consensus grabbed from metadata
-          val currentConsensus = INPUTS(1).R4[Coll[(Coll[Byte], Coll[Long])]].get // New consensus grabbed from current command
-          val currentPoolFees = INPUTS(0).R6[Coll[(Coll[Byte], Int)]].get // Pool fees grabbed from current metadata
-          val currentTxFee = MIN_TXFEE * currentConsensus.size
-
-          // Get each miners owed payouts from the last consensus
-          val totalUnpaidPayouts = lastConsensus
-            .filter{(consVal:(Coll[Byte], Coll[Long])) => consVal._2(2) < consVal._2(1)}
-            .fold(0L, {(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(2)})
-          // Subtract unpaid payments from holded value, gives us the value to calculate fees and rewards from
-          val totalRewards = TOTAL_HOLDED_VALUE - totalUnpaidPayouts
-
-          // Cut down on transaction cost by ensuring that stored payout holding box does not do duplicate calculations
-          if(SELF.value != TOTAL_HOLDED_VALUE && SELF.value == totalUnpaidPayouts){
-            smartPoolNFT
+          // Cut down on transaction cost by returning true if this holding box is not the first or only holding box
+          // in this transaction
+          if(!calculateConsensus){
+            true
           }else{
+
+            val poolInfo = INPUTS(0).R7[Coll[Long]].get
+            val lastEpoch = poolInfo(0)
+
+            // Now that we know boxes have the proper register layout, let's confirm that we are working with
+            // with the right metadata box by ensuring the smartPool NFT is present.
+            // If it's epoch 0, let's simply ensure that the box id is equal to the smart pool NFT id
+            val smartPoolNFT =
+              if(lastEpoch != 0){
+                INPUTS(0).tokens(0)._1 == const_smartPoolNFT
+              }else{
+                if(INPUTS(0).tokens.size > 0){
+                  INPUTS(0).tokens(0)._1 == const_smartPoolNFT
+                }else{
+                  INPUTS(0).id == const_smartPoolNFT
+                }
+              }
+
+            val lastConsensus = INPUTS(0).R4[Coll[(Coll[Byte], Coll[Long])]].get // old consensus grabbed from metadata
+            val currentConsensus = INPUTS(1).R4[Coll[(Coll[Byte], Coll[Long])]].get // New consensus grabbed from current command
+            val currentPoolFees = INPUTS(0).R6[Coll[(Coll[Byte], Int)]].get // Pool fees grabbed from current metadata
+            val currentTxFee = MIN_TXFEE * currentConsensus.size
+
+            // Get each miners owed payouts from the last consensus
+            val totalUnpaidPayouts = lastConsensus
+              .filter{(consVal:(Coll[Byte], Coll[Long])) => consVal._2(2) < consVal._2(1)}
+              .fold(0L, {(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(2)})
+            // Subtract unpaid payments from holded value, gives us the value to calculate fees and rewards from
+            val totalRewards = TOTAL_HOLDED_VALUE - totalUnpaidPayouts
+
+
             val feeList: Coll[(Coll[Byte], Long)] = currentPoolFees.map{
               // Pool fee is defined as x/1000 of total inputs value.
               (poolFee: (Coll[Byte], Int)) => ( poolFee._1 , ((poolFee._2.toLong * totalRewards)/1000) )
@@ -500,7 +526,7 @@ object SimpleHoldingContract {
         }else{
           false
         }
-      sigmaProp(consensusValid)
+      sigmaProp(consensusValid) || sigmaProp(REGROUP_TX)
     }
     """.stripMargin
 

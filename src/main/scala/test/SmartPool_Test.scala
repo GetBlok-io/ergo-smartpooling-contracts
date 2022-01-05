@@ -17,7 +17,7 @@ import sigmastate.basics.DLogProtocol.ProveDlog
 import sigmastate.eval.SigmaDsl
 import sigmastate.serialization.{GroupElementSerializer, ProveDlogSerializer}
 import special.sigma.GroupElement
-import test.TestCommands.{createCustomCommandBox, createDefaultCommandBox, createModifiedCommandBox, distributionTx, getCurrentCommand, getCurrentMetadata, initialMetadataTx, miningRewardsToHolding, settingsTx, viewCommandInfo, viewMetadataInfo}
+import test.TestCommands.{createCustomCommandBox, createDefaultCommandBox, createModifiedCommandBox, distributionTx, getCurrentCommand, getCurrentMetadata, initialMetadataTx, miningRewardsToHolding, regroupHolding, settingsTx, viewCommandInfo, viewMetadataInfo}
 import test.TestParameters.{creationMetadataID, currentCommandID, currentMetadataID, nodeGE, poolOperator}
 
 import scala.collection.JavaConverters._
@@ -50,7 +50,7 @@ object SmartPool_Test {
     // Execute transaction
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
       TestParameters.initializeParameters(ctx)
-      //viewMetadataInfo(ctx)
+      viewMetadataInfo(ctx)
       //viewCommandInfo(ctx)
 
       // TODO Try preheader tests out for proof of vote
@@ -63,7 +63,8 @@ object SmartPool_Test {
       //var commandBox = createModifiedCommandBox(ctx, metadataBox)
 
       //metadataBox = settingsTx(ctx, metadataBox, commandBox, preHeader)
-      miningRewardsToHolding(ctx)
+      //miningRewardsToHolding(ctx)
+      regroupHolding(ctx)
       //var commandBox = createCustomCommandBox(ctx, metadataBox)
       //metadataBox = distributionTx(ctx, metadataBox, commandBox)
 //      println(
