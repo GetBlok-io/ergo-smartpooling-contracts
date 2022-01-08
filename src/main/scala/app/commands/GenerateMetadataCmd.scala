@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory
 import transactions.GenesisTx
 
 import scala.collection.JavaConverters.seqAsJavaListConverter
-// TODO: Change how wallet mneumonic is handled in order to be safer against hacks(maybe unlock file from node)
+
 class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
   val logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_GEN_METADATA_CMD)
 
@@ -114,7 +114,7 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
 
 
       logger.info("Tx is now being signed...")
-      //TODO check if this works
+
       val signedTx = prover.sign(unsignedTx)
 
       logger.info("Tx was successfully signed!")

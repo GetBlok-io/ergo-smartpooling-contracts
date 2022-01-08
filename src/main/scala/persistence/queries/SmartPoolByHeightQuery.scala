@@ -8,7 +8,7 @@ import persistence.responses.{SettingsResponse, SmartPoolResponse}
 import java.sql.PreparedStatement
 
 // Query for minimum payouts to input into command box
-// TODO: Finish this query for usage in mainnet. Currently not necessary for testnet
+
 class SmartPoolByHeightQuery(dbConn: DatabaseConnection, poolId: String, height: Long) extends DatabaseQuery[SmartPoolResponse](dbConn) {
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
   override val queryString: String =

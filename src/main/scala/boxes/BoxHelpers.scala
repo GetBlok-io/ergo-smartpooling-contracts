@@ -62,7 +62,6 @@ object BoxHelpers {
     boxList.foldLeft[java.lang.Long](0L){(z, b) => z + b.getValue}
   }
 
-  @deprecated
   def findIdealHoldingBoxes(ctx: BlockchainContext, holdingAddress: Address, holdingValue: Long, storedPaymentValue: Long): List[InputBox] ={
     logger.info("Searching for ideal holding boxes...")
     var offset = 0

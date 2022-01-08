@@ -10,7 +10,6 @@ import org.ergoplatform.explorer.client.ExplorerApiClient
 abstract class SmartPoolCmd(config: SmartPoolConfig) {
   val appCommand: AppCommand.Value
 
-  // TODO: Add helper functions to get current metadata and command, and select type of command and holding boxes
 
   protected val nodeConf: SmartPoolNodeConfig = config.getNode
   protected val walletConf: SmartPoolWalletConfig = nodeConf.getWallet

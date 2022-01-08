@@ -21,7 +21,7 @@ import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqA
 import scala.util.Try
 
 
-// TODO: Change how wallet mneumonic is handled in order to be safer against hacks(maybe unlock file from node)
+
 class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DISTRIBUTE_REWARDS_CMD)
@@ -67,13 +67,12 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
     // Lets ensure that blocks are only set to confirmed once we pay them out.
     // TODO: Change assertions to require
-    assert(block.status == "confirmed")
-    // Block must have full num of confirmations
-    //assert(block.confirmationProgress == 1.0)
+    require(block.status == "confirmed", "Block status is not confirmed")
+
     // Assertions to make sure config is setup for command
-    assert(holdConf.getHoldingAddress != "")
+    require(holdConf.getHoldingAddress != "", "Holding address is not defined")
     // Assume holding type is default for now
-    assert(holdConf.getHoldingType == "default")
+    require(holdConf.getHoldingType == "default", "Holding type must be default")
 
     blockReward = (block.reward * Parameters.OneErg).toLong
 

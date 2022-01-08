@@ -9,7 +9,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import persistence.PersistenceHandler
 import persistence.queries.BlockByHeightQuery
 
-// TODO: Change how wallet mneumonic is handled in order to be safer against hacks(maybe unlock file from node)
+
 class SendMultipleToHoldingCmd(config: SmartPoolConfig, blockHeights: Array[Int]) extends SmartPoolCmd(config) {
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_SEND_TO_HOLDING_CMD)
   private var blockReward = 0L

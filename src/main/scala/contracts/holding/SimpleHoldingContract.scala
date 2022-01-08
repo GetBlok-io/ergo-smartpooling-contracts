@@ -258,7 +258,6 @@ object SimpleHoldingContract {
    *
    * TODO: Consider alternate spending path to destroy Smart Pool boxes in case pool shuts down or restarts due to update.
    * TODO: Allow option to choose TxFee
-   * TODO: CHECK MIN PAYMENT CODE CAREFULLY - this code could be very finnicky and it stores an important piece of info
    */
   val script: String =
     s"""

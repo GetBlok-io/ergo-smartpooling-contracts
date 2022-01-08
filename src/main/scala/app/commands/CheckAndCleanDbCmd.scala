@@ -23,6 +23,7 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
  */
 
 // TODO: Add confirmation number to config file
+// TODO: Use node instead of explorer?
 class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
   val logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_CLEAN_DB_CMD)
 
