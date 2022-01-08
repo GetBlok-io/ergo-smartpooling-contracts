@@ -31,6 +31,7 @@ class ConsensusByTransactionQuery(dbConn: DatabaseConnection, poolId: String, tr
       _response = _response++Array(ConsensusResponse(
         rt.getString(1),
         rt.getString(2),
+        rt.getString(5),
         rt.getString(6),
         rt.getLong(7),
         rt.getLong(8),

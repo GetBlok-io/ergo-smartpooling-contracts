@@ -185,6 +185,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       val commandBox = new CommandInputBox(commandTx.commandOutBox.convertToInputWith(cmdTxId.filter(c => c != '\"'), 0), commandContract)
       logger.info("Now building DistributionTx using new command box...")
       logger.info(commandBox.toString)
+      nextCommandBox = commandBox
       val distTx = new DistributionTx(ctx.newTxBuilder())
       val unsignedDistTx =
         distTx

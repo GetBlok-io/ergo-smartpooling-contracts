@@ -33,7 +33,8 @@ class SmartPoolByHeightQuery(dbConn: DatabaseConnection, poolId: String, height:
         rt.getString(1),
         rt.getString(2),
         rt.getLong(3),
-        rt.getLong(4)
+        rt.getLong(4),
+        rt.getString(9)
       )
     }
 

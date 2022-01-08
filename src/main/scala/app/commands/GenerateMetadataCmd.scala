@@ -32,7 +32,7 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
     assert(walletConf.getSecretStoragePath != "")
 
     logger.info(nodeConf.getNodeApi.getApiUrl)
-    logger.info(nodeConf.getNodeApi.getApiKey)
+
 
 
     secretStorage = SecretStorage.loadFrom(walletConf.getSecretStoragePath)
@@ -68,14 +68,14 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
       metadataAddress = Address.fromErgoTree(metadataContract.getErgoTree, nodeConf.getNetworkType)
 
 
-      val boxesToSpend = ctx.getCoveringBoxesFor(nodeAddress, metadataValue + (txFee * 2), List[ErgoToken]().asJava).getBoxes
+      val boxesToSpend = ctx.getWallet.getUnspentBoxes(metadataValue + (txFee * 2)).get()
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
       val outB = txB.outBoxBuilder()
       smartPoolId = boxesToSpend.get(0).getId
       val smartPoolToken = new ErgoToken(smartPoolId, 1)
       // TODO: Remove constant values for tokens and place them into config
       val tokenBox = outB
-        .value(metadataValue + (Parameters.MinFee * 4))
+        .value(metadataValue + (txFee))
         .mintToken(smartPoolToken, "GetBlok.io SmartPool Display Token", "This NFT identifies this box to be a part of GetBlok.io's smart-contract based mining pool", 0)
         .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
         .build()

@@ -32,7 +32,8 @@ class SmartPoolByEpochQuery(dbConn: DatabaseConnection, poolId: String, epoch: L
         rt.getString(1),
         rt.getString(2),
         rt.getLong(3),
-        rt.getLong(4)
+        rt.getLong(4),
+        rt.getString(9)
       ))
     }
     logger.info(s"SmartPoolByEpoch query with ${_response.length} rows")

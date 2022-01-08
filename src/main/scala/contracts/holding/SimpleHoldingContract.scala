@@ -66,8 +66,8 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         val shareNum = consVal._2(0)
         var currentMinPayout = consVal._2(1)
         println(shareNum)
-        val valueFromShares = ((totalValAfterFees * BigDecimal(shareNum)) / BigDecimal(totalShares)).toLong
-
+        var valueFromShares = ((totalValAfterFees * BigDecimal(shareNum)) / BigDecimal(totalShares)).toLong
+        valueFromShares = valueFromShares - (valueFromShares % 1000)
 //        println("Share Num: " + shareNum)
 //        println("Total Shares: " + totalShares)
 //        println("Val After Fees: " + totalValAfterFees)
@@ -162,7 +162,8 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
     def getValueFromShare(shareNum: Long) = {
       if(totalShares != 0) {
         val newBoxValue = ((totalValAfterFees * BigDecimal(shareNum)) / BigDecimal(totalShares)).toLong
-        newBoxValue
+        val dustRemoved = newBoxValue - (newBoxValue % 1000)
+        dustRemoved
       }else
         0L
     }
@@ -360,7 +361,8 @@ object SimpleHoldingContract {
             // The percentage used is the proportion of the share number passed in over the total number of shares.
             def getValueFromShare(shareNum: Long) = {
               val newBoxValue = (((totalValAfterFees) * (shareNum)) / (totalShares)).toLong
-              newBoxValue
+              val dustRemoved = newBoxValue - (newBoxValue % 1000)
+              dustRemoved
             }
 
             val lastConsensusPropBytes = lastConsensus.map{
@@ -485,9 +487,11 @@ object SimpleHoldingContract {
 
 
   def getBoxValue(shareNum: Long, totalShares: Long, totalValueAfterFees: Long): Long = {
-    if(totalShares != 0)
-      ((totalValueAfterFees * shareNum)/totalShares)
-    else
+    if(totalShares != 0) {
+      val boxValue = ((totalValueAfterFees * shareNum)/totalShares)
+      val dustRemoved = boxValue - (boxValue % 1000)
+      dustRemoved
+    } else
       0L
   }
 

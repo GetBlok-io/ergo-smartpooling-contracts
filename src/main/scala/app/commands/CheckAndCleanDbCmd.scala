@@ -13,7 +13,7 @@ import persistence.entries.{BalanceChangeEntry, PaymentEntry}
 import persistence.{DatabaseConnection, PersistenceHandler}
 import persistence.queries.{ConsensusByTransactionQuery, SmartPoolByEpochQuery, SmartPoolByHeightQuery}
 import persistence.responses.SmartPoolResponse
-import persistence.writes.{BalanceChangeInsertion, ConsensusDeletion, PaymentInsertion, SmartPoolDeletion}
+import persistence.writes.{BalanceChangeInsertion, ConsensusDeletion, ConsensusDeletionByNFT, PaymentInsertion, SmartPoolDeletion, SmartPoolDeletionByNFT}
 import retrofit2.Retrofit
 import retrofit2.converter.scalars.ScalarsConverterFactory
 
@@ -61,7 +61,8 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
     if(confirmations.exists(c => c._2 >= 1)){
       logger.info("Found transaction with >= 1 confirmations!")
       val duplicateTxs = confirmations.filter(c => c._2 < 1)
-      val realTx = confirmations.filter(c => c._2 >= 1).head
+      val realTxs = confirmations.filter(c => c._2 >= 1)
+      val realTx = realTxs.filter(c => c._1.smartpoolNFT == lastSmartPool.smartpoolNFT).head
       val consensusResponses = new ConsensusByTransactionQuery(dbConn, paramsConf.getPoolId, realTx._1.transactionHash).setVariables().execute().getResponse
       var paymentsInserted = 0L
       var balanceChangesInserted = 0L
@@ -99,6 +100,12 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
       }else{
         logger.info("No duplicate transactions found for given epoch")
       }
+
+      logger.info("Now deleting all entries without last smartpoolnft")
+      val smartPoolNFTWipe = new SmartPoolDeletionByNFT(dbConn).setVariables(lastSmartPool).execute()
+      val consensusNFTWipe = new ConsensusDeletionByNFT(dbConn).setVariables(lastSmartPool).execute()
+      logger.info("DB changes complete!")
+
     }else{
       exit(logger, ExitCodes.NO_CONFIRMED_TXS_FOUND)
     }
