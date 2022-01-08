@@ -22,13 +22,13 @@ import scala.collection.mutable.ArrayBuffer
  */
 class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContract(holdingContract) {
   import SimpleHoldingContract._
-// TODO: Ensure totalValAfterFees == totalHoldingOutputs
+
 
   override def applyToCommand(commandTx: CreateCommandTx): CommandOutputBuilder = {
     val metadataBox = commandTx.metadataInputBox
     val storedPayouts = metadataBox.getShareConsensus.cValue.map(c => c._2(2)).sum
 
-    val holdingBoxes = BoxHelpers.findIdealHoldingBoxes(commandTx.ctx, this.getAddress, commandTx.holdingValue, storedPayouts)
+    val holdingBoxes = commandTx.holdingInputs
 
     val currentShareConsensus = commandTx.cOB.metadataRegisters.shareConsensus
     val lastShareConsensus = metadataBox.shareConsensus
@@ -37,7 +37,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
       (accum: Long, box: InputBox) =>
         accum + box.getValue
     }
-
+    println("Holding Box Values: " + holdingBoxValues)
     val lastConsensus = lastShareConsensus.getNormalValue
     val currentConsensus = currentShareConsensus.getNormalValue
     val currentPoolFees = metadataBox.getPoolFees.getNormalValue
@@ -133,6 +133,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         }else
           accum
     }
+    println("Total Value Held: " + TOTAL_HOLDED_VALUE)
     val lastShareConsensus = metadataBox.shareConsensus
     val lastConsensus = metadataBox.getShareConsensus.getNormalValue
     val currentConsensus = commandBox.getShareConsensus.getNormalValue
@@ -288,50 +289,11 @@ object SimpleHoldingContract {
           false
         }
 
-      val metadataValid =
-        if(metadataExists){
-          allOf(Coll(
-            INPUTS(0).R4[Coll[(Coll[Byte], Coll[Long])]].isDefined,       // Last consensus
-            INPUTS(0).R5[Coll[(Coll[Byte], Coll[Byte])]].isDefined, // Current members
-            INPUTS(0).R6[Coll[(Coll[Byte], Int)]].isDefined,        // Pool fees
-            INPUTS(0).R7[Coll[Long]].isDefined,                     // Pool Information
-            INPUTS(0).R8[Coll[(Coll[Byte], Coll[Byte])]].isDefined  // Pool operators
-          ))
-        }else{
-          false
-        }
-      // Command box is defined as some box protected by a script present in the pool operators register.
-      val commandExists =
-        if(metadataValid){
-          val POOL_OPERATORS = INPUTS(0).R8[Coll[(Coll[Byte], Coll[Byte])]].get
-          val COMMAND_BYTES = INPUTS(1).propositionBytes
-          // Verifies that the command boxes proposition bytes exists in the pool operators collection
-          val commandOwnedByOperators = POOL_OPERATORS.exists{
-            (op: (Coll[Byte], Coll[Byte])) =>
-              op._1 == COMMAND_BYTES
-          }
-          commandOwnedByOperators
-        }else{
-          false
-        }
-      // Command box is essentially a new metadata box, so has same registers.
-      val commandValid =
-        if(commandExists){
-          allOf(Coll(
-            INPUTS(1).R4[Coll[(Coll[Byte], Coll[Long])]].isDefined,       // New consensus
-            INPUTS(1).R5[Coll[(Coll[Byte], Coll[Byte])]].isDefined, // New members list
-            INPUTS(1).R6[Coll[(Coll[Byte], Int)]].isDefined,        // New Pool fees
-            INPUTS(1).R7[Coll[Long]].isDefined,                     // New Pool Information
-            INPUTS(1).R8[Coll[(Coll[Byte], Coll[Byte])]].isDefined  // New Pool operators
-          ))
-        }else{
-          false
-        }
       // Check if consensus is valid. This is verified by performing consensus on-chain, that means
       // the amount of erg each box gets is proportional to the amount of shares assigned to them by
       // the pool.
       val consensusValid =
-        if(commandValid){
+        if(metadataExists){
           val holdingBoxes = INPUTS.filter{(box: Box) => box.propositionBytes == SELF.propositionBytes}
 
           // Lets ensure that only one holding box performs the consensus calculations to reduce tx cost
@@ -354,7 +316,7 @@ object SimpleHoldingContract {
             val poolInfo = INPUTS(0).R7[Coll[Long]].get
             val lastEpoch = poolInfo(0)
 
-            // Now that we know boxes have the proper register layout, let's confirm that we are working with
+            // Let's confirm that we are working with
             // with the right metadata box by ensuring the smartPool NFT is present.
             // If it's epoch 0, let's simply ensure that the box id is equal to the smart pool NFT id
             val smartPoolNFT =
@@ -418,6 +380,7 @@ object SimpleHoldingContract {
             }
 
             // Ensures there exists output boxes for each consensus value
+            // And that owed payments are stored
             val consensusPaid = currentConsensus.forall{
               (consVal: (Coll[Byte], Coll[Long])) =>
 
@@ -426,6 +389,7 @@ object SimpleHoldingContract {
 
                 val currentShareNumber = consVal._2(0)
                 val currentMinPayout = consVal._2(1)
+                val currentStoredPayout = consVal._2(2)
                 val valueFromShares = getValueFromShare(currentShareNumber)
                 val indexInLastConsensus = lastConsensusPropBytes.indexOf(consVal._1, 0)
                 val indexInOutputs = outputPropBytes.indexOf(consVal._1, 0)
@@ -435,55 +399,23 @@ object SimpleHoldingContract {
 
                   if(lastStoredPayout + valueFromShares >= currentMinPayout){
                     if(indexInOutputs != -1){
-                      outputValues(indexInOutputs) == lastStoredPayout + valueFromShares
+                      (outputValues(indexInOutputs) == lastStoredPayout + valueFromShares) && (currentStoredPayout == 0L)
                     }else{
                       false
                     }
                   }else{
-                    indexInOutputs == -1
+                    (indexInOutputs == -1) && (currentStoredPayout == (lastStoredPayout + valueFromShares))
                   }
                 }else{
                   // If the last consensus doesn't exist, we can say the last payment was 0 and just use val from shares
                   if(valueFromShares >= currentMinPayout){
                     if(indexInOutputs != -1){
-                      outputValues(indexInOutputs) == valueFromShares
+                      (outputValues(indexInOutputs) == valueFromShares) && (currentStoredPayout == 0L)
                     }else{
                       false
                     }
                   }else{
-                    indexInOutputs == -1
-                  }
-                }
-            }
-
-            // Ensure payments are stored or paid as the current share value + last stored share value
-            val owedPaymentsStored = currentConsensus.forall{
-              (consVal: (Coll[Byte], Coll[Long])) =>
-
-                val currentShareNumber = consVal._2(0)
-                val currentMinPayout = consVal._2(1)
-                val currentStoredPayout = consVal._2(2)
-                val valueFromShares = getValueFromShare(currentShareNumber)
-                val indexInLastConsensus = lastConsensusPropBytes.indexOf(consVal._1, 0)
-
-                if(indexInLastConsensus != -1){
-
-                  val lastStoredPayout = lastConsensusValues(indexInLastConsensus)(2)
-
-                  // If the last stored payout + valueFromShares is greater than current min payout, then
-                  // we know the payout was paid in this consensus and we can verify that the current stored payout is 0
-                  if(lastStoredPayout + valueFromShares >= currentMinPayout){
-                   currentStoredPayout == 0L
-                  }else{
-                    // If its less than the currentMinPayout, we can ensure that the value is stored in the current payout
-                    currentStoredPayout == (lastStoredPayout + valueFromShares)
-                  }
-                }else{
-                  // If the last consensus doesn't exist, we can say the last payment was 0 and just use val from shares
-                  if(valueFromShares >= currentMinPayout){
-                    currentStoredPayout == 0L
-                  }else{
-                    currentStoredPayout == valueFromShares
+                    (indexInOutputs == -1) && (currentStoredPayout == valueFromShares)
                   }
                 }
             }
@@ -521,12 +453,12 @@ object SimpleHoldingContract {
                 }else{
                   true
                 }
-            } && owedPaymentsStored && changeInOutputs && smartPoolNFT
+            } && changeInOutputs && smartPoolNFT
           }
         }else{
           false
         }
-      sigmaProp(consensusValid) || sigmaProp(REGROUP_TX)
+      sigmaProp(REGROUP_TX) || sigmaProp(consensusValid)
     }
     """.stripMargin
 

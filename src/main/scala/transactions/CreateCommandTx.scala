@@ -18,7 +18,7 @@ class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Com
   val txFee: Long = Parameters.MinFee * 2
 
   protected[this] var _mainHoldingContract: HoldingContract = _
-  protected[this] var _holdingValue: Long = 0L
+  protected[this] var _holdingInputs: List[InputBox] = List[InputBox]()
   protected[this] var _withHolding = false
 
   // Custom metadata registers. These registers are set before the cOB is initialized(epoch and height are updated)
@@ -31,14 +31,14 @@ class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Com
 
   def holdingContract: HoldingContract = _mainHoldingContract
 
-  def withHolding(holdingContract: HoldingContract, holdingVal: Long): CreateCommandTx = {
+  def withHolding(holdingContract: HoldingContract, holdingBoxes: List[InputBox]): CreateCommandTx = {
     _mainHoldingContract = holdingContract
-    _holdingValue = holdingVal
+    _holdingInputs = holdingBoxes
     _withHolding = true
     this
   }
 
-  def holdingValue: Long = _holdingValue
+  def holdingInputs: List[InputBox] = _holdingInputs
 
   // This metadata input is not used in the transaction, and is only used to copy initial values from.
   def metadataToCopy(value: MetadataInputBox): CreateCommandTx = {

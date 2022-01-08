@@ -68,10 +68,10 @@ class RegroupTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Transacti
 
     outputBoxes = outputBoxes++List(holdingOutbox)
 
-    val valueDelta = Math.abs(newHoldingValue - heldValue)
+    val valueDelta = Math.abs(newHoldingValue - heldValue.toLong)
     // We only add change box if value delta exists, but users of this class should ensure
     // that a value delta exists so that the transaction is actually useful.
-    if(valueDelta != 0){
+    if(valueDelta > Parameters.MinFee){
       val holdingChangeBox: OutBox =
         asUnsignedTxB.outBoxBuilder()
           .value(valueDelta)
@@ -80,7 +80,7 @@ class RegroupTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Transacti
       outputBoxes = outputBoxes++List(holdingChangeBox)
     }
 
-    val feeInputs = ctx.getCoveringBoxesFor(feeAddress, txFee, List[ErgoToken]().asJava).getBoxes.asScala
+    val feeInputs = ctx.getWallet.getUnspentBoxes(txFee).get().asScala.toList
 
     val unsignedTx = asUnsignedTxB
       .boxesToSpend((holdingInputs++feeInputs).asJava)

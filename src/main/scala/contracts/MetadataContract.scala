@@ -165,7 +165,7 @@ object MetadataContract {
     val poolOpBytes = poolOp.getErgoAddress.script.bytes
     val initialConsensus: ShareConsensus = ShareConsensus.fromConversionValues(Array((poolOpBytes, Array(1L, (1 * Parameters.OneErg)/10 , 0L))))
     val initialMembers: MemberList = MemberList.fromConversionValues(Array((poolOpBytes, poolOp.toString)))
-    val initialPoolFee: PoolFees = PoolFees.fromConversionValues(Array((poolOpBytes, 1)))
+    val initialPoolFee: PoolFees = PoolFees.fromConversionValues(Array((poolOpBytes, 10)))
     val initialPoolOp: PoolOperators = PoolOperators.fromConversionValues(Array((poolOpBytes, poolOp.toString)))
     // The following info is stored: epoch 0, currentEpochHeight, creationEpochHeight,
     // and a filler value for the box id, since that info can only be obtained after the first spending tx.

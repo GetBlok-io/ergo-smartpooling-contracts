@@ -56,7 +56,7 @@ class SendMultipleToHoldingCmd(config: SmartPoolConfig, blockHeights: Array[Int]
 
       // Block must still be pending
       //assert(block.status == "pending")
-      blockReward = blockReward + (block.reward * Parameters.OneErg).toLong
+      blockReward = blockReward + (BigDecimal(block.reward) * Parameters.OneErg).toLong
       // Block must have full num of confirmations
       //assert(block.confirmationProgress == 1.0)
       // Assertions to make sure config is setup for command
@@ -66,8 +66,9 @@ class SendMultipleToHoldingCmd(config: SmartPoolConfig, blockHeights: Array[Int]
 
   def executeCommand: Unit = {
     logger.info("Command has begun execution")
-
-
+    logger.info(s"Total Block Reward to Send: $blockReward")
+    blockReward = blockReward - (blockReward % Parameters.MinFee)
+    logger.info(s"Rounding block reward to minimum box amount: $blockReward")
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
       val secretStorage = SecretStorage.loadFrom(walletConf.getSecretStoragePath)
       secretStorage.unlock(nodeConf.getWallet.getWalletPass)

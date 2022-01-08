@@ -1,7 +1,7 @@
 package test
 
 import boxes.builders.{CommandOutputBuilder, MetadataOutputBuilder}
-import boxes.{CommandInputBox, MetadataInputBox, MetadataOutBox}
+import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox, MetadataOutBox}
 import contracts.command.{CommandContract, MinerPKContract, PKContract}
 import contracts.holding.SimpleHoldingContract
 import contracts.{MetadataContract, generateContractAddress}
@@ -26,10 +26,10 @@ object TestParameters {
   final val networkType = NetworkType.TESTNET
   val poolMiner = Address.create("3WwtfPaghPbuPtYQs4Uj9QooYsPYkEZsESjmcR49MB4fs5kEshX7")
   val poolMinerTwo = Address.create("3WzKopFYhfRGPaUvC7v49DWgeY1efaCD3YpNQ6FZGr2t5mBhWjmw")
-  var creationMetadataID = ErgoId.create("7750730c2d0490145780984c02152eaefc16390461c2e34960212d956085c093")
+  var creationMetadataID = ErgoId.create("02eb540400d441a288b6fce71ed76d171afc06347aeab504312249f07a5406ca")
   var holdingInputs = List("7ad1bf36908fd07eabb00706bada3f6cdb7d15f6d44cc8d32b60ae076c42ee1d", "3e76e81425fe02766da9c10f40aa5db18eaa6110aa4df2202dd91633d4719cb0")
 
-  val currentMetadataID = "82bec9b154cbe45b5722a2ef8f43e9ea4605025cd43b774b515978285a298759"
+  val currentMetadataID = "81bb1eb163b69d76e586e8f4d3e02e2ba5958fea514abafc69ef9469be4ae0bf"
   var currentCommandID = "49ff9cbe600063534dfe1f8900b344543d44d68852065e34e3b1a164d81450ed"
 
   val poolOpSecret = SecretString.create("decade replace tired property draft patch innocent regular habit refuse double hard stick where phrase")
@@ -242,7 +242,7 @@ object TestCommands {
         .withCommandContract(commandContract)
         .commandValue(commandValue)
         .inputBoxes(poolOperatorBoxes: _*)
-        .withHolding(new SimpleHoldingContract(holdingContract), rewardsValue)
+        .withHolding(new SimpleHoldingContract(holdingContract), holdingBoxes.asScala.toList)
         .buildCommandTx()
     println("Command Box Creation Tx Built\n")
     val signed: SignedTransaction = poolOpProver.sign(tx)
@@ -302,12 +302,13 @@ object TestCommands {
    */
   def distributionTx(ctx: BlockchainContext, metadataBox: MetadataInputBox, commandBox: CommandInputBox) = {
     val p2PKCommandContract = new PKContract(poolOperator)
+    val holdingBoxes = BoxHelpers.findIdealHoldingBoxes(ctx, holdingAddress, rewardsValue, 0L)
     val tx = new DistributionTx(ctx.newTxBuilder())
     val builtTx =
       tx
         .metadataInput(metadataBox)
         .commandInput(commandBox)
-        .holdingValue(rewardsValue)
+        .holdingInputs(holdingBoxes)
         .holdingContract(new SimpleHoldingContract(holdingContract))
         .buildMetadataTx()
     val signed: SignedTransaction = poolOpProver.sign(builtTx)
@@ -379,7 +380,7 @@ object TestCommands {
       .setConsensus(shareCons)
       .setMembers(memsList)
       .inputBoxes(poolOperatorBoxes: _*)
-      .withHolding(new SimpleHoldingContract(holdingContract), rewardsValue)
+      .withHolding(new SimpleHoldingContract(holdingContract), holdingBoxes.asScala.toList)
       .buildCommandTx()
 
 

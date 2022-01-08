@@ -20,7 +20,7 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
   private var hOB: HoldingOutputBuilder = _
   private[this] var _mainHoldingContract: HoldingContract = _
   private[this] var _otherCommandContracts: List[CommandContract] = List[CommandContract]()
-  private[this] var _holdingValue: Long = 0L
+  private[this] var _holdingInputs: List[InputBox] = List[InputBox]()
 
 
   private def otherCommandContracts: List[CommandContract] = _otherCommandContracts
@@ -37,10 +37,10 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
     this
   }
 
-  def holdingValue: Long = _holdingValue
+  def holdingInputs: List[InputBox] = _holdingInputs
 
-  def holdingValue(value: Long): DistributionTx = {
-    _holdingValue = value
+  def holdingInputs(holdingBoxes: List[InputBox]): DistributionTx = {
+    _holdingInputs = holdingBoxes
     this
   }
 
@@ -68,12 +68,10 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
     val commandContract = commandInputBox.contract
     val holdingAddress = holdingContract.getAddress
 
-    val storedPayouts = metadataInputBox.getShareConsensus.cValue.map(c => c._2(2)).sum
-    logger.info(s"Stored Payouts: $storedPayouts")
-    logger.info(s"Holding Value: $holdingValue")
-    logger.info(s"Total Holding Box Value: ${storedPayouts + holdingValue}")
 
-    val holdingBoxes = BoxHelpers.findIdealHoldingBoxes(ctx, holdingAddress, holdingValue, storedPayouts)
+    logger.info(s"Total Holding Box Value: ${BoxHelpers.sumBoxes(holdingInputs)}")
+
+    val holdingBoxes = holdingInputs
 
     val metadataContract = metadataInputBox.getContract
 
@@ -94,7 +92,7 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
     val outputBoxes = List(metadataOutBox.asOutBox)++(holdingOutputs.map(h => h.asOutBox))
     logger.info("Distribution Tx built")
     logger.info("Total Input Value: "+ (inputBoxes.map(x => x.getValue.toLong).sum))
-    logger.info("Total Output Value: "+ outputBoxes.map(x => x.getValue).sum)
+    logger.info("Total Output Value: "+ outputBoxes.map(x => x.getValue.toLong).sum)
 
       this.asUnsignedTxB
       .boxesToSpend(inputBoxes.asJava)

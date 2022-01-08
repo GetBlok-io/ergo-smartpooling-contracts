@@ -64,7 +64,7 @@ object SmartPool_Test {
 
       //metadataBox = settingsTx(ctx, metadataBox, commandBox, preHeader)
       //miningRewardsToHolding(ctx)
-      regroupHolding(ctx)
+      //regroupHolding(ctx)
       //var commandBox = createCustomCommandBox(ctx, metadataBox)
       //metadataBox = distributionTx(ctx, metadataBox, commandBox)
 //      println(

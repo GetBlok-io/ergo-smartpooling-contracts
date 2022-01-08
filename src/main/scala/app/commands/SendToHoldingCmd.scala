@@ -67,7 +67,9 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
 
   def executeCommand: Unit = {
     logger.info("Command has begun execution")
-
+    logger.info(s"Total Block Reward to Send: $blockReward")
+    blockReward = blockReward - (blockReward % Parameters.MinFee)
+    logger.info(s"Rounding block reward to minimum box amount: $blockReward")
 
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
       val secretStorage = SecretStorage.loadFrom(walletConf.getSecretStoragePath)

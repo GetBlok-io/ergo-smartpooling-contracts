@@ -10,10 +10,12 @@ import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.slf4j.{Logger, LoggerFactory}
 import payments.PaymentHandler
+import persistence.entries.{ConsensusEntry, PaymentEntry, SmartPoolEntry}
 import persistence.queries.{BlockByHeightQuery, MinimumPayoutsQuery, PPLNSQuery}
+import persistence.writes.{ConsensusInsertion, PaymentInsertion, SmartPoolDataInsertion}
 import persistence.{DatabaseConnection, PersistenceHandler}
 import registers.{MemberList, ShareConsensus}
-import transactions.{CreateCommandTx, DistributionTx}
+import transactions.{CreateCommandTx, DistributionTx, RegroupTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 import scala.util.Try
@@ -37,7 +39,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
   private var txId: String = _
   private var nextCommandBox: CommandInputBox = _
   private var signedTx: SignedTransaction = _
-
+  private var dbConn: DatabaseConnection = _
 
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
@@ -51,7 +53,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     val persistence = new PersistenceHandler(Some(config.getPersistence.getHost), Some(config.getPersistence.getPort), Some(config.getPersistence.getDatabase))
     persistence.setConnectionProperties(config.getPersistence.getUsername, config.getPersistence.getPassword, config.getPersistence.isSslConnection)
 
-    val dbConn = persistence.connectToDatabase
+    dbConn = persistence.connectToDatabase
     logger.info("Now performing BlockByHeight Query")
     val blockQuery = new BlockByHeightQuery(dbConn, paramsConf.getPoolId, blockHeight.toLong)
     val block =  blockQuery.setVariables().execute().getResponse
@@ -93,7 +95,9 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
   def executeCommand: Unit = {
     logger.info("Command has begun execution")
-
+    logger.info(s"Total Block Reward to Send: $blockReward")
+    blockReward = blockReward - (blockReward % Parameters.MinFee)
+    logger.info(s"Rounding block reward to minimum box amount: $blockReward")
     val txJson: String = ergoClient.execute((ctx: BlockchainContext) => {
 
       val secretStorage = SecretStorage.loadFrom(walletConf.getSecretStoragePath)
@@ -103,16 +107,6 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       val nodeAddress = prover.getEip3Addresses.get(0)
       holdingContract = new holding.SimpleHoldingContract(SimpleHoldingContract.generateHoldingContract(ctx, Address.create(metaConf.getMetadataAddress), ErgoId.create(paramsConf.getSmartPoolId)))
       logger.info("Holding Address: " + holdingContract.getAddress.toString)
-      val isHoldingCovered = Try(ctx.getCoveringBoxesFor(holdingContract.getAddress, blockReward, List[ErgoToken]().asJava).isCovered)
-
-      if(isHoldingCovered.isFailure){
-        exit(logger, ExitCodes.HOLDING_NOT_COVERED)
-      }else{
-        if(isHoldingCovered.get)
-          logger.info("Holding address has enough ERG to cover transaction")
-        else
-          exit(logger, ExitCodes.HOLDING_NOT_COVERED)
-      }
 
       logger.info(s"Prover Address=${prover.getAddress}")
       logger.info(s"Node Address=${nodeAddress}")
@@ -130,6 +124,42 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       logger.info(s"Box used to create metadata input: ${selectMetadataBox.get.asInput.toJson(true)}")
       val metadataBox = selectMetadataBox.get
       logger.info(metadataBox.toString)
+      val storedPayouts = metadataBox.getShareConsensus.cValue.map(c => c._2(2)).sum
+      val isHoldingCovered = Try(ctx.getCoveringBoxesFor(holdingContract.getAddress, blockReward + storedPayouts, List[ErgoToken]().asJava).isCovered)
+
+      if(isHoldingCovered.isFailure){
+        exit(logger, ExitCodes.HOLDING_NOT_COVERED)
+      }else{
+        if(isHoldingCovered.get)
+          logger.info("Holding address has enough ERG to cover transaction")
+        else
+          exit(logger, ExitCodes.HOLDING_NOT_COVERED)
+      }
+
+
+      var holdingBoxes = ctx.getCoveringBoxesFor(holdingContract.getAddress, blockReward + storedPayouts, List[ErgoToken]().asJava).getBoxes.asScala.toList
+
+      if(BoxHelpers.sumBoxes(holdingBoxes) > (blockReward + storedPayouts)){
+        logger.info("Ideal holding boxes are greater than block rewards + stored payouts")
+        logger.info("Initiating regroup tx to get exact holding box inputs.")
+        val regroupTx = new RegroupTx(ctx.newTxBuilder())
+        val unsignedRegroup = regroupTx
+          .txFee(paramsConf.getInitialTxFee)
+          .feeAddress(nodeAddress)
+          .holdingContract(holdingContract)
+          .holdingInputs(holdingBoxes)
+          .newHoldingValue(blockReward + storedPayouts)
+          .build()
+        val signedRegroup = prover.sign(unsignedRegroup)
+        val regroupTxId = ctx.sendTransaction(signedRegroup)
+        logger.info(s"RegroupTx sent with id: $regroupTxId and cost ${signedRegroup.getCost}")
+        exit(logger, ExitCodes.REGROUP_TX_SENT)
+        // Uncomment to allow regroup Tx to chain into distribution
+        // val holdingInputs = signedRegroup.getOutputsToSpend.asScala.filter(i => i.getValue == (blockReward + storedPayouts)).toList
+
+        // holdingBoxes = holdingInputs
+      }
+
 
       val commandTx = new CreateCommandTx(ctx.newTxBuilder())
       val commandContract = new PKContract(nodeAddress)
@@ -143,7 +173,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
           .withCommandContract(commandContract)
           .commandValue(cmdConf.getCommandValue)
           .inputBoxes(inputBoxes: _*)
-          .withHolding(holdingContract, blockReward)
+          .withHolding(holdingContract, holdingBoxes)
           .setConsensus(shareConsensus)
           .setMembers(memberList)
           .buildCommandTx()
@@ -160,12 +190,13 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
         distTx
           .metadataInput(metadataBox)
           .commandInput(commandBox)
-          .holdingValue(blockReward)
+          .holdingInputs(holdingBoxes)
           .holdingContract(holdingContract)
           .buildMetadataTx()
       val signedDistTx = prover.sign(unsignedDistTx)
+      signedTx = signedDistTx
       logger.info("Distribution Tx successfully signed.")
-      val txId = ctx.sendTransaction(signedDistTx).filter(c => c != '\"')
+      txId = ctx.sendTransaction(signedDistTx).filter(c => c != '\"')
       logger.info(s"Tx successfully sent with id: $txId and cost: ${signedDistTx.getCost}")
       metadataId = signedDistTx.getOutputsToSpend.get(0).getId
       signedDistTx.toJson(true)
@@ -184,6 +215,45 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
     ConfigHandler.writeConfig(AppParameters.configFilePath, newConfig)
     logger.info("Config file has been successfully updated")
+    val membersSerialized = nextCommandBox.getMemberList.cValue.map(m => m._2)
+    val feesSerialized = nextCommandBox.getPoolFees.cValue.map(f => f._2.toLong)
+    val opsSerialized = nextCommandBox.getPoolOperators.cValue.map(o => o._2)
+
+
+    logger.info("SmartPool Data now being built and inserted into database.")
+    val txOutputs = signedTx.getOutputsToSpend.asScala
+
+    val outputMap: Map[String, Long] = txOutputs.map{
+      o => (Address.fromErgoTree(o.getErgoTree, nodeConf.getNetworkType).toString, o.getValue.toLong)
+    }.toMap
+
+    val smartPoolEntry = SmartPoolEntry(config.getParameters.getPoolId, txId, nextCommandBox.getCurrentEpoch,
+      nextCommandBox.getCurrentEpochHeight, membersSerialized, feesSerialized, nextCommandBox.getPoolInfo.cValue,
+      opsSerialized, smartPoolId.toString, Array(blockHeight.toLong))
+
+    val consensusEntries = nextCommandBox.getMemberList.cValue.map{
+      (memberVal: (Array[Byte], String)) =>
+        val consensusValues = nextCommandBox.getShareConsensus.cValue.filter{
+          c =>
+            c._1 sameElements memberVal._1
+        }.head
+        ConsensusEntry(config.getParameters.getPoolId, txId, nextCommandBox.getCurrentEpoch, nextCommandBox.getCurrentEpochHeight,
+          smartPoolId.toString, memberVal._2, consensusValues._2(0), consensusValues._2(1), consensusValues._2(2), outputMap.getOrElse(memberVal._2, 0L))
+    }
+
+    val smartPoolDataUpdate = new SmartPoolDataInsertion(dbConn)
+    smartPoolDataUpdate.setVariables(smartPoolEntry).execute()
+    var rowsInserted = 0L
+    logger.info(s"Attempting to insert ${consensusEntries.length} entries into consensus table")
+    consensusEntries.foreach{
+      ce =>
+
+        val consensusUpdate = new ConsensusInsertion(dbConn)
+        rowsInserted = rowsInserted + consensusUpdate.setVariables(ce).execute()
+    }
+    logger.info(s"$rowsInserted rows were inserted!")
+
+
   }
 
   private def applyMinimumPayouts(dbConn: DatabaseConnection, memberList: MemberList, shareConsensus: ShareConsensus): ShareConsensus ={

@@ -31,8 +31,8 @@ object SmartPoolingApp{
         case arg if arg.startsWith("-") =>
           val commandArg = arg.substring(1)
           commandArg match {
-            case "c" =>
-              val commandValue = arg.split("=")(1)
+            case str if str.charAt(0) == 'c' && str != "chcl" =>
+              val commandValue = str.split("=")(1)
               try {
                 config = Try(SmartPoolConfig.load(commandValue))
                 AppParameters.configFilePath = commandValue
@@ -41,15 +41,15 @@ object SmartPoolingApp{
                 case ex: Exception =>
                   exit(logger, ExitCodes.CONFIG_NOT_FOUND)
               }
-            case "g" =>
+            case str if str.charAt(0) == 'g' =>
               txCommand = GenerateMetadataCmd
-            case "d" =>
+            case  str if str.charAt(0) == 'd' =>
               txCommand = DistributeRewardsCmd
-            case "v" =>
+            case  str if str.charAt(0) == 'v' =>
               txCommand = ViewMetadataCmd
-            case "h" =>
+            case  str if str.charAt(0) == 'h' =>
               txCommand = SendToHoldingCmd
-            case "r" =>
+            case  str if str.charAt(0) == 'r' =>
               txCommand = ResetStatusCmd
             case "chcl" =>
               txCommand = CheckAndCleanDbCmd

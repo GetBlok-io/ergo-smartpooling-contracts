@@ -1,4 +1,4 @@
-import app.ExitCodes.{COMMAND_FAILED, CONFIG_NOT_FOUND, FAILED_TO_RETRIEVE_METADATA, HOLDING_NOT_COVERED, INVALID_ARGUMENTS, INVALID_CONFIG, NO_CONFIRMED_TXS_FOUND, SUCCESS}
+import app.ExitCodes.{COMMAND_FAILED, CONFIG_NOT_FOUND, FAILED_TO_RETRIEVE_METADATA, HOLDING_NOT_COVERED, INVALID_ARGUMENTS, INVALID_CONFIG, NO_CONFIRMED_TXS_FOUND, REGROUP_TX_SENT, SUCCESS}
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.ergoplatform.appkit.NetworkType
@@ -27,6 +27,7 @@ package object app {
     final val HOLDING_NOT_COVERED = 203
     final val FAILED_TO_RETRIEVE_METADATA = 204
     final val NO_CONFIRMED_TXS_FOUND = 205
+    final val REGROUP_TX_SENT = 206
 
   }
 
@@ -48,6 +49,8 @@ package object app {
         logger.error("The metadata box could not be retrieved from the blockchain.")
       case NO_CONFIRMED_TXS_FOUND =>
         logger.error("No confirmed transactions found for the current smartpool.")
+      case REGROUP_TX_SENT =>
+        logger.error("A regroup tx was sent to obtain exact holding inputs.")
       case _ =>
         logger.error("An unknown error occurred")
     }
