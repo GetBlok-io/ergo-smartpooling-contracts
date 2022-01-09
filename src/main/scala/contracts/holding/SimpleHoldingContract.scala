@@ -14,7 +14,7 @@ import transactions.{CreateCommandTx, DistributionTx}
 import scala.collection.JavaConverters.seqAsJavaListConverter
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import scala.collection.mutable.ArrayBuffer
-
+// TODO: Clean up offchain code to look nicer and possibly be more efficient
 /**
  * This is a simple holding contract that distributes PPS and saves minimum payouts that are then applied to next
  * command box output

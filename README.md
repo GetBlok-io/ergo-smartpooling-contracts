@@ -104,7 +104,7 @@ This is the main transaction that distributes payouts to each SmartPool Member.
 We may also refer to this transaction as a payout cycle or epoch. Each
 transaction destroys an old metadata box and creates a new one with the same
 value. The transaction also spends the command box according to the script protecting it.
-All of the holding boxes are used to create boxes for each member, with registers according
+All the holding boxes are used to create boxes for each member, with registers according
 to the consensus given. The following diagram is a simplistic model of a 
 consensus transaction. It assumes that there are no Pool Fees boxes to output to.
 ![Consensus Tx](docs/ConsensusTx.png)
