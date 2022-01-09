@@ -99,7 +99,7 @@ smart pool NFT. The holding contract ensures that holding boxes may only be spen
 Another job of the HoldingBox is to ensure that payments below each miner's minimum payment level are
 stored in a change box under the holding contract that is outputted during the distribution transaction.
 
-# The Distribution/Consensus Transaction
+# The Distribution Transaction
 This is the main transaction that distributes payouts to each SmartPool Member.
 We may also refer to this transaction as a payout cycle or epoch. Each
 transaction destroys an old metadata box and creates a new one with the same
@@ -107,7 +107,7 @@ value. The transaction also spends the command box according to the script prote
 All the holding boxes are used to create boxes for each member, with registers according
 to the consensus given. The following diagram is a simplistic model of a 
 consensus transaction. It assumes that there are no Pool Fees boxes to output to.
-![Consensus Tx](docs/ConsensusTx.png)
+![Consensus Tx](docs/distribution_tx.svg)
 
 # Building Complex Payment Schemes On Top Of the SmartPool
 The modular nature of the SmartPool allows for complex payment schemes to be used.
