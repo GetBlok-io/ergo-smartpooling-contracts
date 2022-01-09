@@ -136,7 +136,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       }
 
 
-      var holdingBoxes = ctx.getCoveringBoxesFor(holdingContract.getAddress, blockReward + storedPayouts, List[ErgoToken]().asJava).getBoxes.asScala.toList
+      var holdingBoxes = BoxHelpers.findIdealHoldingBoxes(ctx, holdingContract.getAddress, blockReward, storedPayouts)
 
       if(BoxHelpers.sumBoxes(holdingBoxes) > (blockReward + storedPayouts)){
         logger.info("Ideal holding boxes are greater than block rewards + stored payouts")

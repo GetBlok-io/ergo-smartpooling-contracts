@@ -87,6 +87,10 @@ object BoxHelpers {
               accumulatedValue = accumulatedValue + box.getValue
               boxesToReturn = List(box)
               exactHoldingFound = true
+              if(storedPaymentValue == 0){
+                return boxesToReturn
+              }
+
             }else if(box.getValue == holdingValue + storedPaymentValue){
               logger.info("Exact box for holding and storage found!")
               return List(box)

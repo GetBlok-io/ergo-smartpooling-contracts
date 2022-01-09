@@ -67,7 +67,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         var currentMinPayout = consVal._2(1)
         println(shareNum)
         var valueFromShares = ((totalValAfterFees * BigDecimal(shareNum)) / BigDecimal(totalShares)).toLong
-        valueFromShares = valueFromShares - (valueFromShares % 1000)
+        valueFromShares = valueFromShares - (valueFromShares % 100000)
 //        println("Share Num: " + shareNum)
 //        println("Total Shares: " + totalShares)
 //        println("Val After Fees: " + totalValAfterFees)
@@ -146,7 +146,10 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
     val totalRewards = TOTAL_HOLDED_VALUE - totalOwedPayouts
     val feeList: Coll[(Coll[Byte], Long)] = currentPoolFees.map{
       // Pool fee is defined as x/1000 of total inputs value.
-      (poolFee: (Coll[Byte], Int)) => ( poolFee._1 , ((poolFee._2 * totalRewards)/1000) )
+      (poolFee: (Coll[Byte], Int)) =>
+        val feeAmount = (poolFee._2 * totalRewards)/1000L
+        val dustRemoved = feeAmount - (feeAmount % 100000L)
+        ( poolFee._1 , dustRemoved )
     }
 
     // Total amount in holding after pool fees and tx fees.
@@ -162,7 +165,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
     def getValueFromShare(shareNum: Long) = {
       if(totalShares != 0) {
         val newBoxValue = ((totalValAfterFees * BigDecimal(shareNum)) / BigDecimal(totalShares)).toLong
-        val dustRemoved = newBoxValue - (newBoxValue % 1000)
+        val dustRemoved = newBoxValue - (newBoxValue % 100000)
         dustRemoved
       }else
         0L
@@ -262,25 +265,22 @@ object SimpleHoldingContract {
   val script: String =
     s"""
     {
+
+      val holdingBoxes = INPUTS.filter{(box: Box) => box.propositionBytes == SELF.propositionBytes}
+
+      // Lets ensure that only one holding box performs the consensus calculations to reduce tx cost
+      val doesCalculations =
+        if(holdingBoxes.size > 1 && holdingBoxes(0).id == SELF.id){
+          true
+        }else{
+          if(holdingBoxes.size == 1){
+            true
+          }else{
+            false
+          }
+        }
+
       val VALID_INPUTS_SIZE = INPUTS.size > 2
-      val TOTAL_HOLDED_VALUE: Long = INPUTS.fold(0L, {(accum: Long, box:Box) =>
-        if(box.propositionBytes == SELF.propositionBytes)
-          accum + box.value
-        else
-          accum
-      })
-
-      val TOTAL_HOLDED_OUTPUTS: Long = OUTPUTS.fold(0L, {(accum: Long, box:Box) =>
-        if(box.propositionBytes == SELF.propositionBytes)
-          accum + box.value
-        else
-          accum
-      })
-      // Alternate spending path that allows holding boxes to be regrouped so long as Total Value Held stays
-      // the same. This ensures exact holding boxes no matter the scenario.
-      val REGROUP_TX = TOTAL_HOLDED_VALUE == TOTAL_HOLDED_OUTPUTS
-
-      val MIN_TXFEE: Long = 1000L * 1000L
 
       val metadataExists =
         if(VALID_INPUTS_SIZE){
@@ -289,30 +289,47 @@ object SimpleHoldingContract {
           false
         }
 
+      // Alternate spending path that allows holding boxes to be regrouped so long as Total Value Held stays
+      // the same. This ensures exact holding boxes no matter the scenario.
+      def regroupTx: Boolean =
+      if(!metadataExists){
+        if(!doesCalculations){
+          true
+        }else{
+          val TOTAL_HOLDED_VALUE: Long = holdingBoxes.fold(0L, {(accum: Long, box:Box) =>
+            accum + box.value
+          })
+          val TOTAL_HOLDED_OUTPUTS: Long = OUTPUTS.fold(0L, {(accum: Long, box:Box) =>
+            if(box.propositionBytes == SELF.propositionBytes)
+              accum + box.value
+            else
+              accum
+          })
+
+          TOTAL_HOLDED_VALUE == TOTAL_HOLDED_OUTPUTS
+        }
+      }else{
+        false
+      }
+
+
+      val MIN_TXFEE: Long = 1000L * 1000L
+
+
+
       // Check if consensus is valid. This is verified by performing consensus on-chain, that means
       // the amount of erg each box gets is proportional to the amount of shares assigned to them by
       // the pool.
-      val consensusValid =
+      def consensusValid: Boolean =
         if(metadataExists){
-          val holdingBoxes = INPUTS.filter{(box: Box) => box.propositionBytes == SELF.propositionBytes}
-
-          // Lets ensure that only one holding box performs the consensus calculations to reduce tx cost
-          val calculateConsensus =
-            if(holdingBoxes.size > 1 && holdingBoxes(0).id == SELF.id){
-              true
-            }else{
-              if(holdingBoxes.size == 1){
-                true
-              }else{
-                false
-              }
-            }
           // Cut down on transaction cost by returning true if this holding box is not the first or only holding box
           // in this transaction
-          if(!calculateConsensus){
+          if(!doesCalculations){
             true
           }else{
-
+            val TOTAL_HOLDED_VALUE: Long = holdingBoxes.fold(0L, {(accum: Long, box:Box) =>
+              accum + box.value
+            })
             val poolInfo = INPUTS(0).R7[Coll[Long]].get
             val lastEpoch = poolInfo(0)
 
@@ -345,7 +362,10 @@ object SimpleHoldingContract {
 
             val feeList: Coll[(Coll[Byte], Long)] = currentPoolFees.map{
               // Pool fee is defined as x/1000 of total inputs value.
-              (poolFee: (Coll[Byte], Int)) => ( poolFee._1 , ((poolFee._2.toLong * totalRewards)/1000) )
+              (poolFee: (Coll[Byte], Int)) =>
+                val feeAmount: Long = (poolFee._2.toLong * totalRewards)/1000L
+                val feeNoDust: Long = feeAmount - (feeAmount % 100000L)
+                (poolFee._1 , feeNoDust)
             }
 
             // Total amount in holding after pool fees and tx fees.
@@ -360,7 +380,7 @@ object SimpleHoldingContract {
             // The percentage used is the proportion of the share number passed in over the total number of shares.
             def getValueFromShare(shareNum: Long) = {
               val newBoxValue = (((totalValAfterFees) * (shareNum)) / (totalShares)).toLong
-              val dustRemoved = newBoxValue - (newBoxValue % 1000)
+              val dustRemoved = newBoxValue - (newBoxValue % 100000)
               dustRemoved
             }
 
@@ -459,7 +479,7 @@ object SimpleHoldingContract {
         }else{
           false
         }
-      sigmaProp(REGROUP_TX) || sigmaProp(consensusValid)
+      sigmaProp(regroupTx) || sigmaProp(consensusValid)
     }
     """.stripMargin
 
