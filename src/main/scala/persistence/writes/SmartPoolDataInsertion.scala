@@ -13,8 +13,8 @@ class SmartPoolDataInsertion(dbConn: DatabaseConnection) extends DatabaseWrite[S
 
   override val insertionString: String =
     """INSERT INTO
-      | smartpool_data (poolid, transactionhash, epoch, height, members, fees, info, operators, smartpoolnft, created, blocks)
-      | VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""".stripMargin
+      | smartpool_data (poolid, transactionhash, epoch, height, members, fees, info, operators, smartpoolnft, created, blocks, subpool_id)
+      | VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(insertionString)
 
   override def setVariables(smartPoolEntry: SmartPoolEntry): DatabaseWrite[SmartPoolEntry] = {
@@ -41,6 +41,7 @@ class SmartPoolDataInsertion(dbConn: DatabaseConnection) extends DatabaseWrite[S
     asStatement.setObject(10, localDateTime)
 
     asStatement.setArray(11, blocksArray)
+    asStatement.setString(12, smartPoolEntry.subpoolId)
     this
   }
 

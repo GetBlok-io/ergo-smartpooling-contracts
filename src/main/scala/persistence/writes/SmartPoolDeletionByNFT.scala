@@ -7,17 +7,17 @@ import persistence.responses.SmartPoolResponse
 
 import java.sql.PreparedStatement
 
-class SmartPoolDeletionByNFT(dbConn: DatabaseConnection) extends DatabaseWrite[SmartPoolResponse](dbConn){
+class SmartPoolDeletionByNFT(dbConn: DatabaseConnection) extends DatabaseWrite[(String, String)](dbConn){
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
 
   override val insertionString: String =
     """DELETE FROM smartpool_data WHERE poolid = ? AND smartpoolnft != ?""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(insertionString)
 
-  override def setVariables(smartPoolResponse: SmartPoolResponse): DatabaseWrite[SmartPoolResponse] = {
+  override def setVariables(smartPoolResponse: (String, String)): DatabaseWrite[(String, String)] = {
 
-    asStatement.setString(1, smartPoolResponse.poolId)
-    asStatement.setString(2, smartPoolResponse.smartpoolNFT)
+    asStatement.setString(1, smartPoolResponse._1)
+    asStatement.setString(2, smartPoolResponse._2)
     this
   }
 

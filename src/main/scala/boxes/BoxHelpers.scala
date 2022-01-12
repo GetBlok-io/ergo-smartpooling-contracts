@@ -1,9 +1,11 @@
 package boxes
 
 import logging.LoggingHandler
-import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoId, InputBox}
+import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoId, InputBox, Parameters}
 import org.slf4j.{Logger, LoggerFactory}
+import registers.{PoolFees, ShareConsensus}
 import sigmastate.lang.exceptions.InvalidArguments
+import special.collection.Coll
 
 import scala.collection.JavaConverters.collectionAsScalaIterableConverter
 
@@ -62,8 +64,24 @@ object BoxHelpers {
     boxList.foldLeft[java.lang.Long](0L){(z, b) => z + b.getValue}
   }
 
+  def findExactBox(ctx: BlockchainContext, holdingAddress: Address, value: Long, boxesUsed: List[InputBox]): Option[InputBox] = {
+    var offset = 0
+    var boxesToSearch = ctx.getUnspentBoxesFor(holdingAddress, offset, BOX_SELECTOR_LIMIT)
+    while(boxesToSearch.size() > 0) {
+      for (box <- boxesToSearch.asScala) {
+        if (box.getValue == value && !boxesUsed.contains(box)) {
+          return Some(box)
+        }
+      }
+      offset = offset + BOX_SELECTOR_LIMIT
+      boxesToSearch = ctx.getUnspentBoxesFor(holdingAddress, offset, BOX_SELECTOR_LIMIT)
+    }
+    None
+  }
+
   def findIdealHoldingBoxes(ctx: BlockchainContext, holdingAddress: Address, holdingValue: Long, storedPaymentValue: Long): List[InputBox] ={
     logger.info("Searching for ideal holding boxes...")
+
     var offset = 0
     var boxesToSearch = ctx.getUnspentBoxesFor(holdingAddress, offset, BOX_SELECTOR_LIMIT)
     var accumulatedValue = 0L
@@ -141,5 +159,37 @@ object BoxHelpers {
 
 
   }
+
+  def getValAfterFees(lastConsensus: ShareConsensus, lastPoolFees: PoolFees, heldValue: Long, newConsensus: ShareConsensus): Long = {
+
+    val currentTxFee = newConsensus.nValue.length * Parameters.MinFee
+
+    val totalOwedPayouts =
+      lastConsensus.nValue.toArray.filter((consVal: (Coll[Byte], Coll[Long])) => consVal._2(2) < consVal._2(1))
+        .foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(2)}
+    val totalRewards = heldValue - totalOwedPayouts
+    val feeList: Coll[(Coll[Byte], Long)] = lastPoolFees.nValue.map{
+      // Pool fee is defined as x/1000 of total inputs value.
+      (poolFee: (Coll[Byte], Int)) =>
+        val feeAmount: Long = (poolFee._2.toLong * totalRewards)/1000L
+        val feeNoDust: Long = feeAmount - (feeAmount % Parameters.MinFee)
+        (poolFee._1 , feeNoDust)
+
+    }
+    // Total amount in holding after pool fees and tx fees.
+    // This is the total amount of ERG to be distributed to pool members
+    val totalValAfterFees = (feeList.toArray.foldLeft(totalRewards){
+      (accum: Long, poolFeeVal: (Coll[Byte], Long)) => accum - poolFeeVal._2
+    })- currentTxFee
+
+    totalValAfterFees
+  }
+
+  def removeDust(value: Long): Long = {
+    value - (value % Parameters.MinFee)
+  }
+
+
+
 
 }

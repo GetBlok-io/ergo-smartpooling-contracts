@@ -61,7 +61,7 @@ class GenesisTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Transacti
 
   override def build(): UnsignedTransaction = {
 
-    val genesisBox: OutBox = MetadataContract.buildGenesisBox(new MetadataOutputBuilder(this.outBoxBuilder()), metadataContract, creatorAddress, metadataValue, ctx.getHeight, smartPoolNFT)
+    val genesisBox: OutBox = MetadataContract.buildGenesisBox(new MetadataOutputBuilder(this.outBoxBuilder()), metadataContract, creatorAddress, metadataValue, ctx.getHeight, smartPoolNFT, 0)
 
     val unsignedTx = asUnsignedTxB
       .boxesToSpend(List[InputBox](tokenInputBox).asJava)

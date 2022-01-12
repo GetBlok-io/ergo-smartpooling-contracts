@@ -9,7 +9,7 @@ import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.slf4j.{Logger, LoggerFactory}
-import payments.PaymentHandler
+import payments.SimplePPLNS
 import persistence.entries.{ConsensusEntry, PaymentEntry, SmartPoolEntry}
 import persistence.queries.{BlockByHeightQuery, MinimumPayoutsQuery, PPLNSQuery}
 import persistence.responses.ShareResponse
@@ -82,7 +82,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       logger.info("Query executed successfully")
       shareResponseList = shareResponseList ++ Array(shares)
     }
-    val commandInputs = PaymentHandler.simpleMultiPPLNSToConsensus(shareResponseList)
+    val commandInputs = SimplePPLNS.simpleMultiPPLNSToConsensus(shareResponseList)
     val tempConsensus = commandInputs._1
     memberList = commandInputs._2
 
@@ -141,7 +141,9 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       }
       //BoxHelpers.findIdealHoldingBoxes(ctx, holdingContract.getAddress, blockReward, storedPayouts)
       val holdingCoveringBoxes = ctx.getCoveringBoxesFor(holdingContract.getAddress, blockReward + storedPayouts, List[ErgoToken]().asJava)
+
       var holdingBoxes = BoxHelpers.findIdealHoldingBoxes(ctx, holdingContract.getAddress, blockReward, storedPayouts)
+      //var holdingBoxes = holdingCoveringBoxes.getBoxes.asScala.toList
       val holdingCovered = holdingCoveringBoxes.getCoveredAmount
       val holdingSummed = holdingBoxes.map(x => x.getValue.toLong).sum
       val holdingSummed2 = holdingBoxes.map(x => x.getValue.longValue()).sum
@@ -158,7 +160,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       logger.info("BlockReward+StoredPayouts: " + (blockReward + storedPayouts))
       logger.info("BlockReward " + blockReward)
       logger.info("Stored Payouts " + storedPayouts)
-      if(BoxHelpers.sumBoxes(holdingBoxes) > (blockReward + storedPayouts + Parameters.MinFee)){
+      if(BoxHelpers.sumBoxes(holdingBoxes) > (blockReward + storedPayouts)){
         logger.info("Ideal holding boxes are greater than block rewards + stored payouts")
         logger.info("Initiating regroup tx to get exact holding box inputs.")
         val regroupTx = new RegroupTx(ctx.newTxBuilder())
@@ -175,9 +177,9 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
         logger.warn("Now exiting distribution command as failure to ensure regroupTx is sent.")
         exit(logger, ExitCodes.REGROUP_TX_SENT)
         // Uncomment to allow regroup tx to chain into distribution
-        // val holdingInputs = signedRegroup.getOutputsToSpend.asScala.filter(i => i.getValue == (blockReward + storedPayouts)).toList
+         val holdingInputs = signedRegroup.getOutputsToSpend.asScala.filter(i => i.getValue == (blockReward + storedPayouts)).toList
 
-        // holdingBoxes = holdingInputs
+         holdingBoxes = holdingInputs
       }else{
         if(BoxHelpers.sumBoxes(holdingBoxes) < (blockReward + storedPayouts)){
           logger.info("Valid holding boxes could not be found!")
@@ -235,7 +237,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
     logger.info("Command has finished execution")
   }
 
-  def recordToConfig: Unit = {
+  def recordToDb: Unit = {
     logger.info("Recording tx info into config...")
 
     logger.info("The following information will be updated:")
@@ -264,7 +266,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
 
     val smartPoolEntry = SmartPoolEntry(config.getParameters.getPoolId, txId, nextCommandBox.getCurrentEpoch,
       nextCommandBox.getCurrentEpochHeight, membersSerialized, feesSerialized, nextCommandBox.getPoolInfo.cValue,
-      opsSerialized, smartPoolId.toString, blockHeights.map(h => h.toLong))
+      opsSerialized, smartPoolId.toString, blockHeights.map(h => h.toLong), nextCommandBox.getSubpoolId.toString)
 
     val consensusEntries = nextCommandBox.getMemberList.cValue.map{
       (memberVal: (Array[Byte], String)) =>
@@ -273,7 +275,8 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
             c._1 sameElements memberVal._1
         }.head
         ConsensusEntry(config.getParameters.getPoolId, txId, nextCommandBox.getCurrentEpoch, nextCommandBox.getCurrentEpochHeight,
-          smartPoolId.toString, memberVal._2, consensusValues._2(0), consensusValues._2(1), consensusValues._2(2), outputMap.getOrElse(memberVal._2, 0L))
+          smartPoolId.toString, memberVal._2, consensusValues._2(0), consensusValues._2(1), consensusValues._2(2), outputMap.getOrElse(memberVal._2, 0L)
+        , nextCommandBox.getSubpoolId.toString)
     }
 
     val smartPoolDataUpdate = new SmartPoolDataInsertion(dbConn)

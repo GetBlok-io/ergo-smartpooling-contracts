@@ -32,7 +32,7 @@ abstract class SmartPoolCmd(config: SmartPoolConfig) {
 
   def executeCommand: Unit
 
-  def recordToConfig: Unit
+  def recordToDb: Unit
 
 
 }

@@ -15,7 +15,7 @@ import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqA
 
 class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends CommandTxTemplate(unsignedTxBuilder) {
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_COMMAND_TX)
-  val txFee: Long = Parameters.MinFee * 2
+  val txFee: Long = Parameters.MinFee * 5
 
   protected[this] var _mainHoldingContract: HoldingContract = _
   protected[this] var _holdingInputs: List[InputBox] = List[InputBox]()

@@ -87,7 +87,9 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
     otherCommandContracts.foreach(c => hOB.applyCommandContract(c))
 
     val holdingOutputs = hOB.build()
-
+    for(hb <- holdingOutputs){
+      logger.info("Holding Box Val: " + hb.asOutBox.getValue)
+    }
     val txFee = commandInputBox.getValue + (commandInputBox.getShareConsensus.nValue.size * Parameters.MinFee)
     val outputBoxes = List(metadataOutBox.asOutBox)++(holdingOutputs.map(h => h.asOutBox))
     logger.info("Distribution Tx built")

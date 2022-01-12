@@ -56,8 +56,8 @@ abstract class InputTemplate(inputBox: InputBox) extends InputBox{
     poolInfo.getCreationHeight
   }
 
-  def getCreationBox: String ={
-    poolInfo.getCreationBox
+  def getSubpoolId: Long ={
+    poolInfo.getSubpoolId()
   }
 
   def getShareConsensus: ShareConsensus = {

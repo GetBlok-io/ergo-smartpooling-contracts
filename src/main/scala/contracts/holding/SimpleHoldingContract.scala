@@ -2,11 +2,13 @@ package contracts.holding
 
 import app.AppParameters
 import boxes.builders.{CommandOutputBuilder, HoldingOutputBuilder}
-import boxes.{CommandInputBox, MetadataInputBox, BoxHelpers}
+import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox}
 import contracts.command.CommandContract
+import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
-import registers.{BytesColl, ShareConsensus}
+import org.slf4j.{Logger, LoggerFactory}
+import registers.{BytesColl, MemberList, ShareConsensus}
 import sigmastate.serialization.ErgoTreeSerializer
 import special.collection.Coll
 import transactions.{CreateCommandTx, DistributionTx}
@@ -22,7 +24,7 @@ import scala.collection.mutable.ArrayBuffer
  */
 class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContract(holdingContract) {
   import SimpleHoldingContract._
-
+  val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DIST_TX)
 
   override def applyToCommand(commandTx: CreateCommandTx): CommandOutputBuilder = {
     val metadataBox = commandTx.metadataInputBox
@@ -49,7 +51,11 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
     val totalRewards = holdingBoxValues - totalOwedPayouts
     val feeList: Coll[(Coll[Byte], Long)] = currentPoolFees.map{
       // Pool fee is defined as x/1000 of total inputs value.
-      (poolFee: (Coll[Byte], Int)) => ( poolFee._1 , ((poolFee._2 * totalRewards)/1000) )
+      (poolFee: (Coll[Byte], Int)) =>
+        val feeAmount: Long = (poolFee._2.toLong * totalRewards)/1000L
+        val feeNoDust: Long = BoxHelpers.removeDust(feeAmount)
+        (poolFee._1 , feeNoDust)
+
     }
     // Total amount in holding after pool fees and tx fees.
     // This is the total amount of ERG to be distributed to pool members
@@ -61,13 +67,21 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
 //    println("Total Shares:" + totalShares)
 //    println("Owed Payouts: " + totalOwedPayouts)
 //    println("Val after fees: " + totalValAfterFees)
+    var shareScoreLeft = 0L
     val updatedConsensus = currentConsensus.toArray.map{
       (consVal: (Coll[Byte], Coll[Long])) =>
         val shareNum = consVal._2(0)
         var currentMinPayout = consVal._2(1)
         println(shareNum)
         var valueFromShares = ((totalValAfterFees * BigDecimal(shareNum)) / BigDecimal(totalShares)).toLong
-        valueFromShares = valueFromShares - (valueFromShares % 100000)
+
+        valueFromShares = BoxHelpers.removeDust(valueFromShares)
+
+        val member = MemberList.fromNormalValues( commandTx.memberList.nValue.filter(m => m._1 == consVal._1))
+        logger.info("Member: " + member.cValue(0)._2)
+        logger.info("Value from shares: " + valueFromShares)
+
+        logger.info("Current Min Payout: " + currentMinPayout)
 //        println("Share Num: " + shareNum)
 //        println("Total Shares: " + totalShares)
 //        println("Val After Fees: " + totalValAfterFees)
@@ -148,7 +162,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
       // Pool fee is defined as x/1000 of total inputs value.
       (poolFee: (Coll[Byte], Int)) =>
         val feeAmount = (poolFee._2 * totalRewards)/1000L
-        val dustRemoved = feeAmount - (feeAmount % 100000L)
+        val dustRemoved = BoxHelpers.removeDust(feeAmount)
         ( poolFee._1 , dustRemoved )
     }
 
@@ -165,7 +179,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
     def getValueFromShare(shareNum: Long) = {
       if(totalShares != 0) {
         val newBoxValue = ((totalValAfterFees * BigDecimal(shareNum)) / BigDecimal(totalShares)).toLong
-        val dustRemoved = newBoxValue - (newBoxValue % 100000)
+        val dustRemoved = BoxHelpers.removeDust(newBoxValue)
         dustRemoved
       }else
         0L
@@ -207,15 +221,18 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         .foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(2)}
 
     val outBoxBuffer = ArrayBuffer[OutBoxBuilder]()
-    val memberAddresses = commandBox.getMemberList.cValue.map{(a: (Array[Byte], String)) => Address.create(a._2)}
-    boxValueMap.foreach{consVal: (Coll[Byte], Long) => println(Address.fromErgoTree(serializer.deserializeErgoTree(consVal._1.toArray), AppParameters.networkType))}
-    memberAddresses.foreach{
-      (addr: Address) =>
+
+
+    val memberAddresses = commandBox.getMemberList.cValue.map(m => Address.create(m._2))
+    boxValueMap.foreach{consVal: (Coll[Byte], Long) => logger.info("Address " + Address.fromErgoTree(serializer.deserializeErgoTree(consVal._1.toArray), AppParameters.networkType))}
+    boxValueMap.foreach{
+      (consVal: (Coll[Byte], Long)) =>
+        val addr = Address.fromErgoTree(serializer.deserializeErgoTree(consVal._1.toArray), AppParameters.networkType)
         val addrBytes = BytesColl.fromConversionValues(addr.getErgoAddress.script.bytes)
 
         // This should (theoretically) never fail since members list and consensus map to each other properly
         val boxValue = boxValueMap.filter{consVal: (Coll[Byte], Long) => BytesColl.fromNormalValues(consVal._1).nValue == addrBytes.nValue}(0)
-        println(s" Value from shares for address ${addr}: ${boxValue._2}")
+        logger.info(s" Value from shares for address ${addr}: ${boxValue._2}")
         if(boxValue._2 > 0) {
           val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
           val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
@@ -227,9 +244,11 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
         val addrBytes = BytesColl.fromConversionValues(addr.getErgoAddress.script.bytes)
         val boxValue = feeList.filter{poolFeeVal: (Coll[Byte], Long) => poolFeeVal._1 == addrBytes.nValue}(0)
-        println(s"Fee Value for address ${addr}: ${boxValue._2}")
-        val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
-        outBoxBuffer.append(newOutBox)
+        if(boxValue._2 > 0) {
+          println(s"Fee Value for address ${addr}: ${boxValue._2}")
+          val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
+          outBoxBuffer.append(newOutBox)
+        }
     }
 
     if(changeValue > 0) {
@@ -279,40 +298,28 @@ object SimpleHoldingContract {
             false
           }
         }
+      val metadataExists = INPUTS(0).propositionBytes == const_metadataPropBytes
 
-      val VALID_INPUTS_SIZE = INPUTS.size > 2
 
-      val metadataExists =
-        if(VALID_INPUTS_SIZE){
-          INPUTS(0).propositionBytes == const_metadataPropBytes
-        }else{
-          false
-        }
 
       // Alternate spending path that allows holding boxes to be regrouped so long as Total Value Held stays
       // the same. This ensures exact holding boxes no matter the scenario.
-      def regroupTx: Boolean =
-      if(!metadataExists){
-        if(!doesCalculations){
-          true
-        }else{
-          val TOTAL_HOLDED_VALUE: Long = holdingBoxes.fold(0L, {(accum: Long, box:Box) =>
-            accum + box.value
-          })
-          val TOTAL_HOLDED_OUTPUTS: Long = OUTPUTS.fold(0L, {(accum: Long, box:Box) =>
-            if(box.propositionBytes == SELF.propositionBytes)
-              accum + box.value
-            else
-              accum
-          })
-
-          TOTAL_HOLDED_VALUE == TOTAL_HOLDED_OUTPUTS
-        }
-      }else{
-        false
-      }
-
-
+      //      def regroupTx(mExists: Boolean): Boolean =
+      //        if(!mExists){
+      //          val TOTAL_HOLDED_VALUE: Long = holdingBoxes.fold(0L, {(accum: Long, box:Box) =>
+      //            accum + box.value
+      //          })
+      //          val TOTAL_HOLDED_OUTPUTS: Long = OUTPUTS.fold(0L, {(accum: Long, box:Box) =>
+      //            if(box.propositionBytes == SELF.propositionBytes)
+      //              accum + box.value
+      //            else
+      //              accum
+      //          })
+      //
+      //          TOTAL_HOLDED_VALUE == TOTAL_HOLDED_OUTPUTS
+      //        }else{
+      //          false
+      //        }
       val MIN_TXFEE: Long = 1000L * 1000L
 
 
@@ -320,13 +327,8 @@ object SimpleHoldingContract {
       // Check if consensus is valid. This is verified by performing consensus on-chain, that means
       // the amount of erg each box gets is proportional to the amount of shares assigned to them by
       // the pool.
-      def consensusValid: Boolean =
-        if(metadataExists){
-          // Cut down on transaction cost by returning true if this holding box is not the first or only holding box
-          // in this transaction
-          if(!doesCalculations){
-            true
-          }else{
+      def consensusValid(mExists: Boolean): Boolean =
+          if(mExists){
             val TOTAL_HOLDED_VALUE: Long = holdingBoxes.fold(0L, {(accum: Long, box:Box) =>
               accum + box.value
             })
@@ -364,7 +366,7 @@ object SimpleHoldingContract {
               // Pool fee is defined as x/1000 of total inputs value.
               (poolFee: (Coll[Byte], Int)) =>
                 val feeAmount: Long = (poolFee._2.toLong * totalRewards)/1000L
-                val feeNoDust: Long = feeAmount - (feeAmount % 100000L)
+                val feeNoDust: Long = feeAmount - (feeAmount % MIN_TXFEE)
                 (poolFee._1 , feeNoDust)
             }
 
@@ -380,7 +382,7 @@ object SimpleHoldingContract {
             // The percentage used is the proportion of the share number passed in over the total number of shares.
             def getValueFromShare(shareNum: Long) = {
               val newBoxValue = (((totalValAfterFees) * (shareNum)) / (totalShares)).toLong
-              val dustRemoved = newBoxValue - (newBoxValue % 100000)
+              val dustRemoved = newBoxValue - (newBoxValue % MIN_TXFEE)
               dustRemoved
             }
 
@@ -475,11 +477,15 @@ object SimpleHoldingContract {
                   true
                 }
             } && changeInOutputs && smartPoolNFT
+          }else{
+            false
           }
-        }else{
-          false
-        }
-      sigmaProp(regroupTx) || sigmaProp(consensusValid)
+
+      if(!doesCalculations){
+        sigmaProp(consensusValid(metadataExists))
+      }else{
+        sigmaProp(true)
+      }
     }
     """.stripMargin
 
@@ -508,7 +514,7 @@ object SimpleHoldingContract {
   def getBoxValue(shareNum: Long, totalShares: Long, totalValueAfterFees: Long): Long = {
     if(totalShares != 0) {
       val boxValue = ((totalValueAfterFees * shareNum)/totalShares)
-      val dustRemoved = boxValue - (boxValue % 1000)
+      val dustRemoved = BoxHelpers.removeDust(boxValue)
       dustRemoved
     } else
       0L

@@ -1,4 +1,4 @@
-import app.ExitCodes.{COMMAND_FAILED, CONFIG_NOT_FOUND, FAILED_TO_RETRIEVE_METADATA, HOLDING_NOT_COVERED, INVALID_ARGUMENTS, INVALID_CONFIG, NO_CONFIRMED_TXS_FOUND, REGROUP_TX_SENT, SUCCESS}
+import app.ExitCodes.{COMMAND_FAILED, CONFIG_NOT_FOUND, FAILED_TO_RETRIEVE_METADATA, HOLDING_NOT_COVERED, INVALID_ARGUMENTS, INVALID_CONFIG, NO_CONFIRMED_TXS_FOUND, REGROUP_TX_SENT, SUBPOOL_TX_FAILED, SUCCESS}
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.ergoplatform.appkit.NetworkType
@@ -28,6 +28,8 @@ package object app {
     final val FAILED_TO_RETRIEVE_METADATA = 204
     final val NO_CONFIRMED_TXS_FOUND = 205
     final val REGROUP_TX_SENT = 206
+    final val TX_GROUPING = 207
+    final val SUBPOOL_TX_FAILED = 208
 
   }
 
@@ -51,6 +53,8 @@ package object app {
         logger.error("No confirmed transactions found for the current smartpool.")
       case REGROUP_TX_SENT =>
         logger.error("A regroup tx was sent to obtain exact holding inputs.")
+      case SUBPOOL_TX_FAILED =>
+        logger.error("A subpool tx chain has a failure in it!")
       case _ =>
         logger.error("An unknown error occurred")
     }

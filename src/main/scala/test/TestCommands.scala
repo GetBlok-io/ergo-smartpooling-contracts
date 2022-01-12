@@ -166,7 +166,7 @@ object TestCommands {
     txB = ctx.newTxBuilder()
     val mOB: MetadataOutputBuilder = new MetadataOutputBuilder(txB.outBoxBuilder())
     // Create output holding box
-    val genesisBox: OutBox = MetadataContract.buildGenesisBox(mOB, metadataContract, poolOperator, initValue, ctx.getHeight, smartPoolToken)
+    val genesisBox: OutBox = MetadataContract.buildGenesisBox(mOB, metadataContract, poolOperator, initValue, ctx.getHeight, smartPoolToken, 0)
 
 
     println("Generating unspent boxes for pool creator " + poolOperator)

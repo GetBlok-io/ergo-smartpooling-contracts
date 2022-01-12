@@ -39,7 +39,7 @@ object SmartPool_Test {
   def main(args: Array[String]): Unit = {
     logger.info("Starting Smart Pool Test...")
 
-    val conf  = ErgoToolConfig.load("smartpoolconfig.json")
+    val conf  = ErgoToolConfig.load("test_config.json")
 
     val nodeConf: ErgoNodeConfig = conf.getNode
     val explorerUrl: String = RestApiErgoClient.getDefaultExplorerUrl(NetworkType.TESTNET)
@@ -63,7 +63,7 @@ object SmartPool_Test {
       //var commandBox = createModifiedCommandBox(ctx, metadataBox)
 
       //metadataBox = settingsTx(ctx, metadataBox, commandBox, preHeader)
-      //miningRewardsToHolding(ctx)
+      miningRewardsToHolding(ctx)
       //regroupHolding(ctx)
       //var commandBox = createCustomCommandBox(ctx, metadataBox)
       //metadataBox = distributionTx(ctx, metadataBox, commandBox)

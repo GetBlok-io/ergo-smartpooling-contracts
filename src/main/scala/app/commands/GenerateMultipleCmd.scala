@@ -1,19 +1,25 @@
 package app.commands
 
 import app.{AppCommand, AppParameters}
+import boxes.{BoxHelpers, MetadataInputBox}
 import config.{ConfigHandler, SmartPoolConfig}
 import contracts.command.{CommandContract, PKContract}
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import contracts.{MetadataContract, holding}
 import logging.LoggingHandler
-import org.ergoplatform.appkit.impl.ErgoTreeContract
 import org.ergoplatform.appkit._
+import org.ergoplatform.appkit.impl.ErgoTreeContract
 import org.slf4j.LoggerFactory
-import transactions.GenesisTx
+import persistence.PersistenceHandler
+import persistence.entries.BoxIndexEntry
+import persistence.writes.{BoxIndexDeletion, BoxIndexInsertion}
+import registers.PoolInfo
+import special.collection.Coll
+import transactions.{GenerateMultipleTx, GenesisTx}
 
-import scala.collection.JavaConverters.seqAsJavaListConverter
+import scala.collection.JavaConverters.{collectionAsScalaIterable, collectionAsScalaIterableConverter}
 
-class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
+class GenerateMultipleCmd(config: SmartPoolConfig, generationAmount: Int) extends SmartPoolCmd(config) {
   val logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_GEN_METADATA_CMD)
 
   override val appCommand: app.AppCommand.Value = AppCommand.GenerateMetadataCmd
@@ -22,7 +28,8 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
   private var metadataAddress: Address = _
   private var holdingContract: HoldingContract = _
   private var commandContract: CommandContract = _
-
+  private var metadataBoxes: List[InputBox] = _
+  private var txId: String = _
   private var secretStorage: SecretStorage = _
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
@@ -67,15 +74,16 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
       val metadataContract = MetadataContract.generateMetadataContract(ctx)
       metadataAddress = Address.fromErgoTree(metadataContract.getErgoTree, nodeConf.getNetworkType)
 
-      val boxesToSpend = ctx.getWallet.getUnspentBoxes(metadataValue + (txFee * 2)).get()
+      val boxesToSpend = ctx.getWallet.getUnspentBoxes((metadataValue*(generationAmount+1)) + (txFee * 2)).get()
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
       val outB = txB.outBoxBuilder()
       smartPoolId = boxesToSpend.get(0).getId
-      val smartPoolToken = new ErgoToken(smartPoolId, 1)
+      val smartPoolToken = new ErgoToken(smartPoolId, generationAmount)
       // TODO: Remove constant values for tokens and place them into config
+      logger.info("boxesToSpend: " + BoxHelpers.sumBoxes(boxesToSpend.asScala.toList))
       val tokenBox = outB
-        .value(metadataValue + (txFee))
-        .mintToken(smartPoolToken, "GetBlok.io SmartPool Display Token", "This token identifies this box to be a part of GetBlok.io's smart-contract based mining pool", 0)
+        .value((metadataValue * generationAmount) + (txFee))
+        .mintToken(smartPoolToken, "GetBlok.io SmartPool Display Token", "This token identifies this box as a subpool under GetBlok.io's smart-contract based mining pool", 0)
         .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
         .build()
 
@@ -98,11 +106,11 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
       logger.info(s"TxFee=${txFee.toDouble / Parameters.OneErg} ERG")
       logger.info("Now building transaction...")
 
-      val genesisTx = new GenesisTx(ctx.newTxBuilder())
+      val genesisTx = new GenerateMultipleTx(ctx.newTxBuilder())
       val unsignedTx =
         genesisTx
         .tokenInputBox(tokenInputBox)
-        .smartPoolNFT(smartPoolToken)
+        .smartPoolToken(smartPoolToken)
         .creatorAddress(nodeAddress)
         .metadataContract(MetadataContract.generateMetadataContract(ctx))
         .metadataValue(metadataValue)
@@ -117,10 +125,21 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
       val signedTx = prover.sign(unsignedTx)
 
       logger.info("Tx was successfully signed!")
-      val txId = ctx.sendTransaction(signedTx)
+      txId = ctx.sendTransaction(signedTx).filter(p => p != '\"')
+      logger.info(s"Tx was sent with id $txId and cost ${signedTx.getCost}")
+      val generationInputs = signedTx.getOutputsToSpend.asScala.toArray
 
 
-      metadataId = signedTx.getOutputsToSpend.get(0).getId
+
+      metadataBoxes = generationInputs.toList.filter(ib =>ib.getValue == metadataValue)
+      for(input <- metadataBoxes){
+
+
+        logger.info("New Metadata Box Made!")
+        logger.info(s"MD Value: " + input.getValue + " MD ID: " + input.getId)
+
+      }
+      metadataId = metadataBoxes.head.getId
 
       logger.info(s"Tx was successfully sent with id: $txId")
 
@@ -156,6 +175,24 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
 
     ConfigHandler.writeConfig(AppParameters.configFilePath, newConfig)
     logger.info("Config file has been successfully updated")
+
+    logger.info("Now rewriting box index to correct values.")
+    logger.info("Creating connection to persistence database")
+    val persistence = new PersistenceHandler(Some(config.getPersistence.getHost), Some(config.getPersistence.getPort), Some(config.getPersistence.getDatabase))
+    persistence.setConnectionProperties(config.getPersistence.getUsername, config.getPersistence.getPassword, config.getPersistence.isSslConnection)
+
+    val dbConn = persistence.connectToDatabase
+
+    val boxWipe = new BoxIndexDeletion(dbConn).execute()
+    for(box <- metadataBoxes){
+      val metaInfo = PoolInfo.fromNormalValues(box.getRegisters.get(3).getValue.asInstanceOf[Coll[Long]])
+
+
+      val boxEntry = BoxIndexEntry(paramsConf.getPoolId, box.getId.toString, txId, 0L, "success", smartPoolId.toString, metaInfo.getSubpoolId().toString, Array(0L))
+      logger.info("Now inserting into box index for box with id " + box.getId.toString)
+      val boxInsertion = new BoxIndexInsertion(dbConn).setVariables(boxEntry).execute()
+    }
+
   }
 
 

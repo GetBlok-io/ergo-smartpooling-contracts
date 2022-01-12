@@ -52,8 +52,8 @@ abstract class OutputTemplate(outBox: OutBox, metadataRegs: MetadataRegisters) e
     poolInfo.getCreationHeight
   }
 
-  def getCreationBox: String ={
-    poolInfo.getCreationBox
+  def getSubpoolId: Long ={
+    poolInfo.getSubpoolId()
   }
 
   def getShareConsensus: ShareConsensus = {
@@ -80,7 +80,7 @@ abstract class OutputTemplate(outBox: OutBox, metadataRegs: MetadataRegisters) e
     - Epoch: ${this.getCurrentEpoch}
     - Epoch Height: ${this.getCurrentEpochHeight}
     - Creation Height: ${this.getCreationHeight}
-    - Creation ID: ${this.getCreationBox}
+    - Creation ID: ${this.getSubpoolId}
     - Last Consensus: ${this.getShareConsensus.getConversionValue.map { (sc: (Array[Byte], Array[Long])) => (sc._1.mkString("Array(", ", ", ")"), sc._2.mkString("Array(", ", ", ")")) }.mkString("Array(", ", ", ")")}
     - Members List: ${this.getMemberList.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Fees: ${this.getPoolFees.getConversionValue.mkString("Array(", ", ", ")")}

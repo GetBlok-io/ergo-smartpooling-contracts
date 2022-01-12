@@ -13,8 +13,8 @@ class ConsensusInsertion(dbConn: DatabaseConnection) extends DatabaseWrite[Conse
 
   override val insertionString: String =
     """INSERT INTO
-      | consensus (poolid, transactionhash, epoch, height, smartpoolnft, miner, shares, minpayout, storedpayout, created, paid)
-      | VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""".stripMargin
+      | consensus (poolid, transactionhash, epoch, height, smartpoolnft, miner, shares, minpayout, storedpayout, created, paid, subpool_id)
+      | VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(insertionString)
 
   override def setVariables(consensusEntry: ConsensusEntry): DatabaseWrite[ConsensusEntry] = {
@@ -32,6 +32,7 @@ class ConsensusInsertion(dbConn: DatabaseConnection) extends DatabaseWrite[Conse
     asStatement.setLong(9, consensusEntry.storedPayout)
     asStatement.setObject(10, localDateTime)
     asStatement.setLong(11, consensusEntry.paid)
+    asStatement.setString(12, consensusEntry.subpoolId)
     this
   }
 

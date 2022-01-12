@@ -21,9 +21,9 @@ import scala.math.BigInt
  */
 class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends InputTemplate(inputBox) {
   val smartPoolId: ErgoId = smartPoolNFTId
-  if(this.getCurrentEpoch != 0)
+  if(this.getCurrentEpoch != 0) {
     require(smartPoolNFTId == this.getTokens.get(0).getId)
-  else {
+  } else {
     if(this.getTokens.size() > 0){
       require(smartPoolNFTId == this.getTokens.get(0).getId)
     }else {
@@ -43,7 +43,7 @@ class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends Input
     - Epoch: ${this.getCurrentEpoch}
     - Epoch Height: ${this.getCurrentEpochHeight}
     - Creation Height: ${this.getCreationHeight}
-    - Creation ID: ${this.getCreationBox}
+    - Subpool Id: ${this.getSubpoolId}
     - Share Consensus: ${this.getShareConsensus.getConversionValue.map { (sc: (Array[Byte], Array[Long])) => (sc._1, sc._2.mkString("Array(", ", ", ")")) }.mkString("Array(", ", ", ")")}
     - Members List: ${this.getMemberList.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Fees: ${this.getPoolFees.getConversionValue.mkString("Array(", ", ", ")")}

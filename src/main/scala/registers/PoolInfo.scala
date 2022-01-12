@@ -69,14 +69,12 @@ class PoolInfo(normalValue: Coll[Long]) extends RegValue[Long, Long] {
     getValue(2)
   }
 
-  def setCreationBox(byteArray: Array[Byte]): PoolInfo = {
-    val creationBoxId = BigInt(byteArray).toLong
-    new PoolInfo(this.normalValue.updated(3, creationBoxId))
+  def setSubpoolId(id: Long): PoolInfo = {
+
+    new PoolInfo(this.normalValue.updated(3, id))
   }
-  def getCreationBox: String = {
-    val creationBox = getValue(3)
-    val creationIdArray = BigInt.long2bigInt(creationBox).toByteArray
-    (new ErgoId(creationIdArray)).toString
+  def getSubpoolId(): Long = {
+    getValue(3)
   }
 }
 

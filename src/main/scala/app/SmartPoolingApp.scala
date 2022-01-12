@@ -1,7 +1,7 @@
 package app
 
 import app.AppCommand.{CheckAndCleanDbCmd, DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, ResetStatusCmd, SendToHoldingCmd, ViewMetadataCmd}
-import app.commands.{CheckAndCleanDbCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd}
+import app.commands.{CheckAndCleanDbCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, GenerateMultipleCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd}
 import org.slf4j.LoggerFactory
 import config.{ConfigHandler, SmartPoolConfig}
 import logging.LoggingHandler
@@ -24,7 +24,7 @@ object SmartPoolingApp{
     val usage = "Usage: java -jar SmartPoolingApp.jar -c=smart/pool/path/config.json [-v | -g | -d blockHeight | -h blockHeight ]"
     var txCommand = EmptyCommand
 
-    var blockHeight = 0
+    var numInput = 0
     var blockHeights = Array[Int]()
     for(arg <- args){
       arg match {
@@ -57,7 +57,7 @@ object SmartPoolingApp{
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
           }
         case arg if arg.forall(c => c.isDigit) =>
-          blockHeight = arg.toInt
+          numInput = arg.toInt
         case arg if arg.startsWith("[") && arg.endsWith("]") =>
           blockHeights = arg.substring(1, arg.length - 1).split(",").map(s => s.toInt)
 
@@ -89,10 +89,13 @@ object SmartPoolingApp{
         txCommand match {
           case GenerateMetadataCmd =>
             cmd = new GenerateMetadataCmd(config.get)
+            if(numInput != 0) {
+              cmd = new GenerateMultipleCmd(config.get, numInput)
+            }
             logger.info(s"SmartPool Command: ${GenerateMetadataCmd.toString}")
           case DistributeRewardsCmd =>
-            if(blockHeight != 0) {
-              cmd = new DistributeRewardsCmd(config.get, blockHeight)
+            if(numInput != 0) {
+              cmd = new DistributeRewardsCmd(config.get, numInput)
             }else if(blockHeights.length > 0){
               cmd = new DistributeMultipleCmd(config.get, blockHeights)
             }else{
@@ -106,16 +109,16 @@ object SmartPoolingApp{
             cmd = new ResetToPendingCmd(config.get)
             logger.info(s"SmartPool Command: ${ResetStatusCmd.toString}")
           case CheckAndCleanDbCmd =>
-            if(blockHeight != 0) {
-              cmd = new CheckAndCleanDbCmd(config.get, blockHeight)
+            if(numInput != 0) {
+              cmd = new CheckAndCleanDbCmd(config.get, numInput)
               logger.info(s"SmartPool Command: ${CheckAndCleanDbCmd.toString}")
             } else {
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
             }
             logger.info(s"SmartPool Command: ${SendToHoldingCmd.toString}")
           case SendToHoldingCmd =>
-            if(blockHeight != 0) {
-              cmd = new SendToHoldingCmd(config.get, blockHeight)
+            if(numInput != 0) {
+              cmd = new SendToHoldingCmd(config.get, numInput)
             } else if(blockHeights.length > 0) {
               cmd = new SendMultipleToHoldingCmd(config.get, blockHeights)
             } else {
@@ -128,7 +131,7 @@ object SmartPoolingApp{
         try {
           cmd.initiateCommand
           cmd.executeCommand
-          cmd.recordToConfig
+          cmd.recordToDb
         }catch {
           case arg: Exception =>
             logger.error(s"An exception occurred while executing the command $txCommand", arg)

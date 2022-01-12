@@ -31,7 +31,7 @@ class ViewMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
     logger.info("Command has finished execution")
   }
 
-  def recordToConfig: Unit = {
+  def recordToDb: Unit = {
     logger.info("Nothing to record for config")
   }
 
