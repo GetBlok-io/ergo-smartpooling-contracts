@@ -65,7 +65,7 @@ package object app {
   object AppCommand extends Enumeration {
     type AppCommand
     val EmptyCommand, GenerateMetadataCmd, ModifySmartPoolCmd, DistributeRewardsCmd, ViewMetadataCmd, SendToHoldingCmd,
-    ResetStatusCmd, CheckAndCleanDbCmd = Value
+    ResetStatusCmd, CheckAndCleanDbCmd, PayoutBalancesCmd, DistributeFailedCmd = Value
   }
 
 }

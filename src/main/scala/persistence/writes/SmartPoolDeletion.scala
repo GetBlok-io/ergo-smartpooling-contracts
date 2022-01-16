@@ -11,23 +11,22 @@ class SmartPoolDeletion(dbConn: DatabaseConnection) extends DatabaseWrite[SmartP
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
 
   override val insertionString: String =
-    """DELETE FROM smartpool_data WHERE poolid = ? AND epoch = ? AND height = ? AND smartpoolnft = ?""".stripMargin
+    """DELETE FROM smartpool_data WHERE poolid = ? AND transactionhash = ?""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(insertionString)
 
   override def setVariables(smartPoolResponse: SmartPoolResponse): DatabaseWrite[SmartPoolResponse] = {
 
     asStatement.setString(1, smartPoolResponse.poolId)
-    asStatement.setLong(2, smartPoolResponse.epoch)
-    asStatement.setLong(3, smartPoolResponse.height)
-    asStatement.setString(4, smartPoolResponse.smartpoolNFT)
+    asStatement.setString(2, smartPoolResponse.transactionHash)
+
     this
   }
 
   override def execute(): Long = {
-
+    logger.info("Now deleting smartpool entry")
     val rowsDeleted = asStatement.executeUpdate()
     asStatement.close()
-
+    logger.info(s"$rowsDeleted rows deleted")
     rowsDeleted
   }
 }

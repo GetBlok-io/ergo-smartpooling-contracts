@@ -13,23 +13,22 @@ class ConsensusDeletion(dbConn: DatabaseConnection) extends DatabaseWrite[SmartP
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
 
   override val insertionString: String =
-    """DELETE FROM consensus WHERE poolid = ? AND epoch = ? AND height = ? AND smartpoolnft = ?""".stripMargin
+    """DELETE FROM consensus WHERE poolid = ? AND transactionhash = ?""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(insertionString)
 
   override def setVariables(smartpoolResponses: SmartPoolResponse): DatabaseWrite[SmartPoolResponse] = {
 
     asStatement.setString(1, smartpoolResponses.poolId)
-    asStatement.setLong(2, smartpoolResponses.epoch)
-    asStatement.setLong(3, smartpoolResponses.height)
-    asStatement.setString(4, smartpoolResponses.smartpoolNFT)
+    asStatement.setString(2, smartpoolResponses.transactionHash)
+
     this
   }
 
   override def execute(): Long = {
-
+    logger.info("Now deleting failed consensus entries")
     val rowsDeleted = asStatement.executeUpdate()
     asStatement.close()
-
+    logger.info(s"$rowsDeleted rows deleted")
     rowsDeleted
   }
 }
