@@ -20,7 +20,7 @@ import scala.util.Try
 
 class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBox], prover: ErgoProver, address: Address,
                         blockReward: Long, holdingContract: HoldingContract, config: SmartPoolConfig,
-                        shareConsensus: ShareConsensus, memberList: MemberList) extends TransactionGroup[Map[MetadataInputBox, String]]{
+                        shareConsensus: ShareConsensus, memberList: MemberList, isFailureAttempt: Boolean, failureIds: Array[String]) extends TransactionGroup[Map[MetadataInputBox, String]]{
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DIST_GRP)
   private[this] var _completed = Map[MetadataInputBox, String]()
@@ -40,7 +40,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
   private var boxToCommand = Map.empty[MetadataInputBox, CommandInputBox]
   private var boxToFees = Map.empty[MetadataInputBox, Array[InputBox]]
 
-  final val SHARE_CONSENSUS_LIMIT = 1
+  final val SHARE_CONSENSUS_LIMIT = 10
   final val STANDARD_FEE = Parameters.MinFee * 5
   override def buildGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
     logger.info("Now building DistributionGroup")
@@ -66,6 +66,13 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
       }else{
         throw new MetadataNotFoundException
       }
+    }
+
+    if(isFailureAttempt){
+      logger.info("Is failure attempt! Now removing unneeded boxes.")
+      val boxesToRemove = boxToShare.keys.filter(b => !failureIds.contains(b.getId.toString))
+      boxToShare = boxToShare--boxesToRemove
+      boxToMember = boxToMember--boxesToRemove
     }
 
     logger.info(s"boxToShare: ${boxToShare.size} boxToMember: ${boxToMember.size}")
@@ -127,8 +134,8 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
       val commandChain = Try {
         val commandTx = new CreateCommandTx(ctx.newTxBuilder())
         val commandContract = new PKContract(address)
-        val inputBoxes = List(boxToFees(metadataBox)(1))
-        val newPoolFees = PoolFees.fromConversionValues(Array((address.getErgoAddress.script.bytes, 1)))
+        val inputBoxes = List(boxToFees(metadataBox)(0))
+        val newPoolFees = PoolFees.fromConversionValues(Array((address.getErgoAddress.script.bytes, 10)))
         var holdingInputs = List(boxToHolding(metadataBox))
         if (boxToStorage.contains(metadataBox)) {
           holdingInputs = holdingInputs ++ List(boxToStorage(metadataBox))
@@ -262,8 +269,14 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
   def findMetadata(metadataArray: Array[MetadataInputBox], consensusVal: (Array[Byte], Array[Long])): Option[MetadataInputBox] = {
     for(box <- metadataArray){
       val shCons = box.getShareConsensus
-      if(shCons.cValue.exists(c => c._1 sameElements consensusVal._1) && box.getShareConsensus.cValue.length <= SHARE_CONSENSUS_LIMIT){
-        return Some(box)
+      if(shCons.cValue.exists(c => c._1 sameElements consensusVal._1)){
+        if(boxToShare.contains(box)){
+          if(boxToShare(box).cValue.length < SHARE_CONSENSUS_LIMIT)
+            return Some(box)
+        }else{
+          return Some(box)
+        }
+
       }
 //      if(!boxToShare.contains(box)){
 //        return Some(box)
@@ -271,7 +284,10 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     }
 
     for(box <- metadataArray){
-      if(box.getShareConsensus.cValue.length <= SHARE_CONSENSUS_LIMIT){
+      if(boxToShare.contains(box)){
+        if(boxToShare(box).cValue.length < SHARE_CONSENSUS_LIMIT)
+          return Some(box)
+      }else if(box.getShareConsensus.cValue.length < SHARE_CONSENSUS_LIMIT){
         return Some(box)
       }
     }

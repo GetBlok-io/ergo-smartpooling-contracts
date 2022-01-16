@@ -361,7 +361,7 @@ object TestCommands {
     val shareCons = ShareConsensus.fromConversionValues(Array(
       (poolMiner.getErgoAddress.script.bytes, Array(240L, Parameters.OneErg*2, 0)),
       (rewardsAddress.getErgoAddress.script.bytes, Array(140L, Parameters.OneErg/8, 0)),
-      (poolMinerTwo.getErgoAddress.script.bytes, Array(110L, Parameters.OneErg/2, 0)),
+      (poolMinerTwo.getErgoAddress.script.bytes, Array(110L, Parameters.OneErg/2, 0))
     ))
     val memsList = MemberList.fromConversionValues(Array(
       (poolMiner.getErgoAddress.script.bytes, poolMiner.toString),

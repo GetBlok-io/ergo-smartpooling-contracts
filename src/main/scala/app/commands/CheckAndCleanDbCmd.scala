@@ -49,7 +49,8 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
 
     logger.info("Now retrieving all boxes from boxIndex")
     val boxIndex = new BoxIndexQuery(dbConn).setVariables().execute().getResponse
-    val confirmations = for(boxResp <- boxIndex) yield (boxResp, explorerHandler.getTxConfirmations(boxResp.txId))
+    val confirmations = for(boxResp <- boxIndex if boxResp.epoch != 0) yield (boxResp, explorerHandler.getTxConfirmations(boxResp.txId))
+    var currentEpoch = 0
     for(c <- confirmations) {
       if(c._2 > 0){
         logger.info(s"Tx for subpool ${c._1.subpoolId} has confirmations!")
@@ -73,11 +74,12 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
               val balanceChangeEntry = BalanceChangeEntry(paramsConf.getPoolId, consensus.miner, amount, s"Stored payment for ${consensus.shares} shares at epoch ${c._1.epoch}")
               balanceChangesInserted = balanceChangesInserted + (new BalanceChangeInsertion(dbConn).setVariables(balanceChangeEntry).execute())
             }
+
           }
           logger.info(s"$paymentsInserted payments inserted along with $balanceChangesInserted balance changes")
       }
     }
-    val smartPoolResponse = new SmartPoolByEpochQuery(dbConn, paramsConf.getPoolId, boxIndex(0).epoch).setVariables().execute().getResponse.head
+
     logger.info("Now deleting all entries without last smartpoolnft")
     val smartPoolNFTWipe = new SmartPoolDeletionByNFT(dbConn).setVariables((paramsConf.getPoolId, paramsConf.getSmartPoolId)).execute()
     val consensusNFTWipe = new ConsensusDeletionByNFT(dbConn).setVariables((paramsConf.getPoolId, paramsConf.getSmartPoolId)).execute()
