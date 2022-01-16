@@ -36,7 +36,7 @@ class ConsensusByTransactionQuery(dbConn: DatabaseConnection, poolId: String, tr
         rt.getLong(7),
         rt.getLong(8),
         rt.getLong(9),
-        rt.getLong(11),
+        rt.getLong(11)
       ))
     }
     logger.info(s"ConsensusByTransaction query with ${_response.length} rows")

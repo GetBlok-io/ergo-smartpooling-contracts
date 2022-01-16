@@ -79,25 +79,25 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
     blockReward = (block.reward * Parameters.OneErg).toLong
 
-//    var totalShareScore = BigDecimal("0")
-//    var shares = Array[Array[ShareResponse]]()
-//    while(totalShareScore < 0.5) {
-//      logger.info("Now performing PPLNS Query to page shares!")
-//      val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
-//      val response = pplnsQuery.setVariables().execute().getResponse
-//      shares = shares++Array(response)
-//      totalShareScore = response.map(s => (s.diff * BigDecimal("256") / s.netDiff)).sum + totalShareScore
-//      logger.info("totalShareScore: " + totalShareScore)
-//      logger.info("Query executed successfully")
-//    }
+    var totalShareScore = BigDecimal("0")
+    var shares = Array[Array[ShareResponse]]()
+    while(totalShareScore < 0.5) {
+      logger.info("Now performing PPLNS Query to page shares!")
+      val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
+      val response = pplnsQuery.setVariables().execute().getResponse
+      shares = shares++Array(response)
+      totalShareScore = response.map(s => (s.diff * BigDecimal("256") / s.netDiff)).sum + totalShareScore
+      logger.info("totalShareScore: " + totalShareScore)
+      logger.info("Query executed successfully")
+    }
     // TODO: CHANGE TO REAL PPLNS
-    logger.info("Now performing PPLNS Query")
-    val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
-    val shares = pplnsQuery.setVariables().execute().getResponse
-    logger.info("Query executed successfully")
-    val commandInputs = SimplePPLNS.simplePPLNSToConsensus(shares)
+//    logger.info("Now performing PPLNS Query")
+//    val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
+//    val shares = pplnsQuery.setVariables().execute().getResponse
+//    logger.info("Query executed successfully")
+//    val commandInputs = SimplePPLNS.simplePPLNSToConsensus(shares)
 
-   // val commandInputs = StandardPPLNS.standardPPLNSToConsensus(shares)
+   val commandInputs = StandardPPLNS.standardPPLNSToConsensus(shares)
     val tempConsensus = commandInputs._1
     memberList = commandInputs._2
 
@@ -133,11 +133,14 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       val boxIndex = new BoxIndexQuery(dbConn).setVariables().execute().getResponse
       var isFailureAttempt = false // Boolean that determines whether or not this distribution chain is resending txs for a failed attempt.
       var metaIds = Array[String]()
+      var failureIds = Array[String]()
       if(boxIndex.forall(br => br.status == "success")){
         metaIds = boxIndex.map(br => br.boxId)
       }else{
-        metaIds = boxIndex.filter(br => br.status == "failure").map(br => br.boxId)
+        metaIds = boxIndex.map(br => br.boxId)
+        logger.warn(s"Failure retrial for ${metaIds.length} subpools")
         isFailureAttempt = true
+        failureIds =  boxIndex.filter(b => b.status == "failure").map(b => b.boxId)
       }
 
       val metaInputs = ctx.getBoxesById(metaIds:_*)
@@ -162,7 +165,8 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       var holdingBoxes = ctx.getUnspentBoxesFor(holdingContract.getAddress, 0, 30).asScala.filter(i => i.getValue == blockReward).toList
 
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
-      val distributionGroup = new DistributionGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward, holdingContract, config, shareConsensus, memberList)
+      val distributionGroup = new DistributionGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,
+        holdingContract, config, shareConsensus, memberList, isFailureAttempt, failureIds)
       val executed = distributionGroup.buildGroup.executeGroup
       logger.info("Total Distribution Groups: " + metadataBoxes.length)
       logger.info("Distribution Groups Executed: " + executed.completed.size)
@@ -245,7 +249,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
 
 
-    exit(logger, ExitCodes.TX_GROUPING)
+    exit(logger, ExitCodes.SUCCESS)
   }
 
 
