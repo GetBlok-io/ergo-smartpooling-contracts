@@ -111,15 +111,39 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
         }
       }
     }
-    boxToFees = collectFeeBoxes
-    val regroupInputs = boxToFees.map(bF => (bF._1,bF._2(1)))
-    logger.info("")
-    val holdingChain = new HoldingChain(ctx, boxToValue, prover, address, STANDARD_FEE, regroupInputs.values.toList, holdingContract, config)
-    val completedHoldingChain = holdingChain.executeChain
-    if(completedHoldingChain.completed != boxToValue){
-      throw new HoldingChainException
+    var withHoldingChain = false
+
+    var holdingBoxesList = List[InputBox]()
+    var exactHoldingMap = Map[MetadataInputBox, InputBox]()
+    for(hv <- boxToValue) {
+      logger.info("Searching for exact holding box with value " + hv._2._1)
+      val exactHoldingBox = BoxHelpers.findExactBox(ctx, holdingContract.getAddress, hv._2._1, holdingBoxesList)
+      if(exactHoldingBox.isEmpty){
+        logger.info("An exact holding box could not be found, a new holding chain is being created")
+        withHoldingChain = true
+      }else{
+        logger.info("An exact holding box was found!")
+        logger.info("Current withHoldingChain: " + withHoldingChain)
+        holdingBoxesList = holdingBoxesList++List(exactHoldingBox.get)
+        exactHoldingMap = exactHoldingMap++Map((hv._1, exactHoldingBox.get))
+      }
     }
-    boxToHolding = completedHoldingChain.result
+
+    boxToFees = collectFeeBoxes(withHoldingChain)
+    if(withHoldingChain) {
+      val regroupInputs = boxToFees.map(bF => (bF._1, bF._2(1)))
+      logger.info("A new holding chain is being created for this distribution!")
+
+      val holdingChain = new HoldingChain(ctx, boxToValue, prover, address, STANDARD_FEE, regroupInputs.values.toList, holdingContract, config)
+      val completedHoldingChain = holdingChain.executeChain
+      if (completedHoldingChain.completed != boxToValue) {
+        throw new HoldingChainException
+      }
+      boxToHolding = completedHoldingChain.result
+    }else{
+      logger.info("Exact holding inputs were found, setting boxToHolding map equal to exactHoldingMap")
+      boxToHolding = exactHoldingMap
+    }
     logger.info("BoxToHolding Length: " + boxToHolding.size)
     boxToHolding.values.foreach(i => logger.info("BoxToHolding Value: " + i.getValue + " Id " + i.getId))
 
@@ -297,7 +321,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
   /**
    * Creates tx to collect fee boxes from node wallet and use them in subsequent transactions
    */
-  def collectFeeBoxes: Map[MetadataInputBox, Array[InputBox]] = {
+  def collectFeeBoxes(withHolding: Boolean): Map[MetadataInputBox, Array[InputBox]] = {
     var feeOutputs = List[OutBox]()
     val txB = ctx.newTxBuilder()
     var totalFees = 0L
@@ -307,11 +331,16 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
      // val txFee = boxSh._2.cValue.length * Parameters.MinFee
      // val holdingFee = txB.outBoxBuilder().value(txFee).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
       val commandFee = txB.outBoxBuilder().value(cmdConf.getCommandValue + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
-      val regroupFee = txB.outBoxBuilder().value(boxToValue(boxSh._1)._1 + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
-      totalFees = totalFees + cmdConf.getCommandValue + STANDARD_FEE + boxToValue(boxSh._1)._1 + STANDARD_FEE
+      if(withHolding) {
+        val regroupFee = txB.outBoxBuilder().value(boxToValue(boxSh._1)._1 + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
+        totalFees = totalFees + cmdConf.getCommandValue + STANDARD_FEE + boxToValue(boxSh._1)._1 + STANDARD_FEE
+        boxToOutputs = boxToOutputs++Map((boxSh._1, Array(commandFee, regroupFee)))
+      }else {
+        totalFees = totalFees + cmdConf.getCommandValue + STANDARD_FEE
 
-      // Elem 0 is distribution out box
-      boxToOutputs = boxToOutputs++Map((boxSh._1, Array(commandFee, regroupFee)))
+        // Elem 0 is distribution out box
+        boxToOutputs = boxToOutputs ++ Map((boxSh._1, Array(commandFee)))
+      }
     }
 
 
@@ -333,19 +362,24 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
       val outBoxes = boxToOutputs(box)
       //val holdingFeeVal = outBoxes(0).getValue
       val commandFeeVal = outBoxes(0).getValue
-      val regroupFeeVal = outBoxes(1).getValue
-      // val holdingFeeBox = feeInputs.asScala.filter(fb => fb.getValue == holdingFeeVal && !inputsAdded.contains(fb)).head
-      // logger.info("HoldingFeeBoxId: " + holdingFeeBox.getId)
-      // inputsAdded = inputsAdded++Array(holdingFeeBox)
       val commandFeeBox = feeInputs.asScala.filter(fb => fb.getValue == commandFeeVal && !inputsAdded.contains(fb)).head
       inputsAdded = inputsAdded++Array(commandFeeBox)
       logger.info("CommandFeeBoxId: " + commandFeeBox.getId)
-      val regroupFeeBox = feeInputs.asScala.filter(fb => fb.getValue == regroupFeeVal && !(inputsAdded.exists(ib => ib.getId == fb.getId))).head
-      inputsAdded = inputsAdded++Array(regroupFeeBox)
-      logger.info("RegroupFeeBoxId: " + regroupFeeBox.getId)
+      if(withHolding) {
+        val regroupFeeVal = outBoxes(1).getValue
+        // val holdingFeeBox = feeInputs.asScala.filter(fb => fb.getValue == holdingFeeVal && !inputsAdded.contains(fb)).head
+        // logger.info("HoldingFeeBoxId: " + holdingFeeBox.getId)
+        // inputsAdded = inputsAdded++Array(holdingFeeBox)
+        val regroupFeeBox = feeInputs.asScala.filter(fb => fb.getValue == regroupFeeVal && !(inputsAdded.exists(ib => ib.getId == fb.getId))).head
+        inputsAdded = inputsAdded ++ Array(regroupFeeBox)
+        logger.info("RegroupFeeBoxId: " + regroupFeeBox.getId)
 
-      logger.info("Inputs Added: " + inputsAdded.length)
-      boxToFeeInputs = boxToFeeInputs++Map((box, Array(commandFeeBox, regroupFeeBox)))
+        logger.info("Inputs Added: " + inputsAdded.length)
+        boxToFeeInputs = boxToFeeInputs ++ Map((box, Array(commandFeeBox, regroupFeeBox)))
+      }else{
+        logger.info("Inputs Added: " + inputsAdded.length)
+        boxToFeeInputs = boxToFeeInputs ++ Map((box, Array(commandFeeBox)))
+      }
     }
     logger.info("Fee Box Inputs: " + boxToFeeInputs.size)
 

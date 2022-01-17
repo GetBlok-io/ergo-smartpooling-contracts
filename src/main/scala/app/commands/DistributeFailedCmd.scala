@@ -39,7 +39,7 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
   private var txId: String = _
   private var nextCommandBox: CommandInputBox = _
   private var signedTx: SignedTransaction = _
-  private val blockHeight: Long = 663542
+  private val blockHeight: Long = 664287
   private var subpoolResponse: SmartPoolResponse = _
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
@@ -78,7 +78,7 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
         (minerAddress.getErgoAddress.script.bytes, Array(c.shares, c.minPayout, c.storedPayout))))
       memberList = MemberList.fromConversionValues(memberList.cValue++Array((minerAddress.getErgoAddress.script.bytes, minerAddress.toString)))
     }
-    blockReward = (BigDecimal(0.331)* Parameters.OneErg).toLong
+    blockReward = (BigDecimal(2.166)* Parameters.OneErg).toLong
 
     logger.info(s"Total rewards from all blocks: ${blockReward}")
 

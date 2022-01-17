@@ -25,18 +25,22 @@ object StandardPPLNS {
         logger.info(shareScores(0)._2.toString())
         logger.info(shareScores(0)._1)
         for (sc <- shareScores) {
-          var shScore = sc._2
-          if (entireShareScore + shScore >= PPLNS_WINDOW) {
-            shScore = PPLNS_WINDOW - totalScore
-            done = true
+          if (entireShareScore < PPLNS_WINDOW && !done) {
+            var shScore = sc._2
+            if (entireShareScore + shScore >= PPLNS_WINDOW) {
+              shScore = PPLNS_WINDOW - totalScore
+              done = true
+            }
+            if (minerScores.contains(sc._1)) {
+              minerScores = minerScores.updated(sc._1, minerScores(sc._1) + shScore)
+            } else {
+              minerScores = minerScores + Tuple2(sc._1, shScore)
+            }
+            totalScore = totalScore + shScore
+            entireShareScore = entireShareScore + shScore
+          }else{
+            logger.info("Share score has been calculated!")
           }
-          if (minerScores.contains(sc._1)) {
-            minerScores = minerScores.updated(sc._1, minerScores(sc._1) + shScore)
-          } else {
-            minerScores = minerScores + Tuple2(sc._1, shScore)
-          }
-          totalScore = totalScore + shScore
-          entireShareScore = entireShareScore + shScore
         }
         logger.info("Entire Share Score: " + entireShareScore)
         logger.info("Total Share Score: " + totalScore)

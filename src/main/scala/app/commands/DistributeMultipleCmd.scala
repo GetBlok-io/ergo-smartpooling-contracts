@@ -21,6 +21,11 @@ import transactions.{CreateCommandTx, DistributionTx, RegroupTx}
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 import scala.util.Try
 
+/**
+ * Deprecated now, originally used to distribute multiple blocks at once. Because this class focuses on using 1 metadata box
+ * it does not work for mainnet(Where DistributionGroup class is used instead to handle multiple subpools at once)
+ */
+@deprecated
 class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) extends SmartPoolCmd(config) {
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DISTRIBUTE_REWARDS_CMD)
