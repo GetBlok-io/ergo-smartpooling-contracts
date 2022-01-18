@@ -1,4 +1,4 @@
-import app.ExitCodes.{COMMAND_FAILED, CONFIG_NOT_FOUND, FAILED_TO_RETRIEVE_METADATA, HOLDING_NOT_COVERED, INVALID_ARGUMENTS, INVALID_CONFIG, NO_CONFIRMED_TXS_FOUND, REGROUP_TX_SENT, SUBPOOL_TX_FAILED, SUCCESS}
+import app.ExitCodes.{COMMAND_FAILED, CONFIG_NOT_FOUND, FAILED_TO_RETRIEVE_METADATA, HOLDING_NOT_COVERED, INVALID_ARGUMENTS, INVALID_CONFIG, LOGGING_INIT_FAILURE, NOT_ALL_SUBPOOLS_RETRIEVED, NO_CONFIRMED_TXS_FOUND, REGROUP_TX_SENT, SUBPOOL_TX_FAILED, SUCCESS}
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.ergoplatform.appkit.NetworkType
@@ -30,6 +30,7 @@ package object app {
     final val REGROUP_TX_SENT = 206
     final val TX_GROUPING = 207
     final val SUBPOOL_TX_FAILED = 208
+    final val NOT_ALL_SUBPOOLS_RETRIEVED = 209
 
   }
 
@@ -55,6 +56,10 @@ package object app {
         logger.error("A regroup tx was sent to obtain exact holding inputs.")
       case SUBPOOL_TX_FAILED =>
         logger.error("A subpool tx chain has a failure in it!")
+      case NOT_ALL_SUBPOOLS_RETRIEVED =>
+        logger.error("Not all subpools could be retrieved from the blockchain. Have all txs confirmed yet?")
+      case LOGGING_INIT_FAILURE =>
+        logger.error("Logging could not be started, please ensure any .lck files have been deleted from past runs.")
       case _ =>
         logger.error("An unknown error occurred")
     }

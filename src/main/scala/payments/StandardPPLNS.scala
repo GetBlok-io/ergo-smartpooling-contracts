@@ -11,48 +11,65 @@ import scala.util.Try
 object StandardPPLNS {
   // Takes a set of share responses and converts them into a tuple of
   // (ShareConsensus, MemberList) so that the values may be easily entered into a command box output
-  def standardPPLNSToConsensus(sharesResponseList: Array[Array[ShareResponse]]): (ShareConsensus, MemberList) = {
-    logger.info("Creating consensus and member list from ShareResponse")
+
+  def buildMinerScores(sharesResponseList: Array[Array[ShareResponse]]): Map[String, BigDecimal] = {
+    logger.info("Building miner scores for payment.")
     var entireShareScore = BigDecimal("0")
+    var scoreMap = Map[String, BigDecimal]()
     var done = false
+
+    logger.warn(s"Using hard-coded constants for ERGO_SHARE_CONSTANT($ERGO_SHARE_CONSTANT) and PPLNS_WINDOW($PPLNS_WINDOW)")
+    logger.warn(s"Changes to these values in MiningCore will NOT be reflected in payout code.")
+
     for(shares <- sharesResponseList) {
       if (entireShareScore < PPLNS_WINDOW && !done) {
         val shareScores = shares.map(s => (s.minerAddress, (s.diff * ERGO_SHARE_CONSTANT) / s.netDiff))
-        logger.warn(s"Using hard-coded constants for ERGO_SHARE_CONSTANT($ERGO_SHARE_CONSTANT) and PPLNS_WINDOW($PPLNS_WINDOW)")
-        logger.warn(s"Changes to these values in MiningCore will NOT be reflected in payout code.")
-        var totalScore: BigDecimal = BigDecimal("0.0")
 
+        var totalScore: BigDecimal = BigDecimal("0.0")
+        logger.info("Current entire share score: " + entireShareScore)
+        logger.info(s"Now iterating through ${shareScores.length} until entireShareScore >= 0.5")
         logger.info(shareScores(0)._2.toString())
         logger.info(shareScores(0)._1)
+
         for (sc <- shareScores) {
           if (entireShareScore < PPLNS_WINDOW && !done) {
             var shScore = sc._2
             if (entireShareScore + shScore >= PPLNS_WINDOW) {
-              shScore = PPLNS_WINDOW - totalScore
+              shScore = PPLNS_WINDOW - entireShareScore
               done = true
             }
-            if (minerScores.contains(sc._1)) {
-              minerScores = minerScores.updated(sc._1, minerScores(sc._1) + shScore)
+            if (scoreMap.contains(sc._1)) {
+              scoreMap = scoreMap.updated(sc._1, scoreMap(sc._1) + shScore)
             } else {
-              minerScores = minerScores + Tuple2(sc._1, shScore)
+              scoreMap = scoreMap ++ Map((sc._1, shScore))
             }
             totalScore = totalScore + shScore
             entireShareScore = entireShareScore + shScore
-          }else{
-            logger.info("Share score has been calculated!")
+            if(entireShareScore >= PPLNS_WINDOW){
+              logger.info("Entire share score is greater than PPLNS window!")
+              logger.info(s"Entire Share Score: " + entireShareScore + " PPLNS window: " + PPLNS_WINDOW)
+              logger.info(s"Now returning score map with $scoreMap miners")
+              return scoreMap
+            }
           }
         }
         logger.info("Entire Share Score: " + entireShareScore)
         logger.info("Total Share Score: " + totalScore)
       }
-      logger.info("EntireShareScore: " + entireShareScore)
+      logger.info("Entire Share Score: " + entireShareScore)
     }
     logger.info("Total Share Score: " + entireShareScore)
+    scoreMap
+  }
 
+  def standardPPLNSToConsensus(sharesResponseList: Array[Array[ShareResponse]]): (ShareConsensus, MemberList) = {
+    logger.info("Creating consensus and member list from ShareResponse")
+
+    val scoreMap = buildMinerScores(sharesResponseList)
     // Lets simply multiply by 1000000, this ensures we have a good amount of decimal places for each share score
     // The smart contract will take the ratio of share score to it's own calculated total score 10000000000000000
     logger.info("Creating list of miner shares")
-    val minerShares: Map[String, BigDecimal] = minerScores.map(score => (score._1, (score._2 * 10000000L)))
+    val minerShares: Map[String, BigDecimal] = scoreMap.map(score => (score._1, (score._2 * 10000000L)))
     logger.info(minerShares.toString())
     val baseArray: Array[(Try[Address], Option[Array[Long]])] = minerShares.toArray.map {
       sh =>

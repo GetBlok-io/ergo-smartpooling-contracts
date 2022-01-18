@@ -69,8 +69,8 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     }
 
     // Lets ensure that blocks are only set to confirmed once we pay them out.
-    // TODO: Change assertions to require
-    require(block.status == "confirmed", "Block status is not confirmed")
+    // TODO: CHANGE BACK AFTER TEST
+   require(block.status == "confirmed", "Block status is not confirmed")
 
     // Assertions to make sure config is setup for command
     require(holdConf.getHoldingAddress != "", "Holding address is not defined")
@@ -90,12 +90,6 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       logger.info("totalShareScore: " + totalShareScore)
       logger.info("Query executed successfully")
     }
-    // TODO: CHANGE TO REAL PPLNS
-//    logger.info("Now performing PPLNS Query")
-//    val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
-//    val shares = pplnsQuery.setVariables().execute().getResponse
-//    logger.info("Query executed successfully")
-//    val commandInputs = SimplePPLNS.simplePPLNSToConsensus(shares)
 
    val commandInputs = StandardPPLNS.standardPPLNSToConsensus(shares)
     val tempConsensus = commandInputs._1
@@ -106,6 +100,8 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     logger.info(s"Share consensus and member list with ${shareConsensus.nValue.size} unique addresses have been built")
     logger.info(shareConsensus.nValue.toString())
     logger.info(memberList.nValue.toString())
+
+
 
   }
 
@@ -142,8 +138,10 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
         isFailureAttempt = true
         failureIds =  boxIndex.filter(b => b.status == "failure").map(b => b.boxId)
       }
-
-      val metaInputs = ctx.getBoxesById(metaIds:_*)
+      val metadataRetrieval = Try{ctx.getBoxesById(metaIds:_*)}
+      if(metadataRetrieval.isFailure)
+        exit(logger, ExitCodes.NOT_ALL_SUBPOOLS_RETRIEVED)
+      val metaInputs = metadataRetrieval.get
 
       val metadataBoxes = metaInputs.map(b => new MetadataInputBox(b, smartPoolId))
       val storedPayoutsList = for(m <- metadataBoxes) yield m.getShareConsensus.cValue.map(c => c._2(2)).sum
