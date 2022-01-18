@@ -4,6 +4,7 @@ import org.ergoplatform.appkit.Parameters;
 
 public class SmartPoolParameters {
     private String smartPoolId;
+    private String voteTokenId;
     private String poolId;
     private String[] poolOperators;
     private long initialTxFee;
@@ -28,6 +29,7 @@ public class SmartPoolParameters {
         metaConf = new MetadataConfig("", "", "default", 0L);
         commandConf = new CommandConfig("", "", "default", 0L);
         holdingConf = new HoldingConfig("", "default", 0L);
+        voteTokenId = "";
     }
 
     public String getSmartPoolId() {
@@ -35,6 +37,14 @@ public class SmartPoolParameters {
     }
 
     public void setSmartPoolId(String smartPoolId) {
+        this.smartPoolId = smartPoolId;
+    }
+
+    public String getVoteTokenId() {
+        return smartPoolId;
+    }
+
+    public void setVoteTokenId(String smartPoolId) {
         this.smartPoolId = smartPoolId;
     }
 

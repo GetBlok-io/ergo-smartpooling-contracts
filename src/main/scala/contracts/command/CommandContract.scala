@@ -18,6 +18,8 @@ abstract class CommandContract(commandContract: ErgoContract) extends ErgoContra
 
   def getAddress: Address = Address.fromErgoTree(this.getErgoTree, AppParameters.networkType)
 
+  def asErgoContract: ErgoContract = commandContract
+
   /**
    * Apply this command contract's effects to an unbuilt command output. Multiple command contracts
    * may apply their effects so as to get the final value of the outputted command box.

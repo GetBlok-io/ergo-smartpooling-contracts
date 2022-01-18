@@ -12,7 +12,7 @@ import special.sigma.GroupElement
  * @param ergoContract
  */
 class MinerPKContract(ergoContract: ErgoContract) extends CommandContract(ergoContract) {
-  val asErgoContract: ErgoContract = ergoContract
+
   override def getAddress: Address = Address.fromErgoTree(ergoContract.getErgoTree, AppParameters.networkType)
 
   /**

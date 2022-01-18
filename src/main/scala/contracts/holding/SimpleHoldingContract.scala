@@ -220,7 +220,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
       currentConsensus.toArray.filter((consVal: (Coll[Byte], Coll[Long])) => consVal._2(2) < consVal._2(1))
         .foldLeft(0L){(accum: Long, consVal: (Coll[Byte], Coll[Long])) => accum + consVal._2(2)}
 
-    val outBoxBuffer = ArrayBuffer[OutBoxBuilder]()
+    var outBoxMap = Map[OutBoxBuilder, (Long, Boolean)]()
 
 
     val memberAddresses = commandBox.getMemberList.cValue.map(m => Address.create(m._2))
@@ -236,7 +236,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         if(boxValue._2 > 0) {
           val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
           val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
-          outBoxBuffer.append(newOutBox)
+          outBoxMap = outBoxMap++Map((newOutBox, (boxValue._2, false)))
         }
     }
     feeAddresses.foreach{
@@ -247,16 +247,16 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         if(boxValue._2 > 0) {
           println(s"Fee Value for address ${addr}: ${boxValue._2}")
           val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
-          outBoxBuffer.append(newOutBox)
+          outBoxMap = outBoxMap++Map((newOutBox, (boxValue._2, true)))
         }
     }
 
     if(changeValue > 0) {
       val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
       val newOutBox = outB.value(changeValue).contract(new ErgoTreeContract(holdingAddress.getErgoAddress.script))
-      outBoxBuffer.append(newOutBox)
+      outBoxMap = outBoxMap++Map((newOutBox, (changeValue, false)))
     }
-    new HoldingOutputBuilder(outBoxBuffer.toList)
+    new HoldingOutputBuilder(outBoxMap)
   }
 
 
