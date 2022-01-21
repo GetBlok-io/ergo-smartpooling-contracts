@@ -2,13 +2,13 @@ package transactions.groups
 
 import boxes.{BoxHelpers, CommandInputBox, CommandOutBox, MetadataInputBox}
 import config.SmartPoolConfig
-import contracts.command.PKContract
+import contracts.command.{CommandContract, PKContract}
 import contracts.holding.HoldingContract
 import logging.LoggingHandler
 import org.ergoplatform.appkit.impl.{ErgoTreeContract, InputBoxImpl}
-import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoProver, InputBox, OutBox, Parameters, SignedTransaction}
+import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoId, ErgoProver, ErgoToken, InputBox, OutBox, Parameters, SignedTransaction}
 import org.slf4j.{Logger, LoggerFactory}
-import registers.{MemberList, PoolFees, ShareConsensus}
+import registers.{MemberList, PoolFees, PoolOperators, ShareConsensus}
 import transactions.{CreateCommandTx, DistributionTx}
 import transactions.models.TransactionGroup
 
@@ -19,7 +19,7 @@ import scala.util.Try
 
 
 class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBox], prover: ErgoProver, address: Address,
-                        blockReward: Long, holdingContract: HoldingContract, config: SmartPoolConfig,
+                        blockReward: Long, holdingContract: HoldingContract, commandContract: CommandContract, config: SmartPoolConfig,
                         shareConsensus: ShareConsensus, memberList: MemberList, isFailureAttempt: Boolean, failureIds: Array[String]) extends TransactionGroup[Map[MetadataInputBox, String]]{
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DIST_GRP)
@@ -42,6 +42,8 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 
   final val SHARE_CONSENSUS_LIMIT = 10
   final val STANDARD_FEE = Parameters.MinFee * 5
+  var customCommand = false
+
   override def buildGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
     logger.info("Now building DistributionGroup")
 
@@ -63,6 +65,10 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
           boxToShare = boxToShare++Map((metadataBox, newShareConsensus))
           boxToMember = boxToMember++Map((metadataBox, newMemberList))
         }
+        if(metadataBox.getPoolOperators.cValue.exists(c => c._1 sameElements commandContract.getErgoTree.bytes)){
+          customCommand = true
+        }
+
       }else{
         throw new MetadataNotFoundException
       }
@@ -152,31 +158,49 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
   }
 
   override def executeGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
+    var commandContractToUse: CommandContract = new PKContract(address)
 
     var boxToCmdOutput = Map.empty[MetadataInputBox, CommandOutBox]
     for (metadataBox <- boxToShare.keys) {
       val commandChain = Try {
         val commandTx = new CreateCommandTx(ctx.newTxBuilder())
-        val commandContract = new PKContract(address)
+
         val inputBoxes = List(boxToFees(metadataBox)(0))
+        // TODO: Take from config instead
         val newPoolFees = PoolFees.fromConversionValues(Array((address.getErgoAddress.script.bytes, 10)))
+        val newPoolOperators = PoolOperators.fromConversionValues(Array(
+          (commandContract.getErgoTree.bytes, "Vote Token Distributor"),
+          (address.getErgoAddress.script.bytes, address.toString),
+        ))
+
         var holdingInputs = List(boxToHolding(metadataBox))
         if (boxToStorage.contains(metadataBox)) {
           holdingInputs = holdingInputs ++ List(boxToStorage(metadataBox))
         }
 
+        commandContractToUse = new PKContract(address)
+        if(customCommand){
+          logger.info("MetadataBox has custom command contract in pool operators, now prioritizing custom command contract.")
+          commandContractToUse = commandContract
+
+        }
         logger.info(s"Adding new command box to map for box ${metadataBox.getId}")
-        val unsignedCommandTx =
+        val unbuiltCommandTx =
           commandTx
             .metadataToCopy(metadataBox)
-            .withCommandContract(commandContract)
+            .withCommandContract(commandContractToUse)
             .commandValue(cmdConf.getCommandValue)
             .inputBoxes(inputBoxes: _*)
             .withHolding(holdingContract, holdingInputs)
             .setConsensus(boxToShare(metadataBox))
             .setMembers(boxToMember(metadataBox))
             .setPoolFees(newPoolFees)
-            .buildCommandTx()
+            .setPoolOps(newPoolOperators)
+        if(config.getParameters.getVoteTokenId != "" && customCommand) {
+          logger.info("Custom token id set, adding tokens to command output")
+          unbuiltCommandTx.cOB.tokens(boxToFees(metadataBox)(0).getTokens.get(0))
+        }
+        val unsignedCommandTx = unbuiltCommandTx.buildCommandTx()
         logger.info(s"Command box built!")
         boxToCmdOutput = boxToCmdOutput ++ Map((metadataBox, commandTx.commandOutBox))
         logger.info("Command box added to outputs")
@@ -216,11 +240,18 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     val cmdTxId = ctx.sendTransaction(signedCmdTx)
     logger.info(s"Tx was successfully sent with id: $cmdTxId and cost: ${signedCmdTx.getCost}")
     logger.info("Command Input Boxes: " + cmdOutputsToSpend)
-    val commandContract = new PKContract(address)
-    val commandBoxes = cmdOutputsToSpend.filter(ib => ib.getValue == cmdConf.getCommandValue).map(o => new CommandInputBox(o, commandContract)).toArray
+
+    val commandBoxes = cmdOutputsToSpend.filter(ib => ib.getValue == cmdConf.getCommandValue).map(o => new CommandInputBox(o, commandContractToUse)).toArray
 
     for(metadataBox <- boxToShare.keys){
       val commandBox = commandBoxes.filter(i => i.getSubpoolId == metadataBox.getSubpoolId).head
+
+      if(config.getParameters.getVoteTokenId != "" && customCommand){
+        logger.info("Tokens in current command box: ")
+        logger.info(s"id: ${commandBox.getTokens.get(0).getId}")
+        logger.info(s"amnt: ${commandBox.getTokens.get(0).getValue}")
+      }
+
       boxToCommand = boxToCommand++Map((metadataBox, commandBox))
     }
     logger.info(s"Total of ${boxToCommand.size} command boxes in map")
@@ -241,19 +272,26 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 
         logger.info("Total Holding Input Value: " + BoxHelpers.sumBoxes(holdingInputs))
         val distTx = new DistributionTx(ctx.newTxBuilder())
-        val unsignedDistTx =
+        val unbuiltDistTx =
           distTx
             .metadataInput(metadataBox)
             .commandInput(commandBox)
             .holdingInputs(holdingInputs)
             .holdingContract(holdingContract)
-            .buildMetadataTx()
+            .operatorAddress(address)
+
+        if(config.getParameters.getVoteTokenId != "" && customCommand){
+          logger.info("VoteTokenId set, now adding tokens to distribute to distribution tx.")
+          unbuiltDistTx.tokenToDistribute(commandBox.getTokens.get(0))
+        }
+
+        val unsignedDistTx = unbuiltDistTx.buildMetadataTx()
         val signedDistTx = prover.sign(unsignedDistTx)
 
         logger.info(s"Signed Tx Num Bytes Cost: ${
-
           signedDistTx.toBytes.length
         }")
+
         logger.info(s"Signed Tx Cost: ${signedDistTx.getCost}")
         val distAsErgoBox = signedDistTx.getOutputsToSpend.get(0).asInstanceOf[InputBoxImpl].getErgoBox
 
@@ -330,7 +368,16 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     for(boxSh <- boxToShare){
      // val txFee = boxSh._2.cValue.length * Parameters.MinFee
      // val holdingFee = txB.outBoxBuilder().value(txFee).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
-      val commandFee = txB.outBoxBuilder().value(cmdConf.getCommandValue + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
+      val commandFeeOutput = txB.outBoxBuilder().value(cmdConf.getCommandValue + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script))
+      if(config.getParameters.getVoteTokenId != "" && customCommand){
+        // If vote token id exists, lets send vote tokens equal to total amount in holding contracts
+        val voteTokenId = ErgoId.create(config.getParameters.getVoteTokenId)
+        val totalTokenAmnt = boxToValue(boxSh._1)._1 + boxToValue(boxSh._1)._2
+        commandFeeOutput.tokens(new ErgoToken(voteTokenId, totalTokenAmnt))
+        logger.info(s"Added $totalTokenAmnt tokens to commandFeeOutput box.")
+
+      }
+      val commandFee = commandFeeOutput.build()
       if(withHolding) {
         val regroupFee = txB.outBoxBuilder().value(boxToValue(boxSh._1)._1 + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
         totalFees = totalFees + cmdConf.getCommandValue + STANDARD_FEE + boxToValue(boxSh._1)._1 + STANDARD_FEE
@@ -345,7 +392,31 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 
 
     val feeTxOutputs = boxToOutputs.values.flatten.toArray
-    val feeInputBoxes = ctx.getWallet.getUnspentBoxes(totalFees+STANDARD_FEE).get()
+    var feeInputBoxes = ctx.getWallet.getUnspentBoxes(totalFees+STANDARD_FEE).get()
+
+    if(config.getParameters.getVoteTokenId != "" && customCommand){
+      logger.info("Now checking if enough vote tokens are in current boxes")
+      val voteTokenId = ErgoId.create(config.getParameters.getVoteTokenId)
+      val totalTokens = boxToValue.values.map(v => v._1 + v._2).sum
+      val currentTokens = feeInputBoxes.asScala
+        .filter(ib => ib.getTokens.size() > 0)
+        .filter(ib => ib.getTokens.get(0).getId.toString == voteTokenId.toString)
+        .map(ib => ib.getTokens.get(0).getValue)
+        .sum
+      logger.info("Total tokens needed: " + totalTokens)
+      logger.info("Current tokens in boxes: " + currentTokens)
+      if(currentTokens < totalTokens){
+        logger.info("Not enough tokens found in current boxes, now searching for exact token box.")
+        val exactTokenBox = BoxHelpers.findExactTokenBox(ctx, address, voteTokenId, totalTokens - currentTokens)
+        if(exactTokenBox.isDefined){
+          logger.info("Exact token box found, now adding to fee input boxes.")
+          feeInputBoxes.add(exactTokenBox.get)
+        }else{
+          throw new ExactTokenBoxNotFoundException
+        }
+      }
+    }
+
     logger.info("Total Fees: " + totalFees)
     logger.info("Total Fee Output Size: " + feeTxOutputs.size)
     logger.info("Total Fee Tx Input Size: " + feeInputBoxes.size)
@@ -365,6 +436,9 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
       val commandFeeBox = feeInputs.asScala.filter(fb => fb.getValue == commandFeeVal && !inputsAdded.contains(fb)).head
       inputsAdded = inputsAdded++Array(commandFeeBox)
       logger.info("CommandFeeBoxId: " + commandFeeBox.getId)
+      if(commandFeeBox.getTokens.size() > 0){
+        logger.info(s"CommandFeeBox Tokens - id: ${commandFeeBox.getTokens.get(0).getId} amnt: ${commandFeeBox.getTokens.get(0).getValue}")
+      }
       if(withHolding) {
         val regroupFeeVal = outBoxes(1).getValue
         // val holdingFeeBox = feeInputs.asScala.filter(fb => fb.getValue == holdingFeeVal && !inputsAdded.contains(fb)).head

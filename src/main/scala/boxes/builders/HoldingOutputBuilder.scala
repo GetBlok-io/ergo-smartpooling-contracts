@@ -5,6 +5,7 @@ import contracts.command.CommandContract
 import contracts.holding.HoldingContract
 import org.ergoplatform.appkit._
 import registers._
+import transactions.DistributionTx
 
 /**
  * Outbox Builder wrapper that builds holding outputs. Each long value represents the value of the holding output,
@@ -21,14 +22,14 @@ class HoldingOutputBuilder(builders: Map[OutBoxBuilder, (Long, Boolean)]) {
     this
   }
 
-  def applyCommandContract(commandContract: CommandContract): HoldingOutputBuilder = {
-   commandContract.applyToHolding(this)
+  def applyCommandContract(distributionTx: DistributionTx, commandContract: CommandContract): HoldingOutputBuilder = {
+    commandContract.applyToHolding(distributionTx)
    this
  }
 
 
   def build(): List[HoldingOutBox] = {
-   val holdingOutputsBuilt = this._outBoxBuilders.map(oBB => new HoldingOutBox(oBB._1.build())).toList
+   val holdingOutputsBuilt = this._outBoxBuilders.keys.map(oBB => new HoldingOutBox(oBB.build())).toList
     holdingOutputsBuilt
   }
 

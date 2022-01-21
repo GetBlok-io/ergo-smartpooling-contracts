@@ -21,6 +21,7 @@ class CommandInputBox(inputBox: InputBox, commandContract: CommandContract) exte
     def serializer = new ErgoTreeSerializer()
     val deserializedConsensus = this.shareConsensus.getConversionValue.map((sc) => (Address.fromErgoTree(serializer.deserializeErgoTree(sc._1), NetworkType.TESTNET), sc._2.mkString("Array(", ", ", ")"))).mkString("Array(", ", ", ")")
     val deserializedMembers = this.memberList.getConversionValue.map((sc) => (Address.fromErgoTree(serializer.deserializeErgoTree(sc._1), NetworkType.TESTNET), sc._2)).mkString("Array(", ", ", ")")
+    val deserializedOps = this.poolOps.getConversionValue.map((sc) => (Address.fromErgoTree(serializer.deserializeErgoTree(sc._1), NetworkType.TESTNET), sc._2)).mkString("Array(", ", ", ")")
     val asString = s"""
     Command Box Info:
     - Id: ${this.getId.toString}
@@ -35,6 +36,7 @@ class CommandInputBox(inputBox: InputBox, commandContract: CommandContract) exte
     - Members Deserialized: ${deserializedMembers}
     - Pool Fees: ${this.getPoolFees.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Ops: ${this.getPoolOperators.getConversionValue.mkString("Array(", ", ", ")")}
+    - Pool Ops Deserialized: ${deserializedOps}
     """
     asString
   }

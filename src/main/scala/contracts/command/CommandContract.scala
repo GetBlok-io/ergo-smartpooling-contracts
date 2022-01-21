@@ -6,6 +6,7 @@ import boxes.{CommandOutBox, MetadataInputBox}
 import org.ergoplatform.appkit._
 import registers._
 import sigmastate.Values
+import transactions.DistributionTx
 
 abstract class CommandContract(commandContract: ErgoContract) extends ErgoContract {
   override def getConstants: Constants = commandContract.getConstants
@@ -31,10 +32,10 @@ abstract class CommandContract(commandContract: ErgoContract) extends ErgoContra
   /**
    * Apply this command contract's effects to an unbuilt command output. Multiple command contracts
    * may apply their effects so as to get the final value of the outputted command box.
-   * @param holdingOutputBuilder initialized command output builder
+   * @param distributionTx distributionTx to apply holding on
    * @return Command output builder with desired command effects on the metadata.
    */
-  def applyToHolding(holdingOutputBuilder: HoldingOutputBuilder): HoldingOutputBuilder
+  def applyToHolding(distributionTx: DistributionTx): HoldingOutputBuilder
 }
 object CommandContract {
 

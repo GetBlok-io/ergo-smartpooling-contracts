@@ -1,7 +1,7 @@
 package app
 
 import app.AppCommand.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, InitializeVoteTokensCmd, PayoutBalancesCmd, ResetStatusCmd, SendToHoldingCmd, ViewMetadataCmd}
-import app.commands.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, GenerateMultipleCmd, InitializeVoteTokensCmd, PayoutLastBalancesCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd}
+import app.commands.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, GenerateMultipleCmd, InitVoteTokensCmd, PayoutLastBalancesCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd}
 import org.slf4j.LoggerFactory
 import config.{ConfigHandler, SmartPoolConfig}
 import logging.LoggingHandler
@@ -141,7 +141,7 @@ object SmartPoolingApp{
             }
             logger.info(s"SmartPool Command: ${SendToHoldingCmd.toString}")
           case InitializeVoteTokensCmd =>
-            cmd = new InitializeVoteTokensCmd(config.get)
+            cmd = new InitVoteTokensCmd(config.get)
           case _ =>
             exit(logger, ExitCodes.NO_COMMAND_TO_USE)
         }

@@ -14,6 +14,7 @@ class HoldingOutBox(outBox: OutBox)
     val asString = s"""
     Holding Output Info:
     - Value: ${this.getValue.toDouble / Parameters.OneErg.toDouble} ERG
+
     """
     asString
   }

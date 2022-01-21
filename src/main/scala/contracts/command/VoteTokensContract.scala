@@ -6,6 +6,7 @@ import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import registers.BytesColl
 import special.sigma.SigmaProp
+import transactions.DistributionTx
 
 /**
  * Command contract that distributes vote tokens equal to share number in contract
@@ -21,16 +22,30 @@ class VoteTokensContract(ergoContract: ErgoContract, voteTokenId: ErgoId) extend
   def applyToCommand(commandOutputBuilder: CommandOutputBuilder): CommandOutputBuilder = commandOutputBuilder
 
   /**
-   * This contract performs no specific changes to the holding outputs.
+   * This contract adds tokens to the holding outputs
    */
-  override def applyToHolding(holdingOutputBuilder: HoldingOutputBuilder): HoldingOutputBuilder = {
-    val outBoxBuilders = holdingOutputBuilder.getOutBoxBuilders
+  override def applyToHolding(distributionTx: DistributionTx): HoldingOutputBuilder = {
+    val hOB = distributionTx.holdingOutputBuilder
+    var holdingMap = hOB.getOutBoxBuilders
+    println("Old map hashcode " + holdingMap.hashCode())
+    holdingMap = holdingMap.map{hm => hm}
+    for(outB <- holdingMap){
+      println("HoldingOutputValue: " + outB._2._1)
+      println("isConsensusVal: " + outB._2._2)
 
-    for(outB <- outBoxBuilders if outB._2._2){
-      val voteTokens = new ErgoToken(voteTokenId, outB._2._1)
-      outB._1.tokens(voteTokens)
+      if(outB._2._2) {
+        println("Output is consensus val, adding tokens to output")
+        val voteTokens = new ErgoToken(voteTokenId, outB._2._1)
+        println("Old hashcode " + outB._1.hashCode())
+        val newOutB = outB._1.tokens(voteTokens)
+        println("New hashcode " + newOutB.hashCode())
+        holdingMap = holdingMap--List(outB._1)
+        holdingMap = holdingMap++Map((newOutB, outB._2))
+      }
     }
-    holdingOutputBuilder
+    println("New map hashcode: " + holdingMap.hashCode())
+    new HoldingOutputBuilder(holdingMap)
+
   }
 
 
@@ -42,25 +57,31 @@ object VoteTokensContract {
     """
       |{
       | val currentConsensus = SELF.R4[Coll[(Coll[Byte], Coll[Long])]].get
+      | val outputProps = OUTPUTS.map{(box:Box) => box.propositionBytes}
       | val tokensDistributed = currentConsensus.forall{
-      |   (consVal: (Coll[Byte], Coll[Long]) =>
-      |   val outputIndex = OUTPUTS.indexOf(consVal._1, 0)
+      |   (consVal: (Coll[Byte], Coll[Long])) =>
+      |   val outputIndex = outputProps.indexOf(consVal._1, 0)
       |   if(outputIndex != -1){
-      |    OUTPUTS(outputIndex).tokens(0)._1 == const_voteTokenId && OUTPUTS(outputIndex).tokens(0)._2 == OUTPUTS(outputIndex).value
+      |     if(OUTPUTS(outputIndex).tokens.size > 0){
+      |       OUTPUTS(outputIndex).tokens(0)._1 == const_voteTokenId && OUTPUTS(outputIndex).tokens(0)._2 == OUTPUTS(outputIndex).value
+      |     }else{
+      |       false
+      |     }
       |   }else{
       |     true
       |   }
-      | sigmaProp(tokensDistributed) && const_nodePK
+      | }
+      | sigmaProp(tokensDistributed) && proveDlog(const_nodeGE)
       |}
       |""".stripMargin
 
-  def generateContract(ctx: BlockchainContext, voteTokenId: ErgoId, nodeAddress: Address): ErgoContract ={
-    val nodePK = nodeAddress.getPublicKey
+  def generateContract(ctx: BlockchainContext, voteTokenId: ErgoId, nodeAddress: Address): CommandContract ={
+    val nodeGE = nodeAddress.getPublicKeyGE
     val voteTokenBytes: BytesColl = BytesColl.fromConversionValues(voteTokenId.getBytes)
     val constantsBuilder = ConstantsBuilder.create()
 
     val compiledContract = ctx.compileContract(constantsBuilder
-      .item("const_nodePK", nodePK)
+      .item("const_nodeGE", nodeGE)
       .item("const_voteTokenId", voteTokenBytes.nValue)
       .build(), script)
     new VoteTokensContract(compiledContract, voteTokenId)

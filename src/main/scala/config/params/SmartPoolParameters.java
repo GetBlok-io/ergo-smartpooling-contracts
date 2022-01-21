@@ -41,11 +41,11 @@ public class SmartPoolParameters {
     }
 
     public String getVoteTokenId() {
-        return smartPoolId;
+        return voteTokenId;
     }
 
-    public void setVoteTokenId(String smartPoolId) {
-        this.smartPoolId = smartPoolId;
+    public void setVoteTokenId(String voteTokenId) {
+        this.voteTokenId = voteTokenId;
     }
 
     public String[] getPoolOperators() {
@@ -84,6 +84,7 @@ public class SmartPoolParameters {
         sp.setMetaConf(this.metaConf);
         sp.setCommandConf(this.commandConf);
         sp.setHoldingConf(this.holdingConf);
+        sp.setVoteTokenId(this.voteTokenId);
         return sp;
     }
 

@@ -7,7 +7,7 @@ import contracts.command.{CommandContract, PKContract}
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
 import org.ergoplatform.ErgoAddress
-import org.ergoplatform.appkit.{BlockchainContext, ErgoToken, InputBox, NetworkType, OutBox, OutBoxBuilder, Parameters, PreHeader, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
+import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoId, ErgoToken, InputBox, NetworkType, OutBox, OutBoxBuilder, Parameters, PreHeader, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
 import org.slf4j.{Logger, LoggerFactory}
 import spire.compat.numeric
 import transactions.models.{MetadataTxTemplate, TransactionTemplate}
@@ -21,11 +21,12 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
   private[this] var _mainHoldingContract: HoldingContract = _
   private[this] var _otherCommandContracts: List[CommandContract] = List[CommandContract]()
   private[this] var _holdingInputs: List[InputBox] = List[InputBox]()
+  private[this] var _tokenToDistribute: ErgoToken = _
+  private[this] var _operatorAddress: Address = _
 
+  def otherCommandContracts: List[CommandContract] = _otherCommandContracts
 
-  private def otherCommandContracts: List[CommandContract] = _otherCommandContracts
-
-  private def otherCommandContracts(contracts: List[CommandContract]): Unit = {
+  def otherCommandContracts(contracts: List[CommandContract]): Unit = {
     _otherCommandContracts = contracts
 
   }
@@ -41,6 +42,28 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
 
   def holdingInputs(holdingBoxes: List[InputBox]): DistributionTx = {
     _holdingInputs = holdingBoxes
+    this
+  }
+
+  def holdingOutputBuilder: HoldingOutputBuilder = hOB
+
+  def holdingOutputBuilder(holdingBuilder: HoldingOutputBuilder): DistributionTx = {
+    hOB = holdingBuilder
+    this
+  }
+
+
+  def tokenToDistribute: ErgoToken = _tokenToDistribute
+
+  def tokenToDistribute(token: ErgoToken): DistributionTx = {
+    _tokenToDistribute = token
+    this
+  }
+
+  def operatorAddress: Address = _operatorAddress
+
+  def operatorAddress(address: Address): DistributionTx = {
+    _operatorAddress = address
     this
   }
 
@@ -82,16 +105,38 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
 
     hOB = holdingContract
       .generateInitialOutputs(ctx, this, holdingBoxes)
-      .applyCommandContract(commandContract)
 
-    otherCommandContracts.foreach(c => hOB.applyCommandContract(c))
+    hOB = commandContract.applyToHolding(this)
+    var tokensDistributed = 0L
+    if(_tokenToDistribute != null) {
+      for (outBB <- hOB.getOutBoxBuilders) {
+        logger.info(s"tokensDistributed: $tokensDistributed")
+        if (outBB._2._2) {
+          logger.info(s"Adding amount ${outBB._2._1} to tokens distributed")
+          tokensDistributed = tokensDistributed + outBB._2._1
+        }
+      }
+    }
+    //otherCommandContracts.foreach(c => hOB.applyCommandContract(this, c))
 
     val holdingOutputs = hOB.build()
     for(hb <- holdingOutputs){
-      logger.info("Holding Box Val: " + hb.asOutBox.getValue)
+      logger.info("Output Box Val: " + hb.asOutBox.getValue)
+      if(_tokenToDistribute != null) {
+        if (hb.asOutBox.token(_tokenToDistribute.getId) != null) {
+          logger.info("Holding Box Token: " + hb.asOutBox.token(_tokenToDistribute.getId).getId)
+          logger.info("Holding Box Token Amnt: " + hb.asOutBox.token(_tokenToDistribute.getId).getValue)
+        }
+      }
     }
-    val txFee = commandInputBox.getValue + (commandInputBox.getShareConsensus.nValue.size * Parameters.MinFee)
+    var txFee = (commandInputBox.getValue + commandInputBox.getShareConsensus.nValue.size * Parameters.MinFee)
+    if(_tokenToDistribute != null){
+      // Ensure there is enough ERG for change box when a token is being distributed
+      txFee = txFee - Parameters.MinFee
+    }
+
     val outputBoxes = List(metadataOutBox.asOutBox)++(holdingOutputs.map(h => h.asOutBox))
+
     logger.info("Distribution Tx built")
     logger.info("Total Input Value: "+ (inputBoxes.map(x => x.getValue.toLong).sum))
     logger.info("Total Output Value: "+ outputBoxes.map(x => x.getValue.toLong).sum)
@@ -100,8 +145,14 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
       .boxesToSpend(inputBoxes.asJava)
       .outputs(outputBoxes:_*)
       .fee(txFee)
-      .sendChangeTo(holdingAddress.getErgoAddress)
-      .build()
+      .sendChangeTo(operatorAddress.getErgoAddress)
+
+    if(_tokenToDistribute != null && tokensDistributed != 0){
+      val tokensAmntToBurn = commandInputBox.getTokens.get(0).getValue - tokensDistributed
+      val tokensToBurn = new ErgoToken(commandInputBox.getTokens.get(0).getId, tokensAmntToBurn)
+      this.asUnsignedTxB.tokensToBurn(tokensToBurn)
+    }
+    this.asUnsignedTxB.build()
 
   }
 

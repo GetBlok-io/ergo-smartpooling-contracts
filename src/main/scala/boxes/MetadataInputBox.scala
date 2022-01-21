@@ -35,6 +35,8 @@ class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends Input
     val serializer = new ErgoTreeSerializer()
     //val shareConsensusDeserialized = shareConsensus.cValue.map{(sc) => (serializer.deserializeErgoTree(sc._1), sc._2)}
     //val shareConsensusWithAddress = shareConsensusDeserialized.map{(sc) => (Address.fromErgoTree(sc._1, AppParameters.networkType), sc._2)}
+    val deserializedOps = this.poolOps.getConversionValue.map((sc) => (Address.fromErgoTree(serializer.deserializeErgoTree(sc._1), AppParameters.networkType), sc._2)).mkString("Array(", ", ", ")")
+
     val asString = s"""
     Metadata Box Info:
     - Id: ${this.getId.toString}
@@ -48,6 +50,7 @@ class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends Input
     - Members List: ${this.getMemberList.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Fees: ${this.getPoolFees.getConversionValue.mkString("Array(", ", ", ")")}
     - Pool Ops: ${this.getPoolOperators.getConversionValue.mkString("Array(", ", ", ")")}
+    - Pool Ops Deserialized: ${deserializedOps}
     """
     asString
   }

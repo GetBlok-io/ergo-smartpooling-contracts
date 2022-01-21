@@ -5,6 +5,7 @@ import boxes.builders.{CommandOutputBuilder, HoldingOutputBuilder}
 import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import special.sigma.GroupElement
+import transactions.DistributionTx
 
 /**
  * Contract that is automatically sent when block is mined by miner(or pool) with public key minerPK in
@@ -25,7 +26,7 @@ class MinerPKContract(ergoContract: ErgoContract) extends CommandContract(ergoCo
    * A simple P2PK Command Contract performs no specifically coded changes to the holding outputs. Therefore,
    * we may simply return the holding output builder that was passed in.
    */
-  override def applyToHolding(holdingOutputBuilder: HoldingOutputBuilder): HoldingOutputBuilder = holdingOutputBuilder
+  override def applyToHolding(distributionTx: DistributionTx): HoldingOutputBuilder = distributionTx.holdingOutputBuilder
 }
 
 object MinerPKContract {

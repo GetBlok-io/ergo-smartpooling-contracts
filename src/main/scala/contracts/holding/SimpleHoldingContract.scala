@@ -236,7 +236,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         if(boxValue._2 > 0) {
           val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
           val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
-          outBoxMap = outBoxMap++Map((newOutBox, (boxValue._2, false)))
+          outBoxMap = outBoxMap++Map((newOutBox, (boxValue._2, true)))
         }
     }
     feeAddresses.foreach{
@@ -247,7 +247,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         if(boxValue._2 > 0) {
           println(s"Fee Value for address ${addr}: ${boxValue._2}")
           val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
-          outBoxMap = outBoxMap++Map((newOutBox, (boxValue._2, true)))
+          outBoxMap = outBoxMap++Map((newOutBox, (boxValue._2, false)))
         }
     }
 

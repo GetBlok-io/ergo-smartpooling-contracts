@@ -3,11 +3,12 @@ package app.commands
 import app.{AppCommand, AppParameters, ExitCodes, exit}
 import boxes.{BoxHelpers, CommandInputBox}
 import config.{ConfigHandler, SmartPoolConfig}
-import contracts.command.PKContract
+import contracts.command.{PKContract, PKTokenContract, VoteTokensContract}
 import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
+import org.ergoplatform.appkit.impl.UnsignedTransactionImpl
 import org.slf4j.{Logger, LoggerFactory}
 import payments.SimplePPLNS
 import persistence.entries.{ConsensusEntry, PaymentEntry, SmartPoolEntry}
@@ -15,7 +16,7 @@ import persistence.queries.{BlockByHeightQuery, MinimumPayoutsQuery, PPLNSQuery}
 import persistence.responses.ShareResponse
 import persistence.writes.{ConsensusInsertion, PaymentInsertion, SmartPoolDataInsertion}
 import persistence.{DatabaseConnection, PersistenceHandler}
-import registers.{MemberList, ShareConsensus}
+import registers.{MemberList, PoolOperators, ShareConsensus}
 import transactions.{CreateCommandTx, DistributionTx, RegroupTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
@@ -195,23 +196,39 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       logger.info(metadataBox.toString)
 
       val commandTx = new CreateCommandTx(ctx.newTxBuilder())
-      val commandContract = new PKContract(nodeAddress)
-
-      val inputBoxes = ctx.getWallet.getUnspentBoxes(cmdConf.getCommandValue + commandTx.txFee).get().asScala.toList
-
+      val voteTokensId = ErgoId.create(paramsConf.getVoteTokenId)
+      val commandContract = VoteTokensContract.generateContract(ctx, voteTokensId, nodeAddress)
+      // commandContract = new PKContract(nodeAddress)
+      var inputBoxes = ctx.getWallet.getUnspentBoxes(cmdConf.getCommandValue + commandTx.txFee).get().asScala.toList
+      val tokenBoxes = inputBoxes.filter(ib => ib.getTokens.asScala.exists(t => t.getId.toString == voteTokensId.toString))
+      if(tokenBoxes.isEmpty){
+        val newTokenBox = BoxHelpers.findExactTokenBox(ctx, nodeAddress, voteTokensId, 100)
+        if(newTokenBox.isDefined){
+          inputBoxes = inputBoxes++List(newTokenBox.get)
+        }else{
+          logger.error("Exact token box could not be found!")
+          exit(logger, ExitCodes.COMMAND_FAILED)
+        }
+      }
 
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
+      val newPoolOperators = PoolOperators.fromConversionValues(Array(
+        (commandContract.getErgoTree.bytes, "Vote Token Distributor"),
+        (nodeAddress.getErgoAddress.script.bytes, "Node Operator"),
+      ))
+      logger.info("Command contract bytes: " + commandContract.getErgoTree.bytes.length)
+      commandTx
+        .metadataToCopy(metadataBox)
+        .withCommandContract(commandContract)
+        .commandValue(cmdConf.getCommandValue)
+        .inputBoxes(inputBoxes: _*)
+        .withHolding(holdingContract, holdingBoxes)
+        .setConsensus(shareConsensus)
+        .setMembers(memberList)
+        .setPoolOps(newPoolOperators)
 
-      val unsignedCommandTx =
-        commandTx
-          .metadataToCopy(metadataBox)
-          .withCommandContract(commandContract)
-          .commandValue(cmdConf.getCommandValue)
-          .inputBoxes(inputBoxes: _*)
-          .withHolding(holdingContract, holdingBoxes)
-          .setConsensus(shareConsensus)
-          .setMembers(memberList)
-          .buildCommandTx()
+      commandTx.cOB.tokens(inputBoxes.filter(ib => ib.getTokens.asScala.exists(t => t.getId.toString == voteTokensId.toString)).head.getTokens.get(0))
+      val unsignedCommandTx = commandTx.buildCommandTx()
       val signedCmdTx = prover.sign(unsignedCommandTx)
       logger.info("Command Tx successfully signed")
       val cmdTxId = ctx.sendTransaction(signedCmdTx)
@@ -220,6 +237,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       val commandBox = new CommandInputBox(commandTx.commandOutBox.convertToInputWith(cmdTxId.filter(c => c != '\"'), 0), commandContract)
       logger.info("Now building DistributionTx using new command box...")
       logger.info(commandBox.toString)
+      logger.info(s"TokenId: ${commandBox.getTokens.get(0).getId} TokenAmnt: ${commandBox.getTokens.get(0).getValue}")
       val distTx = new DistributionTx(ctx.newTxBuilder())
       val unsignedDistTx =
         distTx
@@ -227,9 +245,19 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
           .commandInput(commandBox)
           .holdingInputs(holdingBoxes)
           .holdingContract(holdingContract)
+          .operatorAddress(nodeAddress)
+          .tokenToDistribute(commandBox.getTokens.get(0))
           .buildMetadataTx()
+
+
       val signedDistTx = prover.sign(unsignedDistTx)
       logger.info("Distribution Tx successfully signed.")
+      for(output <- signedDistTx.getOutputsToSpend.asScala){
+        if(output.getTokens.size() > 0){
+          logger.info(s"OutputTokenId: ${output.getTokens.get(0).getId} OutputTokenAmnt: ${output.getTokens.get(0).getValue}")
+        }
+      }
+     // val outputWithToken = signedDistTx.getOutputsToSpend.asScala.filter(ib => ib.getTokens.get(0).getId.toString == voteTokensId.toString)
 
       txId = ctx.sendTransaction(signedDistTx).filter(c => c != '\"')
       nextCommandBox = commandBox

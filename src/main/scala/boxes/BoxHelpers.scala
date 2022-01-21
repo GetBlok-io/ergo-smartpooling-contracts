@@ -189,6 +189,25 @@ object BoxHelpers {
     value - (value % Parameters.MinFee)
   }
 
+  /*
+   * Finds exact box with given token and minimum amount of said token
+   */
+  def findExactTokenBox(ctx: BlockchainContext, address: Address, tokenId: ErgoId, minAmount: Long): Option[InputBox] ={
+    var offset = 0
+    var boxesToSearch = ctx.getUnspentBoxesFor(address, offset, BOX_SELECTOR_LIMIT)
+    while(boxesToSearch.size() > 0) {
+      for (box <- boxesToSearch.asScala) {
+        if (box.getTokens.size() > 0) {
+          if(box.getTokens.get(0).getId == tokenId && box.getTokens.get(0).getValue >= minAmount)
+            return Some(box)
+        }
+      }
+      offset = offset + BOX_SELECTOR_LIMIT
+      boxesToSearch = ctx.getUnspentBoxesFor(address, offset, BOX_SELECTOR_LIMIT)
+    }
+    None
+  }
+
 
 
 

@@ -23,6 +23,7 @@ object LoggingHandler {
     val LOG_CLEAN_DB_CMD = "CheckAndCleanDbCmd"
     val LOG_PAY_BALANCES_CMD = "PayoutBalancesCmd"
     val LOG_INIT_VOTE_CMD = "InitializeVoteTokensCmd"
+    val LOG_INIT_POV_CMD = "InitializePOVTokensCmd"
     val LOG_NODE_HANDLER = "NodeHandler"
 
     val LOG_COMMAND_TX = "CommandTx"

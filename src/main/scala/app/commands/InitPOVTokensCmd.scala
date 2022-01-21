@@ -2,19 +2,16 @@ package app.commands
 
 import app.{AppCommand, AppParameters}
 import config.{ConfigHandler, SmartPoolConfig}
-import contracts.command.{CommandContract, PKContract}
-import contracts.holding.{HoldingContract, SimpleHoldingContract}
-import contracts.{MetadataContract, holding}
+import contracts.command.CommandContract
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import org.slf4j.LoggerFactory
-import transactions.GenesisTx
 
-class InitializeVoteTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
-  val logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_GEN_METADATA_CMD)
+class InitPOVTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
+  val logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_INIT_POV_CMD)
 
-  override val appCommand: app.AppCommand.Value = AppCommand.InitializeVoteTokensCmd
+  override val appCommand: app.AppCommand.Value = AppCommand.InitializePOVTokensCmd
   private var voteTokenId: ErgoId = _
 
   private var commandContract: CommandContract = _
@@ -68,7 +65,10 @@ class InitializeVoteTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(conf
       // TODO: Remove constant values for tokens and place them into config
       val tokenBox = outB
         .value(Parameters.OneErg + (txFee))
-        .mintToken(voteToken, "GetBlok.io Soft-Fork Vote Token", "This token is used to vote on GetBlok.io's decision during EIP-0027 Soft Fork", 0)
+        .mintToken(voteToken, "GetBlok.io Proof-of-Vote Token",
+          "This token is used as a part of GetBlok.io's PoV system. Each PoV token owned by GetBlok.io's " +
+            "wallet address is proof that GetBlok.io has successfully voted according to the decision given to it by its miners.",
+          0)
         .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
         .build()
 

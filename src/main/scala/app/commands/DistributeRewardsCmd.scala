@@ -3,7 +3,7 @@ package app.commands
 import app.{AppCommand, AppParameters, ExitCodes, exit}
 import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox}
 import config.{ConfigHandler, SmartPoolConfig}
-import contracts.command.PKContract
+import contracts.command.{PKContract, VoteTokensContract}
 import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
@@ -70,7 +70,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
     // Lets ensure that blocks are only set to confirmed once we pay them out.
     // TODO: CHANGE BACK AFTER TEST
-   require(block.status == "confirmed", "Block status is not confirmed")
+   // require(block.status == "confirmed", "Block status is not confirmed")
 
     // Assertions to make sure config is setup for command
     require(holdConf.getHoldingAddress != "", "Holding address is not defined")
@@ -80,23 +80,36 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     blockReward = (block.reward * Parameters.OneErg).toLong
 
     var totalShareScore = BigDecimal("0")
-    var shares = Array[Array[ShareResponse]]()
-    while(totalShareScore < 0.5) {
-      logger.info("Now performing PPLNS Query to page shares!")
+
+    if(config.getNode.getNetworkType == NetworkType.MAINNET) {
+      var shares = Array[Array[ShareResponse]]()
+      while (totalShareScore < 0.5) {
+        logger.info("Now performing PPLNS Query to page shares!")
+        val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
+        val response = pplnsQuery.setVariables().execute().getResponse
+        shares = shares ++ Array(response)
+        totalShareScore = response.map(s => (s.diff * BigDecimal("256") / s.netDiff)).sum + totalShareScore
+        logger.info("totalShareScore: " + totalShareScore)
+        logger.info("Query executed successfully")
+      }
+      val commandInputs = StandardPPLNS.standardPPLNSToConsensus(shares)
+      val tempConsensus = commandInputs._1
+      memberList = commandInputs._2
+      shareConsensus = applyMinimumPayouts(dbConn, memberList, tempConsensus)
+    }else {
+      // We calculate share scores in a simpler manner in testnet to account for differences in difficulty and number
+      // of miners
+      logger.info("Now performing PPLNS Query")
       val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
-      val response = pplnsQuery.setVariables().execute().getResponse
-      shares = shares++Array(response)
-      totalShareScore = response.map(s => (s.diff * BigDecimal("256") / s.netDiff)).sum + totalShareScore
-      logger.info("totalShareScore: " + totalShareScore)
+      val shares: Array[ShareResponse] = pplnsQuery.setVariables().execute().getResponse
       logger.info("Query executed successfully")
+
+      val commandInputs = SimplePPLNS.simplePPLNSToConsensus(shares)
+      val tempConsensus = commandInputs._1
+      memberList = commandInputs._2
+
+      shareConsensus = applyMinimumPayouts(dbConn, memberList, tempConsensus)
     }
-
-   val commandInputs = StandardPPLNS.standardPPLNSToConsensus(shares)
-    val tempConsensus = commandInputs._1
-    memberList = commandInputs._2
-
-    shareConsensus = applyMinimumPayouts(dbConn, memberList, tempConsensus)
-
     logger.info(s"Share consensus and member list with ${shareConsensus.nValue.size} unique addresses have been built")
     logger.info(shareConsensus.nValue.toString())
     logger.info(memberList.nValue.toString())
@@ -161,10 +174,11 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       }
 
       var holdingBoxes = ctx.getUnspentBoxesFor(holdingContract.getAddress, 0, 30).asScala.filter(i => i.getValue == blockReward).toList
-
+      val voteTokenId = ErgoId.create(paramsConf.getVoteTokenId)
+      val commandContract = VoteTokensContract.generateContract(ctx, voteTokenId, nodeAddress)
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
       val distributionGroup = new DistributionGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,
-        holdingContract, config, shareConsensus, memberList, isFailureAttempt, failureIds)
+        holdingContract, commandContract, config, shareConsensus, memberList, isFailureAttempt, failureIds)
       val executed = distributionGroup.buildGroup.executeGroup
       logger.info("Total Distribution Groups: " + metadataBoxes.length)
       logger.info("Distribution Groups Executed: " + executed.completed.size)
