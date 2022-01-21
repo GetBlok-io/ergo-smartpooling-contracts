@@ -3,7 +3,7 @@ package app.commands
 import app.{AppCommand, AppParameters}
 import config.SmartPoolConfig
 import config.node.{SmartPoolNodeConfig, SmartPoolWalletConfig}
-import config.params.{CommandConfig, HoldingConfig, MetadataConfig, SmartPoolParameters}
+import config.params.{CommandConfig, HoldingConfig, MetadataConfig, SmartPoolParameters, VotingConfig}
 import org.ergoplatform.appkit.RestApiErgoClient
 import org.ergoplatform.explorer.client.ExplorerApiClient
 
@@ -17,6 +17,7 @@ abstract class SmartPoolCmd(config: SmartPoolConfig) {
   protected val metaConf: MetadataConfig = paramsConf.getMetaConf
   protected val cmdConf: CommandConfig = paramsConf.getCommandConf
   protected val holdConf: HoldingConfig = paramsConf.getHoldingConf
+  protected val voteConf: VotingConfig = paramsConf.getVotingConf
 
   val explorerUrl: String = RestApiErgoClient.getDefaultExplorerUrl(nodeConf.getNetworkType)
 

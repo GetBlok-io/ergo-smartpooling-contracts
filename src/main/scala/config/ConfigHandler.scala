@@ -21,7 +21,8 @@ object ConfigHandler {
     val node = new SmartPoolNodeConfig(api, wallet, NetworkType.TESTNET)
     val persistence = new PersistenceConfig("127.0.0.1", 9000, "db_name", false)
     val logging = new LoggingConfig(3, 10000)
-    val config = new SmartPoolConfig(node, params, persistence, logging)
+    val failures = new FailuresConfig()
+    val config = new SmartPoolConfig(node, params, persistence, logging, failures)
 
     config
   }

@@ -20,11 +20,15 @@ public class SmartPoolConfig {
     private PersistenceConfig persistence;
     private LoggingConfig logging;
 
-    public SmartPoolConfig(SmartPoolNodeConfig nodeConf, SmartPoolParameters paramConf, PersistenceConfig persConfig, LoggingConfig logConf){
+
+    private FailuresConfig failures;
+
+    public SmartPoolConfig(SmartPoolNodeConfig nodeConf, SmartPoolParameters paramConf, PersistenceConfig persConfig, LoggingConfig logConf, FailuresConfig failConf){
         node = nodeConf;
         parameters = paramConf;
         persistence = persConfig;
         logging = logConf;
+        failures = failConf;
     }
     /**
      * Returns Ergo node configuration
@@ -57,6 +61,13 @@ public class SmartPoolConfig {
         this.persistence = persistence;
     }
 
+    public FailuresConfig getFailure() {
+        return failures;
+    }
+
+    public void setFailure(FailuresConfig failure) {
+        this.failures = failure;
+    }
     /**
      * Load config from the given reader.
      *
@@ -93,7 +104,7 @@ public class SmartPoolConfig {
     }
 
     public SmartPoolConfig copy() {
-        return new SmartPoolConfig(node, parameters.copy(), persistence, logging);
+        return new SmartPoolConfig(node, parameters.copy(), persistence, logging, failures);
     }
 
     public LoggingConfig getLogging() {

@@ -4,7 +4,7 @@ import org.ergoplatform.appkit.Parameters;
 
 public class SmartPoolParameters {
     private String smartPoolId;
-    private String voteTokenId;
+
     private String poolId;
     private String[] poolOperators;
     private long initialTxFee;
@@ -15,7 +15,7 @@ public class SmartPoolParameters {
     private MetadataConfig metaConf;
     private CommandConfig commandConf;
     private HoldingConfig holdingConf;
-
+    private VotingConfig votingConf;
 
 
     public SmartPoolParameters(String spId, String pId, String[] poolOps){
@@ -29,7 +29,7 @@ public class SmartPoolParameters {
         metaConf = new MetadataConfig("", "", "default", 0L);
         commandConf = new CommandConfig("", "", "default", 0L);
         holdingConf = new HoldingConfig("", "default", 0L);
-        voteTokenId = "";
+        votingConf = new VotingConfig();
     }
 
     public String getSmartPoolId() {
@@ -40,13 +40,7 @@ public class SmartPoolParameters {
         this.smartPoolId = smartPoolId;
     }
 
-    public String getVoteTokenId() {
-        return voteTokenId;
-    }
 
-    public void setVoteTokenId(String voteTokenId) {
-        this.voteTokenId = voteTokenId;
-    }
 
     public String[] getPoolOperators() {
         return poolOperators;
@@ -84,7 +78,7 @@ public class SmartPoolParameters {
         sp.setMetaConf(this.metaConf);
         sp.setCommandConf(this.commandConf);
         sp.setHoldingConf(this.holdingConf);
-        sp.setVoteTokenId(this.voteTokenId);
+        sp.setVotingConf(this.votingConf);
         return sp;
     }
 
@@ -128,4 +122,11 @@ public class SmartPoolParameters {
         this.metaConf = metaConf;
     }
 
+    public VotingConfig getVotingConf() {
+        return votingConf;
+    }
+
+    public void setVotingConf(VotingConfig votingConf) {
+        this.votingConf = votingConf;
+    }
 }

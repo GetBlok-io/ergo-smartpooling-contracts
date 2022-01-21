@@ -64,11 +64,12 @@ class InitVoteTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
       val outB = txB.outBoxBuilder()
 
-      val voteToken = new ErgoToken(voteTokenId, Parameters.OneErg * 500000)
+      val voteToken = new ErgoToken(voteTokenId, Parameters.OneErg * voteConf.getVoteTokensToMint)
       // TODO: Remove constant values for tokens and place them into config
       val tokenBox = outB
         .value(Parameters.OneErg + (txFee))
-        .mintToken(voteToken, "GetBlok.io Soft-Fork Vote Token", "This token is used to vote on GetBlok.io's decision during EIP-0027 Soft Fork", 9)
+        .mintToken(voteToken, "GetBlok.io Soft-Fork Governance Token",
+          "This token distributed to miners allows voting on getblok's decision during the EIP-0027 Soft-Fork Proposal Vote. Learn more at https://vote.getblok.io", 9)
         .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
         .build()
 
@@ -94,11 +95,11 @@ class InitVoteTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
     logger.info("Recording tx info into config...")
 
     logger.info("The following information will be updated:")
-    logger.info(s"VoteToken Id: ${paramsConf.getVoteTokenId}(old) -> $voteTokenId")
+    logger.info(s"VoteToken Id: ${voteConf.getVoteTokenId}(old) -> $voteTokenId")
 
 
     val newConfig = config.copy()
-    newConfig.getParameters.setVoteTokenId(voteTokenId.toString)
+    newConfig.getParameters.getVotingConf.setVoteTokenId(voteTokenId.toString)
 
     ConfigHandler.writeConfig(AppParameters.configFilePath, newConfig)
     logger.info("Config file has been successfully updated")

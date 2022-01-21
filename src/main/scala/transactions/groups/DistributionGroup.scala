@@ -43,7 +43,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
   final val SHARE_CONSENSUS_LIMIT = 10
   final val STANDARD_FEE = Parameters.MinFee * 5
   var customCommand = false
-
+  var voteTokenStr = config.getParameters.getVotingConf.getVoteTokenId
   override def buildGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
     logger.info("Now building DistributionGroup")
 
@@ -196,7 +196,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
             .setMembers(boxToMember(metadataBox))
             .setPoolFees(newPoolFees)
             .setPoolOps(newPoolOperators)
-        if(config.getParameters.getVoteTokenId != "" && customCommand) {
+        if(voteTokenStr != "" && customCommand) {
           logger.info("Custom token id set, adding tokens to command output")
           unbuiltCommandTx.cOB.tokens(boxToFees(metadataBox)(0).getTokens.get(0))
         }
@@ -246,7 +246,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     for(metadataBox <- boxToShare.keys){
       val commandBox = commandBoxes.filter(i => i.getSubpoolId == metadataBox.getSubpoolId).head
 
-      if(config.getParameters.getVoteTokenId != "" && customCommand){
+      if(voteTokenStr != "" && customCommand){
         logger.info("Tokens in current command box: ")
         logger.info(s"id: ${commandBox.getTokens.get(0).getId}")
         logger.info(s"amnt: ${commandBox.getTokens.get(0).getValue}")
@@ -280,7 +280,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
             .holdingContract(holdingContract)
             .operatorAddress(address)
 
-        if(config.getParameters.getVoteTokenId != "" && customCommand){
+        if(voteTokenStr != "" && customCommand){
           logger.info("VoteTokenId set, now adding tokens to distribute to distribution tx.")
           unbuiltDistTx.tokenToDistribute(commandBox.getTokens.get(0))
         }
@@ -346,10 +346,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     }
 
     for(box <- metadataArray){
-      if(boxToShare.contains(box)){
-        if(boxToShare(box).cValue.length < SHARE_CONSENSUS_LIMIT)
-          return Some(box)
-      }else if(box.getShareConsensus.cValue.length < SHARE_CONSENSUS_LIMIT){
+      if(box.getShareConsensus.cValue.length < SHARE_CONSENSUS_LIMIT){
         return Some(box)
       }
     }
@@ -369,9 +366,9 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
      // val txFee = boxSh._2.cValue.length * Parameters.MinFee
      // val holdingFee = txB.outBoxBuilder().value(txFee).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
       val commandFeeOutput = txB.outBoxBuilder().value(cmdConf.getCommandValue + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script))
-      if(config.getParameters.getVoteTokenId != "" && customCommand){
+      if(voteTokenStr != "" && customCommand){
         // If vote token id exists, lets send vote tokens equal to total amount in holding contracts
-        val voteTokenId = ErgoId.create(config.getParameters.getVoteTokenId)
+        val voteTokenId = ErgoId.create(voteTokenStr)
         val totalTokenAmnt = boxToValue(boxSh._1)._1 + boxToValue(boxSh._1)._2
         commandFeeOutput.tokens(new ErgoToken(voteTokenId, totalTokenAmnt))
         logger.info(s"Added $totalTokenAmnt tokens to commandFeeOutput box.")
@@ -394,9 +391,9 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     val feeTxOutputs = boxToOutputs.values.flatten.toArray
     var feeInputBoxes = ctx.getWallet.getUnspentBoxes(totalFees+STANDARD_FEE).get()
 
-    if(config.getParameters.getVoteTokenId != "" && customCommand){
+    if(voteTokenStr != "" && customCommand){
       logger.info("Now checking if enough vote tokens are in current boxes")
-      val voteTokenId = ErgoId.create(config.getParameters.getVoteTokenId)
+      val voteTokenId = ErgoId.create(voteTokenStr)
       val totalTokens = boxToValue.values.map(v => v._1 + v._2).sum
       val currentTokens = feeInputBoxes.asScala
         .filter(ib => ib.getTokens.size() > 0)

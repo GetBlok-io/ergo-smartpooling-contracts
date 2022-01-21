@@ -174,7 +174,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       }
 
       var holdingBoxes = ctx.getUnspentBoxesFor(holdingContract.getAddress, 0, 30).asScala.filter(i => i.getValue == blockReward).toList
-      val voteTokenId = ErgoId.create(paramsConf.getVoteTokenId)
+      val voteTokenId = ErgoId.create(voteConf.getVoteTokenId)
       val commandContract = VoteTokensContract.generateContract(ctx, voteTokenId, nodeAddress)
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
       val distributionGroup = new DistributionGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,

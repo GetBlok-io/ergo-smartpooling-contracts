@@ -196,7 +196,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       logger.info(metadataBox.toString)
 
       val commandTx = new CreateCommandTx(ctx.newTxBuilder())
-      val voteTokensId = ErgoId.create(paramsConf.getVoteTokenId)
+      val voteTokensId = ErgoId.create(voteConf.getVoteTokenId)
       val commandContract = VoteTokensContract.generateContract(ctx, voteTokensId, nodeAddress)
       // commandContract = new PKContract(nodeAddress)
       var inputBoxes = ctx.getWallet.getUnspentBoxes(cmdConf.getCommandValue + commandTx.txFee).get().asScala.toList

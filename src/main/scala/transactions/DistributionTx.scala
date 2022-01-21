@@ -146,8 +146,8 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
       .outputs(outputBoxes:_*)
       .fee(txFee)
       .sendChangeTo(operatorAddress.getErgoAddress)
-
-    if(_tokenToDistribute != null && tokensDistributed != 0){
+    // Unused tokens are burnt to prevent abuse.
+    if(_tokenToDistribute != null){
       val tokensAmntToBurn = commandInputBox.getTokens.get(0).getValue - tokensDistributed
       val tokensToBurn = new ErgoToken(commandInputBox.getTokens.get(0).getId, tokensAmntToBurn)
       this.asUnsignedTxB.tokensToBurn(tokensToBurn)

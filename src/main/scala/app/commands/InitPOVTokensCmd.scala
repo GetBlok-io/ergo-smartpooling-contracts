@@ -54,29 +54,30 @@ class InitPOVTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
       logger.info(s"Node Address=${nodeAddress}")
 
       val txFee = paramsConf.getInitialTxFee
-
-
-      val boxesToSpend = ctx.getWallet.getUnspentBoxes(Parameters.OneErg + (txFee * 2)).get()
+      val povValue = BigDecimal(voteConf.getPovIncentive * Parameters.OneErg).toLong
+      val totalPOVTokens = voteConf.getPovTokensToMint
+      val boxesToSpend = ctx.getWallet.getUnspentBoxes(povValue * totalPOVTokens + (txFee * 2)).get()
       voteTokenId = boxesToSpend.get(0).getId
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
-      val outB = txB.outBoxBuilder()
-
-      val voteToken = new ErgoToken(voteTokenId, Parameters.OneErg * 500000)
-      // TODO: Remove constant values for tokens and place them into config
-      val tokenBox = outB
-        .value(Parameters.OneErg + (txFee))
-        .mintToken(voteToken, "GetBlok.io Proof-of-Vote Token",
-          "This token is used as a part of GetBlok.io's PoV system. Each PoV token owned by GetBlok.io's " +
-            "wallet address is proof that GetBlok.io has successfully voted according to the decision given to it by its miners.",
-          0)
-        .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
-        .build()
-
+      var povOutputs = List.empty[OutBox]
+      for(i <- 0 to totalPOVTokens) {
+        val outB = txB.outBoxBuilder()
+        val voteToken = new ErgoToken(voteTokenId, 1)
+        val povBox = outB
+          .value(povValue)
+          .mintToken(voteToken, "GetBlok.io Proof-of-Vote Token",
+            "This token is used as a part of GetBlok.io's PoV system. Each PoV token owned by GetBlok.io's " +
+              "wallet address is proof that GetBlok.io has successfully voted according to the decision given to it by its miners.",
+            0)
+          .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
+          .build()
+        povOutputs = povOutputs++List(povBox)
+      }
       val tokenTx =
         txB
           .boxesToSpend(boxesToSpend)
           .fee(txFee)
-          .outputs(tokenBox)
+          .outputs(povOutputs: _*)
           .sendChangeTo(nodeAddress.getErgoAddress)
           .build()
 
@@ -94,11 +95,11 @@ class InitPOVTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
     logger.info("Recording tx info into config...")
 
     logger.info("The following information will be updated:")
-    logger.info(s"VoteToken Id: ${paramsConf.getVoteTokenId}(old) -> $voteTokenId")
+    logger.info(s"VoteToken Id: ${voteConf.getVoteTokenId}(old) -> $voteTokenId")
 
 
     val newConfig = config.copy()
-    newConfig.getParameters.setVoteTokenId(voteTokenId.toString)
+    newConfig.getParameters.getVotingConf.setVoteTokenId(voteTokenId.toString)
 
     ConfigHandler.writeConfig(AppParameters.configFilePath, newConfig)
     logger.info("Config file has been successfully updated")

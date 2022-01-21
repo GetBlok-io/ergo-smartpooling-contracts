@@ -39,17 +39,19 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
   private var txId: String = _
   private var nextCommandBox: CommandInputBox = _
   private var signedTx: SignedTransaction = _
-  private val blockHeight: Long = 664287
+  private var blockHeight: Long = 0L
   private var subpoolResponse: SmartPoolResponse = _
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
     logger.info("Attempting retrial of failed subpool!")
     // Make sure smart pool ids are set
-    assert(paramsConf.getSmartPoolId != "")
-    assert(metaConf.getMetadataId != "")
+    require(paramsConf.getSmartPoolId != "")
+    require(metaConf.getMetadataId != "")
+
     smartPoolId = ErgoId.create(paramsConf.getSmartPoolId)
     metadataId = ErgoId.create(metaConf.getMetadataId)
-
+    blockReward = (BigDecimal(config.getFailure.getFailedValue) * Parameters.OneErg).toLong
+    blockHeight = config.getFailure.getFailedBlock
     logger.info("Creating connection to persistence database")
     val persistence = new PersistenceHandler(Some(config.getPersistence.getHost), Some(config.getPersistence.getPort), Some(config.getPersistence.getDatabase))
     persistence.setConnectionProperties(config.getPersistence.getUsername, config.getPersistence.getPassword, config.getPersistence.isSslConnection)
@@ -78,7 +80,7 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
         (minerAddress.getErgoAddress.script.bytes, Array(c.shares, c.minPayout, c.storedPayout))))
       memberList = MemberList.fromConversionValues(memberList.cValue++Array((minerAddress.getErgoAddress.script.bytes, minerAddress.toString)))
     }
-    blockReward = (BigDecimal(2.166)* Parameters.OneErg).toLong
+
 
     logger.info(s"Total rewards from all blocks: ${blockReward}")
 
