@@ -8,17 +8,17 @@ import persistence.responses.ShareResponse
 import java.sql.{Date, PreparedStatement, ResultSet}
 
 // Query the last N shares created before a certain date. Used
-class PPLNSQuery(dbConn: DatabaseConnection, poolId: String, blockHeight: Long, numShares: Int) extends DatabaseQuery[Array[ShareResponse]](dbConn) {
+class PPLNSQuery(dbConn: DatabaseConnection, poolId: String, blockHeight: Long, numShares: Int, offset: Int) extends DatabaseQuery[Array[ShareResponse]](dbConn) {
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
   override val queryString: String =
-    """SELECT * FROM shares WHERE poolid = ? AND blockheight <= ? ORDER BY created DESC FETCH NEXT ? ROWS ONLY""".stripMargin
+    """SELECT * FROM shares WHERE poolid = ? AND blockheight <= ? ORDER BY created DESC FETCH NEXT ? ROWS ONLY OFFSET ?""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(queryString)
 
   override def setVariables(): DatabaseQuery[Array[ShareResponse]] = {
     asStatement.setString(1, poolId)
     asStatement.setLong(2, blockHeight)
     asStatement.setInt(3, numShares)
-
+    asStatement.setInt(4, offset)
     this
   }
 

@@ -8,7 +8,7 @@ import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
-import org.ergoplatform.appkit.impl.InputBoxImpl
+import org.ergoplatform.appkit.impl.{ErgoTreeContract, InputBoxImpl}
 import org.slf4j.{Logger, LoggerFactory}
 import payments.{SimplePPLNS, StandardPPLNS}
 import persistence.entries.{BoxIndexEntry, ConsensusEntry, PaymentEntry, SmartPoolEntry}
@@ -80,27 +80,33 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     blockReward = (block.reward * Parameters.OneErg).toLong
 
     var totalShareScore = BigDecimal("0")
-
+    var offset = 0
     if(config.getNode.getNetworkType == NetworkType.MAINNET) {
       var shares = Array[Array[ShareResponse]]()
       while (totalShareScore < 0.5) {
         logger.info("Now performing PPLNS Query to page shares!")
-        val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
+        logger.info("Old offset: " + offset)
+        val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT, offset)
         val response = pplnsQuery.setVariables().execute().getResponse
         shares = shares ++ Array(response)
+        logger.info("Shares length: " + shares.length)
+        logger.info("Response length: " + response.length)
+        offset = offset + response.length
         totalShareScore = response.map(s => (s.diff * BigDecimal("256") / s.netDiff)).sum + totalShareScore
         logger.info("totalShareScore: " + totalShareScore)
         logger.info("Query executed successfully")
+        logger.info("New offset: " + offset)
       }
       val commandInputs = StandardPPLNS.standardPPLNSToConsensus(shares)
       val tempConsensus = commandInputs._1
       memberList = commandInputs._2
       shareConsensus = applyMinimumPayouts(dbConn, memberList, tempConsensus)
+
     }else {
       // We calculate share scores in a simpler manner in testnet to account for differences in difficulty and number
       // of miners
       logger.info("Now performing PPLNS Query")
-      val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
+      val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT, 0)
       val shares: Array[ShareResponse] = pplnsQuery.setVariables().execute().getResponse
       logger.info("Query executed successfully")
 
@@ -138,6 +144,10 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
       logger.warn("Using hard-coded PK Command Contract, ensure this value is added to configuration file later for more command box options")
       logger.info("Now attempting to retrieve metadata box from blockchain")
+      val voteTokenId = ErgoId.create(voteConf.getVoteTokenId)
+      val commandContract = VoteTokensContract.generateContract(ctx, voteTokenId, nodeAddress)
+      logger.info(s"Command Contract: ${commandContract.getAddress}")
+
 
       val boxIndex = new BoxIndexQuery(dbConn).setVariables().execute().getResponse
       var isFailureAttempt = false // Boolean that determines whether or not this distribution chain is resending txs for a failed attempt.
@@ -146,14 +156,35 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       if(boxIndex.forall(br => br.status == "success")){
         metaIds = boxIndex.map(br => br.boxId)
       }else{
+        logger.info(s"currentMemberList: ${memberList.cValue.length}")
+        logger.info(s"currentShareCons: ${shareConsensus.cValue.length}")
         metaIds = boxIndex.map(br => br.boxId)
-        logger.warn(s"Failure retrial for ${metaIds.length} subpools")
+        logger.info("")
         isFailureAttempt = true
-        failureIds =  boxIndex.filter(b => b.status == "failure").map(b => b.boxId)
+
+        val failedSubpools =  Array("24", "25", "26", "27")
+        failureIds =  boxIndex.filter(b => failedSubpools.contains(b.subpoolId)).map(b => b.boxId)
+        val successBoxes =  boxIndex.filter(b => !failedSubpools.contains(b.subpoolId)).map(b => new MetadataInputBox(ctx.getBoxesById(b.boxId).head, smartPoolId))
+        metaIds = failureIds
+        memberList = MemberList.fromConversionValues(
+          memberList.cValue.filterNot(m => successBoxes.exists(ib => ib.memberList.cValue.exists(im => im._2 == m._2)
+          )))
+
+        shareConsensus = ShareConsensus.fromConversionValues(
+          shareConsensus.cValue.filter(sc => memberList.cValue.exists(m => m._1 sameElements sc._1)
+          ))
+        logger.warn(s"Failure retrial for ${metaIds.length} subpools")
+        logger.warn(s"There are currently ${memberList.cValue.length} members and ${shareConsensus.cValue.length} consensus values")
+        logger.info(failureIds.mkString("Array(", ", ", ")"))
+        logger.info(s"newMemberList: ${memberList.cValue.length}")
+        logger.info(s"newShareCons: ${shareConsensus.cValue.length}")
+        logger.info("Share consensus: " + shareConsensus.cValue.mkString("Array(", ", ", ")"))
+        logger.info("Member List: " + memberList.cValue.mkString("Array(", ", ", ")"))
+        // blockReward = (BigDecimal(6.61) * Parameters.OneErg).toLong
+        exit(logger, ExitCodes.COMMAND_FAILED)
       }
       val metadataRetrieval = Try{ctx.getBoxesById(metaIds:_*)}
-      if(metadataRetrieval.isFailure)
-        exit(logger, ExitCodes.NOT_ALL_SUBPOOLS_RETRIEVED)
+
       val metaInputs = metadataRetrieval.get
 
       val metadataBoxes = metaInputs.map(b => new MetadataInputBox(b, smartPoolId))
@@ -174,8 +205,8 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       }
 
       var holdingBoxes = ctx.getUnspentBoxesFor(holdingContract.getAddress, 0, 30).asScala.filter(i => i.getValue == blockReward).toList
-      val voteTokenId = ErgoId.create(voteConf.getVoteTokenId)
-      val commandContract = VoteTokensContract.generateContract(ctx, voteTokenId, nodeAddress)
+
+
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
       val distributionGroup = new DistributionGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,
         holdingContract, commandContract, config, shareConsensus, memberList, isFailureAttempt, failureIds)

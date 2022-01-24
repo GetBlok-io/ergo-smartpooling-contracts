@@ -60,7 +60,7 @@ class InitPOVTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
       voteTokenId = boxesToSpend.get(0).getId
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
       var povOutputs = List.empty[OutBox]
-      for(i <- 0 to totalPOVTokens) {
+      for(i <- 0L to totalPOVTokens) {
         val outB = txB.outBoxBuilder()
         val voteToken = new ErgoToken(voteTokenId, 1)
         val povBox = outB

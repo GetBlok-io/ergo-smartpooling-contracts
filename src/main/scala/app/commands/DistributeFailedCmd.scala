@@ -3,7 +3,7 @@ package app.commands
 import app.{AppCommand, AppParameters, ExitCodes, exit}
 import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox}
 import config.{ConfigHandler, SmartPoolConfig}
-import contracts.command.PKContract
+import contracts.command.{PKContract, VoteTokensContract}
 import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import logging.LoggingHandler
@@ -144,32 +144,43 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
       logger.info("Total holding boxes: " + holdingBoxesList.length)
       logger.info("Total held value: " + BoxHelpers.sumBoxes(holdingBoxesList))
       logger.info(metadataBox.toString)
-
+      val voteTokenId = ErgoId.create(voteConf.getVoteTokenId)
       val commandTx = new CreateCommandTx(ctx.newTxBuilder())
-      val commandContract = new PKContract(nodeAddress)
+      val commandContract = VoteTokensContract.generateContract(ctx,voteTokenId, nodeAddress)
 
-      val inputBoxes = ctx.getWallet.getUnspentBoxes(cmdConf.getCommandValue + commandTx.txFee).get().asScala.toList
-
+      var inputBoxes = ctx.getWallet.getUnspentBoxes(cmdConf.getCommandValue + commandTx.txFee).get().asScala.toList
+      val tokenBoxes = inputBoxes.filter(ib => ib.getTokens.asScala.exists(t => t.getId.toString == voteTokenId.toString))
+      if(tokenBoxes.isEmpty){
+        val newTokenBox = BoxHelpers.findExactTokenBox(ctx, nodeAddress, voteTokenId, 100)
+        if(newTokenBox.isDefined){
+          inputBoxes = inputBoxes++List(newTokenBox.get)
+        }else{
+          logger.error("Exact token box could not be found!")
+          exit(logger, ExitCodes.COMMAND_FAILED)
+        }
+      }
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
 
-      val unsignedCommandTx =
         commandTx
           .metadataToCopy(metadataBox)
           .withCommandContract(commandContract)
           .commandValue(cmdConf.getCommandValue)
           .inputBoxes(inputBoxes: _*)
           .withHolding(holdingContract, holdingBoxesList)
+          .withChange(nodeAddress)
           .setConsensus(shareConsensus)
           .setMembers(memberList)
-          .buildCommandTx()
+
+      commandTx.cOB.tokens(new ErgoToken(voteTokenId, BoxHelpers.sumBoxes(holdingBoxesList)))
+      val unsignedCommandTx = commandTx.buildCommandTx()
       val signedCmdTx = prover.sign(unsignedCommandTx)
       logger.info("Next command box" + commandTx.commandOutBox)
       logger.info("Command Tx successfully signed")
 
       val cmdTxId = ctx.sendTransaction(signedCmdTx)
       logger.info(s"Tx was successfully sent with id: $cmdTxId")
-
-      val commandBox = new CommandInputBox(commandTx.commandOutBox.convertToInputWith(cmdTxId.filter(c => c != '\"'), 0), commandContract)
+      //val exactCommandBox = BoxHelpers.findExactTokenBox(ctx, commandContract.getAddress, voteTokenId, BoxHelpers.sumBoxes(holdingBoxesList))
+      val commandBox = new CommandInputBox(signedCmdTx.getOutputsToSpend.get(0), commandContract)
       logger.info("Now building DistributionTx using new command box...")
       logger.info(commandBox.toString)
       val distTx = new DistributionTx(ctx.newTxBuilder())
@@ -179,6 +190,8 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
           .commandInput(commandBox)
           .holdingInputs(holdingBoxesList)
           .holdingContract(holdingContract)
+          .operatorAddress(nodeAddress)
+          .tokenToDistribute(commandBox.getTokens.get(0))
           .buildMetadataTx()
       val signedDistTx = prover.sign(unsignedDistTx)
       logger.info("Distribution Tx successfully signed.")

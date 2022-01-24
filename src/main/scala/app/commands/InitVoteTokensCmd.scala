@@ -69,7 +69,8 @@ class InitVoteTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
       val tokenBox = outB
         .value(Parameters.OneErg + (txFee))
         .mintToken(voteToken, "GetBlok.io Soft-Fork Governance Token",
-          "This token distributed to miners allows voting on getblok's decision during the EIP-0027 Soft-Fork Proposal Vote. Learn more at https://vote.getblok.io", 9)
+          "This token distributed to miners allows voting on GetBlok.io's decision during the EIP-0027 Soft-Fork Proposal Vote." +
+            " Learn more at https://ergo.getblok.io/vote", 9)
         .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
         .build()
 

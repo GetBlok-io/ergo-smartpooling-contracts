@@ -9,11 +9,11 @@ import org.ergoplatform.appkit._
 import org.ergoplatform.explorer.client.ExplorerApiClient
 import org.ergoplatform.restapi.client.JSON
 import org.slf4j.LoggerFactory
-import persistence.entries.{BalanceChangeEntry, PaymentEntry}
+import persistence.entries.{BalanceChangeEntry, BoxIndexEntry, PaymentEntry}
 import persistence.{DatabaseConnection, PersistenceHandler}
 import persistence.queries.{BoxIndexQuery, ConsensusByTransactionQuery, PaymentsQuery, PaymentsQueryByTransaction, SmartPoolByEpochQuery, SmartPoolByHeightQuery}
 import persistence.responses.SmartPoolResponse
-import persistence.writes.{BalanceChangeInsertion, ConsensusDeletionByNFT, PaymentInsertion, SmartPoolDeletionByNFT}
+import persistence.writes.{BalanceChangeInsertion, BoxIndexUpdate, ConsensusDeletionByNFT, PaymentInsertion, SmartPoolDeletionByNFT}
 import retrofit2.Retrofit
 import retrofit2.converter.scalars.ScalarsConverterFactory
 
@@ -102,6 +102,18 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
       exit(logger, ExitCodes.SUCCESS)
     }else {
       logger.warn("There were errors found in the current box index!")
+      logger.warn("Now initiating failed redistribiution")
+      val failIndex = boxIndex.filter(b => b.status == "failure")
+//      for(b <- failIndex){
+//        val boxEntry = BoxIndexEntry(b.poolId, b.boxId, "d220fac50ff3b8a06b4a62dd78f6707e5f0fde2d395db88ad25523ae82291212", b.epoch, "success", b.smartPoolNft, b.subpoolId, Array(669001))
+//        logger.info(boxEntry.toString)
+//        logger.info("subpool id" + boxEntry.subpoolId)
+//        val boxIndexUpdate = new BoxIndexUpdate(dbConn).setVariables(boxEntry).execute()
+//      }
+//      val distributeRewardsCmd = new DistributeRewardsCmd(config, 669001)
+//      distributeRewardsCmd.initiateCommand
+//      distributeRewardsCmd.executeCommand
+//      distributeRewardsCmd.recordToDb
       exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
     }
 

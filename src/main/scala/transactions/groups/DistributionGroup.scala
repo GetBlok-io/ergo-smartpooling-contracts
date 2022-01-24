@@ -1,5 +1,6 @@
 package transactions.groups
 
+import app.ExitCodes
 import boxes.{BoxHelpers, CommandInputBox, CommandOutBox, MetadataInputBox}
 import config.SmartPoolConfig
 import contracts.command.{CommandContract, PKContract}
@@ -52,6 +53,9 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
       val boxSearch = findMetadata(metadataInputs, sc)
       if(boxSearch.isDefined){
         val metadataBox = boxSearch.get
+        logger.info("Miner address: " + memberList.cValue.filter(m => Address.create(m._2).getErgoAddress.script.bytes sameElements sc._1).head._2)
+        logger.info("Subpool to be placed in: " + metadataBox.getSubpoolId)
+        logger.info("Full metadata: " + metadataBox.toString)
         val newShareConsensus = ShareConsensus.fromConversionValues(Array(sc))
 
         val memberVal = memberList.cValue.filter(m => m._1 sameElements sc._1).head
@@ -66,19 +70,27 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
           boxToMember = boxToMember++Map((metadataBox, newMemberList))
         }
         if(metadataBox.getPoolOperators.cValue.exists(c => c._1 sameElements commandContract.getErgoTree.bytes)){
-          customCommand = true
+          if(voteTokenStr != "")
+            customCommand = true
         }
 
       }else{
         throw new MetadataNotFoundException
       }
     }
-
+    for(boxSh <- boxToShare){
+      if(boxSh._2.cValue.length > SHARE_CONSENSUS_LIMIT){
+        logger.error(s"There was an error assigning a share consensus to subpool ${boxSh._1.getSubpoolId}")
+        logger.error(s"Current share consensus length: ${boxSh._2.cValue.length}")
+        app.exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
+      }
+    }
     if(isFailureAttempt){
       logger.info("Is failure attempt! Now removing unneeded boxes.")
-      val boxesToRemove = boxToShare.keys.filter(b => !failureIds.contains(b.getId.toString))
-      boxToShare = boxToShare--boxesToRemove
-      boxToMember = boxToMember--boxesToRemove
+      boxToMember.foreach(m => logger.info(m.toString()))
+      boxToMember.foreach(m => logger.info(m._2.cValue.mkString("Array(", ", ", ")")))
+
+
     }
 
     logger.info(s"boxToShare: ${boxToShare.size} boxToMember: ${boxToMember.size}")
@@ -306,6 +318,8 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
         signedDistTx.toJson(true)
         _completed = _completed ++ Map((newMetadataBox, txId))
         _txs = _txs++Map((newMetadataBox, signedDistTx))
+        logger.info("Now waiting for 0.5secs")
+        Thread.sleep(500)
       }
 
       if(distributionChain.isFailure) {
@@ -336,7 +350,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
           if(boxToShare(box).cValue.length < SHARE_CONSENSUS_LIMIT)
             return Some(box)
         }else{
-          return Some(box)
+            return Some(box)
         }
 
       }
@@ -346,7 +360,11 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     }
 
     for(box <- metadataArray){
-      if(box.getShareConsensus.cValue.length < SHARE_CONSENSUS_LIMIT){
+      if(boxToShare.contains(box)) {
+        if (boxToShare(box).cValue.length < SHARE_CONSENSUS_LIMIT) {
+          return Some(box)
+        }
+      }else{
         return Some(box)
       }
     }

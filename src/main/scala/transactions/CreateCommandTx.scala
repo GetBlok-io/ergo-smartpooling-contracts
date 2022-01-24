@@ -6,7 +6,7 @@ import contracts.MetadataContract
 import contracts.command.CommandContract
 import contracts.holding.HoldingContract
 import logging.LoggingHandler
-import org.ergoplatform.appkit.{ErgoToken, InputBox, Parameters, UnsignedTransaction, UnsignedTransactionBuilder}
+import org.ergoplatform.appkit.{Address, ErgoToken, InputBox, Parameters, UnsignedTransaction, UnsignedTransactionBuilder}
 import org.slf4j.{Logger, LoggerFactory}
 import registers.{MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
 import transactions.models.{CommandTxTemplate, MetadataTxTemplate}
@@ -20,6 +20,8 @@ class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Com
   protected[this] var _mainHoldingContract: HoldingContract = _
   protected[this] var _holdingInputs: List[InputBox] = List[InputBox]()
   protected[this] var _withHolding = false
+  protected[this] var _withChange = false
+  protected[this] var _changeAddress: Address = _
 
   // Custom metadata registers. These registers are set before the cOB is initialized(epoch and height are updated)
   // Therefore, one must be careful when setting pool info manually
@@ -35,6 +37,14 @@ class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Com
     _mainHoldingContract = holdingContract
     _holdingInputs = holdingBoxes
     _withHolding = true
+    this
+  }
+
+  def changeAddress: Address = _changeAddress
+
+  def withChange(changeAddress: Address): CreateCommandTx = {
+    _changeAddress = changeAddress
+    _withChange = true
     this
   }
 
@@ -111,14 +121,17 @@ class CreateCommandTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Com
       this.holdingContract.applyToCommand(this)
     }
     val commandOutBox = cOB.build()
-
+    var changeAddress = commandContract.getAddress.getErgoAddress
+    if(_withChange){
+      changeAddress = _changeAddress.getErgoAddress
+    }
     this.commandOutput(commandOutBox)
     logger.info("Now building as unsigned Tx")
     this.asUnsignedTxB
       .boxesToSpend(this._inputBoxes.asJava)
       .outputs(commandOutBox.asOutBox)
       .fee(txFee)
-      .sendChangeTo(commandContract.getAddress.getErgoAddress)
+      .sendChangeTo(changeAddress)
       .build()
 
   }

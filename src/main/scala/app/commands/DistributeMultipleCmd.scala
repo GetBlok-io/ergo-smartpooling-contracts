@@ -83,7 +83,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
 
 
       logger.info("Now performing PPLNS Query")
-      val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT)
+      val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT, 0)
       val shares: Array[ShareResponse] = pplnsQuery.setVariables().execute().getResponse
       logger.info("Query executed successfully")
       shareResponseList = shareResponseList ++ Array(shares)
