@@ -43,7 +43,7 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
   private var subpoolResponse: SmartPoolResponse = _
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
-    logger.info("Attempting retrial of failed subpool!")
+    logger.info("Attempting retrial of failed subpool")
     // Make sure smart pool ids are set
     require(paramsConf.getSmartPoolId != "")
     require(metaConf.getMetadataId != "")
@@ -52,6 +52,8 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
     metadataId = ErgoId.create(metaConf.getMetadataId)
     blockReward = (BigDecimal(config.getFailure.getFailedValue) * Parameters.OneErg).toLong
     blockHeight = config.getFailure.getFailedBlock
+//    blockHeight = 670816
+//    blockReward = (BigDecimal(3.736) * Parameters.OneErg).toLong
     logger.info("Creating connection to persistence database")
     val persistence = new PersistenceHandler(Some(config.getPersistence.getHost), Some(config.getPersistence.getPort), Some(config.getPersistence.getDatabase))
     persistence.setConnectionProperties(config.getPersistence.getUsername, config.getPersistence.getPassword, config.getPersistence.isSslConnection)
@@ -246,11 +248,11 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
       signedDistTx.toJson(true)
     })
     logger.info("Command has finished execution")
-    exit(logger, ExitCodes.SUCCESS)
+
   }
 
   def recordToDb: Unit = {
-
+    exit(logger, ExitCodes.SUCCESS)
 
   }
 
@@ -273,6 +275,9 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
   }
 
 
-
+  def setFailedValues(failedVal: Double, failedBlock: Long): Unit ={
+    blockReward = BigDecimal(failedVal * Parameters.OneErg).toLong
+    blockHeight = failedBlock
+  }
 }
 

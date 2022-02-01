@@ -136,7 +136,8 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
     }
 
     val outputBoxes = List(metadataOutBox.asOutBox)++(holdingOutputs.map(h => h.asOutBox))
-
+    val inputIds = inputBoxes.map(ib => ib.getId.toString)
+    logger.info("Input Ids: " + inputIds.mkString("( ", " , " , " )"))
     logger.info("Distribution Tx built")
     logger.info("Total Input Value: "+ (inputBoxes.map(x => x.getValue.toLong).sum))
     logger.info("Total Output Value: "+ outputBoxes.map(x => x.getValue.toLong).sum)

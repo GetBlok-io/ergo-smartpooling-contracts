@@ -39,7 +39,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
       (accum: Long, box: InputBox) =>
         accum + box.getValue
     }
-    println("Holding Box Values: " + holdingBoxValues)
+
     val lastConsensus = lastShareConsensus.getNormalValue
     val currentConsensus = currentShareConsensus.getNormalValue
     val currentPoolFees = metadataBox.getPoolFees.getNormalValue
@@ -77,6 +77,17 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
 
         valueFromShares = BoxHelpers.removeDust(valueFromShares)
 
+        // Custom epoch value being set to keep track of members whose payout must be flushed
+        var epochLeft = 0L
+        if(consVal._2.length > 3){
+          epochLeft = consVal._2(3)
+        }
+        if(shareNum == 0){
+          epochLeft = epochLeft + 1
+        }else if(shareNum > 0){
+          epochLeft = 0
+        }
+
         val member = MemberList.fromNormalValues( commandTx.memberList.nValue.filter(m => m._1 == consVal._1))
         logger.info("Member: " + member.cValue(0)._2)
         logger.info("Value from shares: " + valueFromShares)
@@ -111,7 +122,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
 //        println(
 //          s"""Parameters - ShareNum: ${shareNum} - CurrentMinPayout: ${currentMinPayout} - ValueFromShares: ${valueFromShares}
 //             |shareValueGreater ${valueFromShares >= currentMinPayout} - """.stripMargin)
-        val newConsensusInfo = Array(shareNum, currentMinPayout, owedPayment)
+        val newConsensusInfo = Array(shareNum, currentMinPayout, owedPayment, epochLeft)
         (consVal._1.toArray, newConsensusInfo)
     }
     val newShareConsensus = ShareConsensus.fromConversionValues(updatedConsensus)

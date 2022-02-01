@@ -47,6 +47,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
     // Make sure smart pool ids are set
+    logger.info(s"DistributeRewardsCmd with blockHeight $blockHeight")
     assert(paramsConf.getSmartPoolId != "")
     assert(metaConf.getMetadataId != "")
     smartPoolId = ErgoId.create(paramsConf.getSmartPoolId)
@@ -162,7 +163,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
         logger.info("")
         isFailureAttempt = true
 
-        val failedSubpools =  Array("24", "25", "26", "27")
+        val failedSubpools =  Array("25")
         failureIds =  boxIndex.filter(b => failedSubpools.contains(b.subpoolId)).map(b => b.boxId)
         val successBoxes =  boxIndex.filter(b => !failedSubpools.contains(b.subpoolId)).map(b => new MetadataInputBox(ctx.getBoxesById(b.boxId).head, smartPoolId))
         metaIds = failureIds

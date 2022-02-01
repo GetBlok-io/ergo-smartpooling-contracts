@@ -111,6 +111,10 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
     logger.info("Nothing to record for config")
   }
 
+  def setBlockReward(reward: Long) = {
+    blockReward = reward
+  }
+
 
 }
 

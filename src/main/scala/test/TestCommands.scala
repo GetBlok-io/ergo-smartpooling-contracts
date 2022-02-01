@@ -1,9 +1,10 @@
 package test
 
 import boxes.builders.{CommandOutputBuilder, MetadataOutputBuilder}
-import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox, MetadataOutBox}
+import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox, MetadataOutBox, RecordingInputBox}
 import contracts.command.{CommandContract, MinerPKContract, PKContract}
 import contracts.holding.SimpleHoldingContract
+import contracts.voting.{ProxyBallotContract, RecordingContract}
 import contracts.{MetadataContract, generateContractAddress}
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoContract, ErgoId, ErgoProver, ErgoToken, InputBox, NetworkType, OutBox, Parameters, PreHeader, SecretString, SignedTransaction, UnsignedTransaction, UnsignedTransactionBuilder}
@@ -395,7 +396,60 @@ object TestCommands {
     new CommandInputBox(commandTx.commandOutBox.convertToInputWith(txId, 0), commandContract)
   }
 
+  def initialRecordingTx(ctx: BlockchainContext) = {
 
+    println(s"Pool Operator Address: ${poolOperator}")
+
+    println(s"Sending ${initValue} ERG to create new Metadata Box\n")
+    val boxesToSpend = ctx.getCoveringBoxesFor(poolOperator, initValue + (Parameters.MinFee * 2), List[ErgoToken]().asJava).getBoxes
+    var txB: UnsignedTransactionBuilder = ctx.newTxBuilder
+    val outB = txB.outBoxBuilder()
+    val recordingToken = new ErgoToken(boxesToSpend.get(0).getId, 1)
+    val tokenBox = outB
+      .value(initValue + (Parameters.MinFee * 1))
+      .mintToken(recordingToken, "Recording Box NFT", "Test Token Recording Box", 0)
+      .contract(new ErgoTreeContract(poolOperator.getErgoAddress.script))
+      .build()
+
+    val tokenTx = txB.boxesToSpend(boxesToSpend).fee(Parameters.MinFee * 1).outputs(tokenBox).sendChangeTo(poolOperator.getErgoAddress).build()
+    val tokenTxSigned = poolOpProver.sign(tokenTx)
+    val tokenTxId: String = ctx.sendTransaction(tokenTxSigned).filter(c => c !='\"')
+    val recordingId = boxesToSpend.get(0).getId
+    val tokenInputBox = tokenBox.convertToInputWith(tokenTxId, 0)
+    val voteYes = ProxyBallotContract.generateContract(ctx, recordingId, voteYes = true, recordingId).getAddress
+    val voteNo = ProxyBallotContract.generateContract(ctx, recordingId, voteYes = false, recordingId).getAddress
+    println("Vote Yes: " + voteYes.toString)
+    println("Vote No: " + voteYes.toString)
+    val recordingContract = RecordingContract.generateContract(ctx, recordingId, voteYes, voteNo)
+    println("Recording: " + recordingContract.getAddress)
+    txB = ctx.newTxBuilder()
+
+    // Create output holding box
+    val genesisBox: OutBox = RecordingContract.buildNewRecordingBox(ctx, recordingId, recordingContract, initValue)
+
+
+    println("Generating unspent boxes for pool creator " + poolOperator)
+
+
+    // Create unsigned transaction
+    val tx: UnsignedTransaction = txB
+      .boxesToSpend(List(tokenInputBox).asJava)
+      .outputs(genesisBox)
+      .fee(Parameters.MinFee * 1)
+      .sendChangeTo(poolOperator.getErgoAddress)
+      .build()
+    println("Initial Recording Tx Built\n")
+    val signed: SignedTransaction = poolOpProver.sign(tx)
+    // Submit transaction to node
+    val txId: String = ctx.sendTransaction(signed).filter(c => c !='\"')
+
+    println(s"Tx successfully sent with id: ${txId} \n")
+    println(signed.toJson(true))
+    println(s"Metadata Id: ${signed.getOutputsToSpend.get(0).getId}")
+    creationMetadataID = signed.getOutputsToSpend.get(0).getId
+
+    new RecordingInputBox(genesisBox.convertToInputWith(txId, 0), recordingId)
+  }
 
 
 }

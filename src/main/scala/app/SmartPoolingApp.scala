@@ -1,7 +1,7 @@
 package app
 
-import app.AppCommand.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, InitializeVoteTokensCmd, PayoutBalancesCmd, ResetStatusCmd, SendToHoldingCmd, ViewMetadataCmd}
-import app.commands.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, GenerateMultipleCmd, InitVoteTokensCmd, PayoutLastBalancesCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd}
+import app.AppCommand.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, GenerateRecordingCmd, InitializeVoteTokensCmd, PayoutBalancesCmd, ResetStatusCmd, SendToHoldingCmd, ViewMetadataCmd, VoteCollectionCmd}
+import app.commands.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, GenerateMultipleCmd, GenerateRecordingCmd, InitVoteTokensCmd, PayoutLastBalancesCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd, VoteCollectionCmd}
 import org.slf4j.LoggerFactory
 import config.{ConfigHandler, SmartPoolConfig}
 import logging.LoggingHandler
@@ -41,11 +41,11 @@ object SmartPoolingApp{
                 case ex: Exception =>
                   exit(logger, ExitCodes.CONFIG_NOT_FOUND)
               }
-            case str if str.charAt(0) == 'g' =>
+            case str if str.charAt(0) == 'g' && str != "gr" =>
               txCommand = GenerateMetadataCmd
             case  str if str.charAt(0) == 'd' =>
               txCommand = DistributeRewardsCmd
-            case  str if str.charAt(0) == 'v' =>
+            case  str if str.charAt(0) == 'v' && str != "vc" =>
               txCommand = ViewMetadataCmd
             case  str if str.charAt(0) == 'h' =>
               txCommand = SendToHoldingCmd
@@ -59,6 +59,10 @@ object SmartPoolingApp{
               txCommand = DistributeFailedCmd
             case "ivt" =>
               txCommand = InitializeVoteTokensCmd
+            case "gr" =>
+              txCommand = GenerateRecordingCmd
+            case "vc" =>
+              txCommand = VoteCollectionCmd
             case _ =>
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
           }
@@ -142,6 +146,10 @@ object SmartPoolingApp{
             logger.info(s"SmartPool Command: ${SendToHoldingCmd.toString}")
           case InitializeVoteTokensCmd =>
             cmd = new InitVoteTokensCmd(config.get)
+          case GenerateRecordingCmd =>
+            cmd = new GenerateRecordingCmd(config.get)
+          case VoteCollectionCmd =>
+            cmd = new VoteCollectionCmd(config.get)
           case _ =>
             exit(logger, ExitCodes.NO_COMMAND_TO_USE)
         }
