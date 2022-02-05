@@ -23,6 +23,7 @@ class ProxyBallotContract(ergoContract: ErgoContract) extends ErgoContract {
 object ProxyBallotContract{
 
   // Uses arbitrary script differentiation to ensure right contracts are being used
+  // TODO: Change script to false on tokensValid false
   def script(voteYes: Boolean): String =
     s"""
     {
@@ -43,16 +44,13 @@ object ProxyBallotContract{
       """.stripMargin
 
   /**
-   * To simplify voting process, we only allow one P2PK address to reclaim lost funds above minimum amount required.
-   * @param ctx
-   * @param voteTokenId
-   * @param voteYes
-   * @return
+   * To simplify voting process, we ensure only two distinct contracts are necessary to send votes, depending
+   * if someone is voting yes or no
    */
   def generateContract(ctx: BlockchainContext, voteTokenId: ErgoId, voteYes: Boolean, recordingNFT: ErgoId): ProxyBallotContract = {
 
-    val voteTokenBytes = BytesColl.fromConversionValues(voteTokenId.getBytes)
-    val recordingBytes = BytesColl.fromConversionValues(recordingNFT.getBytes)
+    val voteTokenBytes = BytesColl.convert(voteTokenId.getBytes)
+    val recordingBytes = BytesColl.convert(recordingNFT.getBytes)
     val constants = ConstantsBuilder.create()
       .item("const_voteTokenId", voteTokenBytes.nValue)
       .item("const_recordingNFT", recordingBytes.nValue)

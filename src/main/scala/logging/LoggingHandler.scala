@@ -37,6 +37,7 @@ object LoggingHandler {
     val LOG_BOX_HELPER = "BoxHelper"
 
     val LOG_DIST_GRP = "DistributionGroup"
+    val LOG_SUB_SEL = "SubpoolSelector"
     val LOG_HOLD_GRP = "HoldingGroup"
 
     val loggerNames = List(
@@ -45,7 +46,7 @@ object LoggingHandler {
       LOG_SEND_TO_HOLDING_CMD, LOG_RESET_STATUS_CMD, LOG_NODE_HANDLER, LOG_PAY_BALANCES_CMD, LOG_CLEAN_DB_CMD, LOG_INIT_VOTE_CMD,
       LOG_GEN_RECORDING_CMD, LOG_VOTE_COLLECTION_CMD,
       LOG_COMMAND_TX, LOG_DIST_TX, LOG_GEN_TX, LOG_MOD_TX, LOG_BOX_HELPER, LOG_REGROUP_TX,
-      LOG_DIST_GRP, LOG_HOLD_GRP
+      LOG_DIST_GRP, LOG_HOLD_GRP, LOG_SUB_SEL
 
     )
 

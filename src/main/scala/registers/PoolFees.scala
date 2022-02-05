@@ -60,7 +60,7 @@ object PoolFees extends RegCompanion[(Coll[Byte], Int), (Array[Byte], Int)] {
 
   override def fromNormalValues(normalValue: Coll[(Coll[Byte], Int)]): PoolFees = new PoolFees(normalValue)
 
-  override def fromConversionValues(conversionValue: Array[(Array[Byte], Int)] ): PoolFees = {
+  override def convert(conversionValue: Array[(Array[Byte], Int)] ): PoolFees = {
     val propBytesConverted = conversionValue.map(c => defaultValue(c))
     new PoolFees(newColl(propBytesConverted, eType))
   }

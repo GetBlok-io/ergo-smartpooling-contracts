@@ -71,7 +71,7 @@ object ShareConsensus extends RegCompanion[(Coll[Byte], Coll[Long]), (Array[Byte
 
   override def fromNormalValues(normalValue: Coll[(Coll[Byte], Coll[Long])]): ShareConsensus = new ShareConsensus(normalValue)
 
-  override def fromConversionValues(conversionValue: Array[(Array[Byte], Array[Long])] ): ShareConsensus = {
+  override def convert(conversionValue: Array[(Array[Byte], Array[Long])] ): ShareConsensus = {
     val propBytesConverted = conversionValue.map(c => defaultValue(c))
     new ShareConsensus(newColl(propBytesConverted, eType))
   }

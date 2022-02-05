@@ -30,8 +30,8 @@ class CustomSettingsCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
   private var metadataId: ErgoId = _
   private var holdingContract: HoldingContract = _
   private var dbConn: DatabaseConnection = _
-  private var memberList: MemberList = MemberList.fromConversionValues(Array())
-  private var shareConsensus: ShareConsensus = ShareConsensus.fromConversionValues(Array())
+  private var memberList: MemberList = MemberList.convert(Array())
+  private var shareConsensus: ShareConsensus = ShareConsensus.convert(Array())
   private var metadataBox: MetadataInputBox = _
 
   private var txId: String = _

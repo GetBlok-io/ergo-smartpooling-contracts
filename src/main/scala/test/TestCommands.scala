@@ -359,12 +359,12 @@ object TestCommands {
 
     val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
     val commandTx = new CreateCommandTx(txB)
-    val shareCons = ShareConsensus.fromConversionValues(Array(
+    val shareCons = ShareConsensus.convert(Array(
       (poolMiner.getErgoAddress.script.bytes, Array(240L, Parameters.OneErg*2, 0)),
       (rewardsAddress.getErgoAddress.script.bytes, Array(140L, Parameters.OneErg/8, 0)),
       (poolMinerTwo.getErgoAddress.script.bytes, Array(110L, Parameters.OneErg/2, 0))
     ))
-    val memsList = MemberList.fromConversionValues(Array(
+    val memsList = MemberList.convert(Array(
       (poolMiner.getErgoAddress.script.bytes, poolMiner.toString),
       (rewardsAddress.getErgoAddress.script.bytes, rewardsAddress.toString),
       (poolMinerTwo.getErgoAddress.script.bytes, poolMinerTwo.toString)

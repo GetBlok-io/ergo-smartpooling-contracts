@@ -2,6 +2,10 @@ package config.params;
 
 import org.ergoplatform.appkit.Parameters;
 
+import java.awt.*;
+import java.util.HashMap;
+import java.util.Map;
+
 public class SmartPoolParameters {
     private String smartPoolId;
 
@@ -10,6 +14,7 @@ public class SmartPoolParameters {
     private long initialTxFee;
     private String paymentType;
     private long PPLNS_NUM_SHARES;
+    private Map<String, Double> fees;
 
 
     private MetadataConfig metaConf;
@@ -25,11 +30,14 @@ public class SmartPoolParameters {
         initialTxFee = Parameters.MinFee;
         paymentType = "PPLNS";
 
+
         PPLNS_NUM_SHARES = 50000;
         metaConf = new MetadataConfig("", "", "default", 0L);
         commandConf = new CommandConfig("", "", "default", 0L);
         holdingConf = new HoldingConfig("", "default", 0L);
         votingConf = new VotingConfig();
+        fees = new HashMap<String, Double>();
+        fees.put("address", 1.0);
     }
 
     public String getSmartPoolId() {
@@ -79,6 +87,7 @@ public class SmartPoolParameters {
         sp.setCommandConf(this.commandConf);
         sp.setHoldingConf(this.holdingConf);
         sp.setVotingConf(this.votingConf);
+        sp.setFees(this.fees);
         return sp;
     }
 
@@ -129,4 +138,14 @@ public class SmartPoolParameters {
     public void setVotingConf(VotingConfig votingConf) {
         this.votingConf = votingConf;
     }
+
+
+    public Map<String, Double> getFees() {
+        return fees;
+    }
+
+    public void setFees(Map<String, Double> fees) {
+        this.fees = fees;
+    }
+
 }

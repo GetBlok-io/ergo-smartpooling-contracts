@@ -163,13 +163,13 @@ object MetadataContract {
    */
   def buildGenesisBox(mOB: MetadataOutputBuilder, metadataContract: ErgoContract, poolOp: Address, initialValue: Long, currentHeight: Int, smartPoolNFT: ErgoToken, subpoolId: Long, mintToken: Boolean = false): OutBox = {
     val poolOpBytes = poolOp.getErgoAddress.script.bytes
-    val initialConsensus: ShareConsensus = ShareConsensus.fromConversionValues(Array((poolOpBytes, Array(1L, (1 * Parameters.OneErg)/10 , 0L))))
-    val initialMembers: MemberList = MemberList.fromConversionValues(Array((poolOpBytes, poolOp.toString)))
-    val initialPoolFee: PoolFees = PoolFees.fromConversionValues(Array((poolOpBytes, 10)))
-    val initialPoolOp: PoolOperators = PoolOperators.fromConversionValues(Array((poolOpBytes, poolOp.toString)))
+    val initialConsensus: ShareConsensus = ShareConsensus.convert(Array((poolOpBytes, Array(1L, (1 * Parameters.OneErg)/10 , 0L))))
+    val initialMembers: MemberList = MemberList.convert(Array((poolOpBytes, poolOp.toString)))
+    val initialPoolFee: PoolFees = PoolFees.convert(Array((poolOpBytes, 10)))
+    val initialPoolOp: PoolOperators = PoolOperators.convert(Array((poolOpBytes, poolOp.toString)))
     // The following info is stored: epoch 0, currentEpochHeight, creationEpochHeight,
     // and a filler value for the box id, since that info can only be obtained after the first spending tx.
-    val initialPoolInfo: PoolInfo = PoolInfo.fromConversionValues(Array(0L, currentHeight.toLong, currentHeight.toLong, subpoolId))
+    val initialPoolInfo: PoolInfo = PoolInfo.convert(Array(0L, currentHeight.toLong, currentHeight.toLong, subpoolId))
     val initialMetadata = new MetadataRegisters(initialConsensus, initialMembers, initialPoolFee, initialPoolInfo, initialPoolOp)
     mOB
       .contract(metadataContract)

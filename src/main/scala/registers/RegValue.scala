@@ -46,7 +46,7 @@ trait RegCompanion[N, C] {
   val eType: ErgoType[N]
 
   def fromNormalValues(normalValue: Coll[N]): RegValue[N, C]
-  def fromConversionValues(conversionValue: Array[C]): RegValue[N, C]
+  def convert(conversionValue: Array[C]): RegValue[N, C]
   def fromErgoValues(ergoValue: ErgoValue[Coll[N]]): RegValue[N, C]
 
   def defaultValue(unitValue: C): N

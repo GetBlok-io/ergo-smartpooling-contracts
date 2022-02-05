@@ -33,6 +33,7 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
 
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
+    logger.info(s"CheckAndClean Db for blockHeight $blockHeight")
     logger.info("Creating connection to persistence database")
     val persistence = new PersistenceHandler(Some(config.getPersistence.getHost), Some(config.getPersistence.getPort), Some(config.getPersistence.getDatabase))
     persistence.setConnectionProperties(config.getPersistence.getUsername, config.getPersistence.getPassword, config.getPersistence.isSslConnection)

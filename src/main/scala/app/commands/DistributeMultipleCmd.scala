@@ -212,7 +212,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       }
 
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
-      val newPoolOperators = PoolOperators.fromConversionValues(Array(
+      val newPoolOperators = PoolOperators.convert(Array(
         (commandContract.getErgoTree.bytes, "Vote Token Distributor"),
         (nodeAddress.getErgoAddress.script.bytes, "Node Operator"),
       ))
@@ -327,7 +327,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
   }
 
   private def applyMinimumPayouts(dbConn: DatabaseConnection, memberList: MemberList, shareConsensus: ShareConsensus): ShareConsensus ={
-    var newShareConsensus = ShareConsensus.fromConversionValues(shareConsensus.cValue)
+    var newShareConsensus = ShareConsensus.convert(shareConsensus.cValue)
     logger.info(s"Now querying minimum payouts for ${newShareConsensus.cValue.length} different members in the smart pool.")
     for(member <- memberList.cValue){
       val minimumPayoutsQuery = new MinimumPayoutsQuery(dbConn, paramsConf.getPoolId, member._2)
@@ -335,7 +335,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
       logger.info(s"Minimum Payout For Address ${member._2}: ${settingsResponse.paymentthreshold}")
       if(settingsResponse.paymentthreshold > 0.1){
         val propBytesIndex = newShareConsensus.cValue.map(c => c._1).indexOf(member._1, 0)
-        newShareConsensus = ShareConsensus.fromConversionValues(
+        newShareConsensus = ShareConsensus.convert(
           newShareConsensus.cValue.updated(propBytesIndex,
             (member._1, Array(newShareConsensus.cValue(propBytesIndex)._2(0), (BigDecimal(settingsResponse.paymentthreshold) * BigDecimal(Parameters.OneErg)).toLong, newShareConsensus.cValue(propBytesIndex)._2(2)))))
       }

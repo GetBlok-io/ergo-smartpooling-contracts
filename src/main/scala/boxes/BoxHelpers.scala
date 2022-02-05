@@ -198,14 +198,38 @@ object BoxHelpers {
     while(boxesToSearch.size() > 0) {
       for (box <- boxesToSearch.asScala) {
         if (box.getTokens.size() > 0) {
-          if(box.getTokens.get(0).getId == tokenId && box.getTokens.get(0).getValue >= minAmount)
-            return Some(box)
+          for(token <- box.getTokens.asScala) {
+            if(token.getId == tokenId && token.getValue >= minAmount)
+              return Some(box)
+          }
         }
       }
       offset = offset + BOX_SELECTOR_LIMIT
       boxesToSearch = ctx.getUnspentBoxesFor(address, offset, BOX_SELECTOR_LIMIT)
     }
     None
+  }
+
+  def findAllTokenBoxes(ctx: BlockchainContext, address: Address, tokenId: ErgoId): (Array[InputBox], Long) ={
+    var offset = 0
+    var boxesToSearch = ctx.getUnspentBoxesFor(address, offset, BOX_SELECTOR_LIMIT)
+    var tokenBoxes = Array[InputBox]()
+    var tokensFound = 0L
+    while(boxesToSearch.size() > 0) {
+      for (box <- boxesToSearch.asScala) {
+        if (box.getTokens.size() > 0) {
+          for(token <- box.getTokens.asScala) {
+            if(token.getId == tokenId) {
+              tokensFound = tokensFound + token.getValue
+              tokenBoxes = tokenBoxes ++ Array(box)
+            }
+          }
+        }
+      }
+      offset = offset + BOX_SELECTOR_LIMIT
+      boxesToSearch = ctx.getUnspentBoxesFor(address, offset, BOX_SELECTOR_LIMIT)
+    }
+    (tokenBoxes, tokensFound)
   }
 
 

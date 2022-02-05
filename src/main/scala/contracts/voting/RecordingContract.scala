@@ -103,9 +103,9 @@ object RecordingContract {
    * @return
    */
   def generateContract(ctx: BlockchainContext, voteTokenId: ErgoId, voteYes: Address, voteNo: Address): RecordingContract = {
-    val voteYesBytes = BytesColl.fromConversionValues(voteYes.getErgoAddress.script.bytes)
-    val voteNoBytes = BytesColl.fromConversionValues(voteNo.getErgoAddress.script.bytes)
-    val voteTokenBytes = BytesColl.fromConversionValues(voteTokenId.getBytes)
+    val voteYesBytes = BytesColl.convert(voteYes.getErgoAddress.script.bytes)
+    val voteNoBytes = BytesColl.convert(voteNo.getErgoAddress.script.bytes)
+    val voteTokenBytes = BytesColl.convert(voteTokenId.getBytes)
     val constants = ConstantsBuilder.create()
       .item("const_voteTokenId", voteTokenBytes.nValue)
       .item("const_voteYesBytes", voteYesBytes.nValue)

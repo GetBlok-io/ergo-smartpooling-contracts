@@ -96,8 +96,8 @@ object StandardPPLNS {
     val arrayConsensus = baseArray.filter(b => b._1.isSuccess && b._2.isDefined).map(b => (b._1.get.getErgoAddress.script.bytes, b._2.get))
     val memberArray = baseArray.filter(b => b._1.isSuccess && b._2.isDefined).map(b => (b._1.get.getErgoAddress.script.bytes, b._1.get.toString))
 
-    val shareConsensus = ShareConsensus.fromConversionValues(arrayConsensus)
-    val memberList = MemberList.fromConversionValues(memberArray)
+    val shareConsensus = ShareConsensus.convert(arrayConsensus)
+    val memberList = MemberList.convert(memberArray)
 
     (shareConsensus, memberList)
   }
@@ -164,8 +164,8 @@ object StandardPPLNS {
     val arrayConsensus = baseArray.filter(b => b._1.isSuccess && b._2.isDefined).map(b => (b._1.get.getErgoAddress.script.bytes, b._2.get))
     val memberArray = baseArray.filter(b => b._1.isSuccess && b._2.isDefined).map(b => (b._1.get.getErgoAddress.script.bytes, b._1.get.toString))
 
-    val shareConsensus = ShareConsensus.fromConversionValues(arrayConsensus)
-    val memberList = MemberList.fromConversionValues(memberArray)
+    val shareConsensus = ShareConsensus.convert(arrayConsensus)
+    val memberList = MemberList.convert(memberArray)
 
     (shareConsensus, memberList)
   }

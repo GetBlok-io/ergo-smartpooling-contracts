@@ -89,7 +89,7 @@ object PoolInfo extends RegCompanion[Long, Long]{
   }
   def fromNormalValues(normalValue: Coll[Long]): PoolInfo = new PoolInfo(normalValue)
 
-  def fromConversionValues(conversionValue: Array[Long] ): PoolInfo = {
+  def convert(conversionValue: Array[Long] ): PoolInfo = {
     new PoolInfo(newColl(conversionValue, eType))
   }
   def fromErgoValues(ergoValue: ErgoValue[Coll[Long]]): PoolInfo = {

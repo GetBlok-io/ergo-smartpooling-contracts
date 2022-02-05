@@ -17,10 +17,10 @@ import persistence.responses.ShareResponse
 import persistence.writes.{BoxIndexUpdate, ConsensusInsertion, PaymentInsertion, SmartPoolDataInsertion}
 import persistence.{DatabaseConnection, PersistenceHandler}
 import registers.{MemberList, PoolFees, ShareConsensus}
-import transactions.groups.DistributionGroup
+import groups.DistributionGroup
 import transactions.{CreateCommandTx, DistributionTx, RegroupTx}
 
-import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
+import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, mapAsScalaMapConverter, seqAsJavaListConverter}
 import scala.util.Try
 
 
@@ -84,6 +84,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     var offset = 0
     if(config.getNode.getNetworkType == NetworkType.MAINNET) {
       var shares = Array[Array[ShareResponse]]()
+
       while (totalShareScore < 0.5) {
         logger.info("Now performing PPLNS Query to page shares!")
         logger.info("Old offset: " + offset)
@@ -98,6 +99,8 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
         logger.info("Query executed successfully")
         logger.info("New offset: " + offset)
       }
+      val lastShare = shares.last.last
+      logger.info(s"Last share height and time: ${lastShare.height} | ${lastShare.created.toString}")
       val commandInputs = StandardPPLNS.standardPPLNSToConsensus(shares)
       val tempConsensus = commandInputs._1
       memberList = commandInputs._2
@@ -110,12 +113,18 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       val pplnsQuery = new PPLNSQuery(dbConn, paramsConf.getPoolId, blockHeight, PPLNS_CONSTANT, 0)
       val shares: Array[ShareResponse] = pplnsQuery.setVariables().execute().getResponse
       logger.info("Query executed successfully")
-
+      val lastShare = shares.last
+      logger.info(s"Last share height and time: ${lastShare.height} | ${lastShare.created.toString}")
       val commandInputs = SimplePPLNS.simplePPLNSToConsensus(shares)
       val tempConsensus = commandInputs._1
       memberList = commandInputs._2
 
       shareConsensus = applyMinimumPayouts(dbConn, memberList, tempConsensus)
+      if(nodeConf.getNetworkType == NetworkType.TESTNET) {
+//        logger.info("Removing value 0 from shareConsensus " + memberList.cValue(0)._2)
+//        shareConsensus = ShareConsensus.convert(shareConsensus.cValue.slice(1, shareConsensus.cValue.length))
+//        memberList = MemberList.convert(memberList.cValue.slice(1, memberList.cValue.length))
+      }
     }
     logger.info(s"Share consensus and member list with ${shareConsensus.nValue.size} unique addresses have been built")
     logger.info(shareConsensus.nValue.toString())
@@ -130,6 +139,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     logger.info(s"Total Block Reward to Send: $blockReward")
     blockReward = blockReward - (blockReward % Parameters.MinFee)
     logger.info(s"Rounding block reward to minimum box amount: $blockReward")
+    require(blockReward != 0, "Block reward was 0")
     ergoClient.execute((ctx: BlockchainContext) => {
 
       val secretStorage = SecretStorage.loadFrom(walletConf.getSecretStoragePath)
@@ -148,6 +158,14 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       val voteTokenId = ErgoId.create(voteConf.getVoteTokenId)
       val commandContract = VoteTokensContract.generateContract(ctx, voteTokenId, nodeAddress)
       logger.info(s"Command Contract: ${commandContract.getAddress}")
+      logger.info("Pool Fees Map: ")
+      val feeMap = paramsConf.getFees.asScala.map{
+        f =>
+          val address = Address.create(f._1)
+          logger.info(f._1 + " | " + f._2)
+          (address.getErgoAddress.script.bytes, (f._2 * 10).toInt)
+      }.toArray
+      val poolFees = PoolFees.convert(feeMap)
 
 
       val boxIndex = new BoxIndexQuery(dbConn).setVariables().execute().getResponse
@@ -167,11 +185,11 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
         failureIds =  boxIndex.filter(b => failedSubpools.contains(b.subpoolId)).map(b => b.boxId)
         val successBoxes =  boxIndex.filter(b => !failedSubpools.contains(b.subpoolId)).map(b => new MetadataInputBox(ctx.getBoxesById(b.boxId).head, smartPoolId))
         metaIds = failureIds
-        memberList = MemberList.fromConversionValues(
+        memberList = MemberList.convert(
           memberList.cValue.filterNot(m => successBoxes.exists(ib => ib.memberList.cValue.exists(im => im._2 == m._2)
           )))
 
-        shareConsensus = ShareConsensus.fromConversionValues(
+        shareConsensus = ShareConsensus.convert(
           shareConsensus.cValue.filter(sc => memberList.cValue.exists(m => m._1 sameElements sc._1)
           ))
         logger.warn(s"Failure retrial for ${metaIds.length} subpools")
@@ -210,7 +228,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
       val distributionGroup = new DistributionGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,
-        holdingContract, commandContract, config, shareConsensus, memberList, isFailureAttempt, failureIds)
+        holdingContract, commandContract, config, shareConsensus, memberList, poolFees, isFailureAttempt, failureIds)
       val executed = distributionGroup.buildGroup.executeGroup
       logger.info("Total Distribution Groups: " + metadataBoxes.length)
       logger.info("Distribution Groups Executed: " + executed.completed.size)
@@ -300,7 +318,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
 
   private def applyMinimumPayouts(dbConn: DatabaseConnection, memberList: MemberList, shareConsensus: ShareConsensus): ShareConsensus ={
-    var newShareConsensus = ShareConsensus.fromConversionValues(shareConsensus.cValue)
+    var newShareConsensus = ShareConsensus.convert(shareConsensus.cValue)
     logger.info(s"Now querying minimum payouts for ${newShareConsensus.cValue.length} different members in the smart pool.")
     for(member <- memberList.cValue){
       val minimumPayoutsQuery = new MinimumPayoutsQuery(dbConn, paramsConf.getPoolId, member._2)
@@ -308,7 +326,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       logger.info(s"Minimum Payout For Address ${member._2}: ${settingsResponse.paymentthreshold}")
       if(settingsResponse.paymentthreshold > 0.1){
         val propBytesIndex = newShareConsensus.cValue.map(c => c._1).indexOf(member._1, 0)
-        newShareConsensus = ShareConsensus.fromConversionValues(
+        newShareConsensus = ShareConsensus.convert(
           newShareConsensus.cValue.updated(propBytesIndex,
             (member._1, Array(newShareConsensus.cValue(propBytesIndex)._2(0), (BigDecimal(settingsResponse.paymentthreshold) * BigDecimal(Parameters.OneErg)).toLong, newShareConsensus.cValue(propBytesIndex)._2(2)))))
       }

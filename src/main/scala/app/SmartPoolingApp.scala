@@ -1,6 +1,7 @@
 package app
 
 import app.AppCommand.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, GenerateRecordingCmd, InitializeVoteTokensCmd, PayoutBalancesCmd, ResetStatusCmd, SendToHoldingCmd, ViewMetadataCmd, VoteCollectionCmd}
+import app.api.{ApiCommand, GenerateVoteTxApi}
 import app.commands.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, GenerateMultipleCmd, GenerateRecordingCmd, InitVoteTokensCmd, PayoutLastBalancesCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd, VoteCollectionCmd}
 import org.slf4j.LoggerFactory
 import config.{ConfigHandler, SmartPoolConfig}
@@ -18,6 +19,8 @@ object SmartPoolingApp{
 
   var cmd: SmartPoolCmd = _
   var config: Try[SmartPoolConfig] = _
+  var apiCmd: String = _
+
   def main(args: Array[String]): Unit = {
     logger.info("Now starting SmartPoolingApp")
 
@@ -26,6 +29,10 @@ object SmartPoolingApp{
 
     var numInput = 0
     var blockHeights = Array[Int]()
+
+//    var isAPI = false
+//    var apiArgs = Array[String]()
+
     for(arg <- args){
       arg match {
         case arg if arg.startsWith("-") =>
@@ -63,6 +70,10 @@ object SmartPoolingApp{
               txCommand = GenerateRecordingCmd
             case "vc" =>
               txCommand = VoteCollectionCmd
+//            case "api" =>
+//              isAPI = true
+//            case "buildvote" if isAPI =>
+//              apiCmd = "buildvote"
             case _ =>
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
           }
@@ -70,7 +81,8 @@ object SmartPoolingApp{
           numInput = arg.toInt
         case arg if arg.startsWith("[") && arg.endsWith("]") =>
           blockHeights = arg.substring(1, arg.length - 1).split(",").map(s => s.toInt)
-
+//        case arg if arg.startsWith("[") && arg.endsWith("]") && isAPI =>
+//          apiArgs = arg.substring(1, arg.length - 1).split(",")
         case _ => exit(logger, ExitCodes.INVALID_ARGUMENTS)
       }
     }
@@ -80,18 +92,29 @@ object SmartPoolingApp{
 
     }
     if(config.isFailure) {
-      logger.warn("A config file could not be found, generating new file under sp_config.json")
+      logger.warn("A config file could not be found")
       config = Try(ConfigHandler.newConfig)
-      ConfigHandler.writeConfig(ConfigHandler.defaultConfigName, config.get)
+      //ConfigHandler.writeConfig(ConfigHandler.defaultConfigName, config.get)
 
       exit(logger, ExitCodes.CONFIG_NOT_FOUND)
     }
-    try {
-      LoggingHandler.initiateLogging(config.get)
-    }catch {
-      case ex: Exception =>
-        exit(logger, ExitCodes.LOGGING_INIT_FAILURE)
-    }
+//    if(!isAPI) {
+      try {
+        LoggingHandler.initiateLogging(config.get)
+      } catch {
+        case ex: Exception =>
+          exit(logger, ExitCodes.LOGGING_INIT_FAILURE)
+      }
+//    }else{
+//      if(apiCmd == "buildvote"){
+//        println("ApiArgs: " + apiArgs.length)
+//        val apiVoteCmd = new GenerateVoteTxApi(config.get, apiArgs)
+//        apiVoteCmd.execute.printOutputs()
+//        sys.exit(0)
+//      }else{
+//        sys.exit(1)
+//      }
+//    }
 
         logger.info(s"Configuration file and command arguments successfully loaded")
 

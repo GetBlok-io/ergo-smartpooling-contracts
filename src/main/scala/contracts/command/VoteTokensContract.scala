@@ -77,7 +77,7 @@ object VoteTokensContract {
 
   def generateContract(ctx: BlockchainContext, voteTokenId: ErgoId, nodeAddress: Address): CommandContract ={
     val nodeGE = nodeAddress.getPublicKeyGE
-    val voteTokenBytes: BytesColl = BytesColl.fromConversionValues(voteTokenId.getBytes)
+    val voteTokenBytes: BytesColl = BytesColl.convert(voteTokenId.getBytes)
     val constantsBuilder = ConstantsBuilder.create()
 
     val compiledContract = ctx.compileContract(constantsBuilder

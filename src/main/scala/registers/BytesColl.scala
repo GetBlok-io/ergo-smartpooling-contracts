@@ -64,7 +64,7 @@ object BytesColl extends RegCompanion[Byte, Byte] {
 
   override def fromNormalValues(normalValue: Coll[Byte]): BytesColl = new BytesColl(normalValue)
 
-  override def fromConversionValues(conversionValue: Array[Byte] ): BytesColl = {
+  override def convert(conversionValue: Array[Byte] ): BytesColl = {
     new BytesColl(newColl(conversionValue, eType))
   }
 

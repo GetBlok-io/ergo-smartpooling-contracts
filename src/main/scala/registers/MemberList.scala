@@ -68,7 +68,7 @@ object MemberList extends RegCompanion[(Coll[Byte], Coll[Byte]), (Array[Byte], S
 
   override def fromNormalValues(normalValue: Coll[(Coll[Byte], Coll[Byte])]): MemberList = new MemberList(normalValue)
 
-  override def fromConversionValues(conversionValue: Array[(Array[Byte], String)] ): MemberList = {
+  override def convert(conversionValue: Array[(Array[Byte], String)] ): MemberList = {
     val propBytesConverted = conversionValue.map{
       (memVal: (Array[Byte], String)) =>
         defaultValue(memVal)

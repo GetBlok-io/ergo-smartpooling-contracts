@@ -32,8 +32,8 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
   private var holdingContract: HoldingContract = _
   private var blockReward: Long = 0L
   private var dbConn: DatabaseConnection = _
-  private var memberList: MemberList = MemberList.fromConversionValues(Array())
-  private var shareConsensus: ShareConsensus = ShareConsensus.fromConversionValues(Array())
+  private var memberList: MemberList = MemberList.convert(Array())
+  private var shareConsensus: ShareConsensus = ShareConsensus.convert(Array())
   private var metadataBox: MetadataInputBox = _
 
   private var txId: String = _
@@ -78,9 +78,9 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
     for(c <- consensusList){
       val minerAddress = Address.create(c.miner)
 
-      shareConsensus = ShareConsensus.fromConversionValues(shareConsensus.cValue++Array(
+      shareConsensus = ShareConsensus.convert(shareConsensus.cValue++Array(
         (minerAddress.getErgoAddress.script.bytes, Array(c.shares, c.minPayout, c.storedPayout))))
-      memberList = MemberList.fromConversionValues(memberList.cValue++Array((minerAddress.getErgoAddress.script.bytes, minerAddress.toString)))
+      memberList = MemberList.convert(memberList.cValue++Array((minerAddress.getErgoAddress.script.bytes, minerAddress.toString)))
     }
 
 
@@ -257,7 +257,7 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
   }
 
   private def applyMinimumPayouts(dbConn: DatabaseConnection, memberList: MemberList, shareConsensus: ShareConsensus): ShareConsensus ={
-    var newShareConsensus = ShareConsensus.fromConversionValues(shareConsensus.cValue)
+    var newShareConsensus = ShareConsensus.convert(shareConsensus.cValue)
     logger.info(s"Now querying minimum payouts for ${newShareConsensus.cValue.length} different members in the smart pool.")
     for(member <- memberList.cValue){
       val minimumPayoutsQuery = new MinimumPayoutsQuery(dbConn, paramsConf.getPoolId, member._2)
@@ -265,7 +265,7 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
       logger.info(s"Minimum Payout For Address ${member._2}: ${settingsResponse.paymentthreshold}")
       if(settingsResponse.paymentthreshold > 0.1){
         val propBytesIndex = newShareConsensus.cValue.map(c => c._1).indexOf(member._1, 0)
-        newShareConsensus = ShareConsensus.fromConversionValues(
+        newShareConsensus = ShareConsensus.convert(
           newShareConsensus.cValue.updated(propBytesIndex,
             (member._1, Array(newShareConsensus.cValue(propBytesIndex)._2(0), (BigDecimal(settingsResponse.paymentthreshold) * BigDecimal(Parameters.OneErg)).toLong, newShareConsensus.cValue(propBytesIndex)._2(2)))))
       }

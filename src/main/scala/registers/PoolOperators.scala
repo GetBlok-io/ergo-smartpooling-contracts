@@ -68,7 +68,7 @@ object PoolOperators extends RegCompanion[(Coll[Byte], Coll[Byte]), (Array[Byte]
 
   override def fromNormalValues(normalValue: Coll[(Coll[Byte], Coll[Byte])]): PoolOperators = new PoolOperators(normalValue)
 
-  override def fromConversionValues(conversionValue: Array[(Array[Byte], String)] ): PoolOperators = {
+  override def convert(conversionValue: Array[(Array[Byte], String)] ): PoolOperators = {
     val bytesConverted = conversionValue.map{
       (memVal: (Array[Byte], String)) =>
         defaultValue(memVal)

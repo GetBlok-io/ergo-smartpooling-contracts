@@ -25,7 +25,7 @@ import scala.collection.mutable.ArrayBuffer
 class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContract(holdingContract) {
   import SimpleHoldingContract._
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DIST_TX)
-
+  final val MIN_PAYMENT_THRESHOLD = Parameters.OneErg / 10L // TODO: Make this an AppParameter
   override def applyToCommand(commandTx: CreateCommandTx): CommandOutputBuilder = {
     val metadataBox = commandTx.metadataInputBox
     val storedPayouts = metadataBox.getShareConsensus.cValue.map(c => c._2(2)).sum
@@ -98,8 +98,11 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
 //        println("Val After Fees: " + totalValAfterFees)
 //        println("Box Value " + valueFromShares)
 
-        if(currentMinPayout < (1*Parameters.OneErg)/10)
-          currentMinPayout = (1*Parameters.OneErg)/10
+        if(currentMinPayout < MIN_PAYMENT_THRESHOLD) {
+          if(epochLeft <= 5)
+            currentMinPayout = MIN_PAYMENT_THRESHOLD
+        }
+
 
         val owedPayment =
           if(lastShareConsensus.nValue.toArray.exists(sc => consVal._1 == sc._1)){
@@ -125,7 +128,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         val newConsensusInfo = Array(shareNum, currentMinPayout, owedPayment, epochLeft)
         (consVal._1.toArray, newConsensusInfo)
     }
-    val newShareConsensus = ShareConsensus.fromConversionValues(updatedConsensus)
+    val newShareConsensus = ShareConsensus.convert(updatedConsensus)
     val newMetadataRegisters = commandTx.cOB.metadataRegisters.copy
     newMetadataRegisters.shareConsensus = newShareConsensus
 
@@ -149,10 +152,10 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
     val serializer = new ErgoTreeSerializer()
     val feeAddresses = metadataBox.getPoolFees.cValue.map(c => Address.fromErgoTree(serializer.deserializeErgoTree(c._1), ctx.getNetworkType))
 
-    val holdingBytes = BytesColl.fromConversionValues(holdingAddress.getErgoAddress.script.bytes)
+    val holdingBytes = BytesColl.convert(holdingAddress.getErgoAddress.script.bytes)
     val TOTAL_HOLDED_VALUE = inputBoxes.foldLeft(0L){
       (accum: Long, box: InputBox) =>
-        val boxPropBytes = BytesColl.fromConversionValues(box.getErgoTree.bytes)
+        val boxPropBytes = BytesColl.convert(box.getErgoTree.bytes)
         if(boxPropBytes.getNormalValue == holdingBytes.getNormalValue){
           accum + box.getValue
         }else
@@ -239,7 +242,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
     boxValueMap.foreach{
       (consVal: (Coll[Byte], Long)) =>
         val addr = Address.fromErgoTree(serializer.deserializeErgoTree(consVal._1.toArray), AppParameters.networkType)
-        val addrBytes = BytesColl.fromConversionValues(addr.getErgoAddress.script.bytes)
+        val addrBytes = BytesColl.convert(addr.getErgoAddress.script.bytes)
 
         // This should (theoretically) never fail since members list and consensus map to each other properly
         val boxValue = boxValueMap.filter{consVal: (Coll[Byte], Long) => BytesColl.fromNormalValues(consVal._1).nValue == addrBytes.nValue}(0)
@@ -253,7 +256,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
     feeAddresses.foreach{
       (addr: Address) =>
         val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
-        val addrBytes = BytesColl.fromConversionValues(addr.getErgoAddress.script.bytes)
+        val addrBytes = BytesColl.convert(addr.getErgoAddress.script.bytes)
         val boxValue = feeList.filter{poolFeeVal: (Coll[Byte], Long) => poolFeeVal._1 == addrBytes.nValue}(0)
         if(boxValue._2 > 0) {
           println(s"Fee Value for address ${addr}: ${boxValue._2}")
@@ -508,8 +511,8 @@ object SimpleHoldingContract {
    * @return Compiled ErgoContract of Holding Smart Contract
    */
   def generateHoldingContract(ctx: BlockchainContext, metadataAddress: Address, smartPoolId: ErgoId): ErgoContract = {
-    val metadataPropBytes: BytesColl = BytesColl.fromConversionValues(metadataAddress.getErgoAddress.script.bytes)
-    val smartPoolIdBytes: BytesColl = BytesColl.fromConversionValues(smartPoolId.getBytes)
+    val metadataPropBytes: BytesColl = BytesColl.convert(metadataAddress.getErgoAddress.script.bytes)
+    val smartPoolIdBytes: BytesColl = BytesColl.convert(smartPoolId.getBytes)
     val constantsBuilder = ConstantsBuilder.create()
 
     val compiledContract = ctx.compileContract(constantsBuilder

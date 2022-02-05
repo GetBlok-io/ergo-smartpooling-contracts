@@ -1,16 +1,11 @@
-package transactions.groups
+package groups.chains
 
-import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox}
+import boxes.MetadataInputBox
 import config.SmartPoolConfig
-import contracts.command.PKContract
 import contracts.holding.HoldingContract
 import logging.LoggingHandler
-import org.ergoplatform.appkit.impl.InputBoxImpl
-import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoProver, InputBox, OutBox}
+import org.ergoplatform.appkit._
 import org.slf4j.{Logger, LoggerFactory}
-import registers.{MemberList, PoolFees, ShareConsensus}
-import transactions.models.TransactionGroup
-import transactions.{CreateCommandTx, DistributionTx, RegroupMultipleTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 

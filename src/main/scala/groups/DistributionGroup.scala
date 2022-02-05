@@ -1,10 +1,11 @@
-package transactions.groups
+package groups
 
 import app.ExitCodes
 import boxes.{BoxHelpers, CommandInputBox, CommandOutBox, MetadataInputBox}
 import config.SmartPoolConfig
 import contracts.command.{CommandContract, PKContract}
 import contracts.holding.HoldingContract
+import groups.chains.{HoldingChain, HoldingChainException}
 import logging.LoggingHandler
 import org.ergoplatform.appkit.impl.{ErgoTreeContract, InputBoxImpl}
 import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoId, ErgoProver, ErgoToken, InputBox, OutBox, Parameters, SignedTransaction}
@@ -21,7 +22,7 @@ import scala.util.Try
 
 class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBox], prover: ErgoProver, address: Address,
                         blockReward: Long, holdingContract: HoldingContract, commandContract: CommandContract, config: SmartPoolConfig,
-                        shareConsensus: ShareConsensus, memberList: MemberList, isFailureAttempt: Boolean, failureIds: Array[String]) extends TransactionGroup[Map[MetadataInputBox, String]]{
+                        shareConsensus: ShareConsensus, memberList: MemberList, poolFees: PoolFees, isFailureAttempt: Boolean, failureIds: Array[String]) extends TransactionGroup[Map[MetadataInputBox, String]]{
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DIST_GRP)
   private[this] var _completed = Map[MetadataInputBox, String]()
@@ -43,120 +44,17 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 
   final val SHARE_CONSENSUS_LIMIT = 10
   final val STANDARD_FEE = Parameters.MinFee * 5
+  final val FEE_ADDRESS = Address.create("9gCs2eUmwMjZR636hCedfCJLP9etrtPKnAYUkwMjpAaLjvBpTgF")
   var customCommand = false
   var voteTokenStr = config.getParameters.getVotingConf.getVoteTokenId
   override def buildGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
     logger.info("Now building DistributionGroup")
 
     logger.info(s"Using ${metadataInputs.length} metadata boxes, with ${shareConsensus.cValue.length} consensus vals")
-//    for(sc <- shareConsensus.cValue){
-//      val boxSearch = findMetadata(metadataInputs, sc)
-//      if(boxSearch.isDefined){
-//        val metadataBox = boxSearch.get
-//        logger.info("Miner address: " + memberList.cValue.filter(m => Address.create(m._2).getErgoAddress.script.bytes sameElements sc._1).head._2)
-//        logger.info("Subpool to be placed in: " + metadataBox.getSubpoolId)
-//        val newShareConsensus = ShareConsensus.fromConversionValues(Array(sc))
-//
-//        val memberVal = memberList.cValue.filter(m => m._1 sameElements sc._1).head
-//        val newMemberList = MemberList.fromConversionValues(Array(memberVal))
-//        if(boxToShare.contains(metadataBox)){
-//          val updatedShareConsensus = ShareConsensus.fromConversionValues(boxToShare(metadataBox).cValue++Array(sc))
-//          val updatedMemberList = MemberList.fromConversionValues(boxToMember(metadataBox).cValue++Array(memberVal))
-//          boxToShare = boxToShare.updated(metadataBox, updatedShareConsensus)
-//          boxToMember = boxToMember.updated(metadataBox, updatedMemberList)
-//        }else{
-//          boxToShare = boxToShare++Map((metadataBox, newShareConsensus))
-//          boxToMember = boxToMember++Map((metadataBox, newMemberList))
-//        }
-//        if(metadataBox.getPoolOperators.cValue.exists(c => c._1 sameElements commandContract.getErgoTree.bytes)){
-//          if(voteTokenStr != "")
-//            customCommand = true
-//        }
-//
-//      }else{
-//        throw new MetadataNotFoundException
-//      }
-//    }
-    var consensusAdded = Array[(Array[Byte], Array[Long])]()
-    var membersAdded = Array[(Array[Byte], String)]()
-    for(metadataBox <- metadataInputs){
-      if(metadataBox.getCurrentEpoch > 0) {
-        for (oldSc <- metadataBox.getShareConsensus.cValue) {
-          logger.info(s"Placing members into share consensus for subpool ${metadataBox.getSubpoolId}")
-          if (shareConsensus.cValue.exists(newSc => newSc._1 sameElements oldSc._1)) {
-            var sc = shareConsensus.cValue.find(newSc => newSc._1 sameElements oldSc._1).get
-            if(sc._2.length <= 3) {
-              sc = (sc._1, sc._2++Array(0L))
-            }
-            logger.info("Miner address: " + memberList.cValue.filter(m => Address.create(m._2).getErgoAddress.script.bytes sameElements sc._1).head._2)
-            logger.info("Subpool to be placed in: " + metadataBox.getSubpoolId)
-            logger.info("Consensus values: " + sc._2.mkString("Array(", ", ", ")"))
-            val memberVal = memberList.cValue.filter(m => m._1 sameElements sc._1).head
-            addMemberToSubpool(metadataBox, sc, memberVal)
-            consensusAdded = consensusAdded ++ Array(sc)
-            membersAdded = membersAdded ++ Array(memberVal)
-          }else{
-            val storedPayout = oldSc._2(2)
-            val oldMemberList = metadataBox.getMemberList
-            if(storedPayout > 0) {
-              val memberVal = oldMemberList.cValue.filter(m => m._1 sameElements oldSc._1).head
-              val oldEpochLeft = if (oldSc._2.length > 3) oldSc._2(3) else 0L
-              var sc = (oldSc._1, Array(0, oldSc._2(1), oldSc._2(2), oldEpochLeft))
-              if (oldEpochLeft == 5L) {
-                sc = (oldSc._1, Array(0, Parameters.OneErg / 10, oldSc._2(2), oldEpochLeft))
-              }
-              logger.info(s"${memberVal._2} is not in current consensus. Assigning share value of 0 and epochLeft ${oldEpochLeft+1}")
-              addMemberToSubpool(metadataBox, sc, memberVal)
-              consensusAdded = consensusAdded ++ Array(sc)
-              membersAdded = membersAdded ++ Array(memberVal)
-            }
-
-          }
-        }
-        if(boxToMember.contains(metadataBox)) {
-          val membersStrings = boxToMember(metadataBox).cValue.map(m => m._2)
-          logger.info(s"Subpool ${metadataBox.getSubpoolId} members list from consensus: " + membersStrings.mkString("\n", "\n", ""))
-        }
-      }
-    }
-    logger.info("Members from old consensus: " + consensusAdded.length)
-    logger.info("Members from new consensus: " + shareConsensus.cValue.length)
-    var membersLeft = memberList.cValue.filter(m => !membersAdded.exists(om => om._2 == m._2))
-    var consensusLeft = shareConsensus.cValue.filter(m => !consensusAdded.exists(om => om._1 sameElements m._1))
-
-    logger.info("Total members left: " + membersLeft.length)
-    logger.info("Total consensus left: " + consensusLeft.length)
-
-    logger.info("Members Left: " + membersLeft.map(m => m._2).mkString("\n"))
-
-
-
-    logger.info("Now adding remaining members to existing subpools.")
-
-    var openSubpools = boxToShare.keys.filter(m => boxToShare(m).cValue.length < SHARE_CONSENSUS_LIMIT).toArray.sortBy(m => m.getSubpoolId)
-    // openSubpools = metadataInputs
-    var currentSubpool = 0
-    logger.info(s"There are a total of ${openSubpools.length} open subpools")
-
-    for(sc <- consensusLeft){
-      val metadataBox = openSubpools(currentSubpool)
-      logger.info("Current open subpool to add to: " + metadataBox.getSubpoolId)
-      val memberVal = memberList.cValue.filter(m => m._1 sameElements sc._1).head
-      logger.info("Member being added to open subpool: " + memberVal._2)
-
-      addMemberToSubpool(metadataBox, sc, memberVal)
-
-      if(boxToShare(metadataBox).cValue.length == SHARE_CONSENSUS_LIMIT){
-        currentSubpool = currentSubpool + 1
-      }
-      consensusAdded = consensusAdded ++ Array(sc)
-      membersAdded = membersAdded ++ Array(memberVal)
-    }
-
-    var metadataLeft = metadataInputs.filter(m => !boxToShare.keys.exists(ms => ms.getSubpoolId == m.getSubpoolId)).sortBy(m => m.getSubpoolId)
-    membersLeft = memberList.cValue.filter(m => !membersAdded.exists(om => om._2 == m._2))
-    consensusLeft = shareConsensus.cValue.filter(m => !consensusAdded.exists(om => om._1 sameElements m._1))
-    logger.info("Members left: " + membersLeft.length)
+    val subpoolSelector = new SubpoolSelector
+    val membersLeft = subpoolSelector.selectDefaultSubpools(metadataInputs, shareConsensus, memberList)._2
+    boxToShare = subpoolSelector.shareMap
+    boxToMember = subpoolSelector.memberMap
 
     for(boxSh <- boxToShare){
       if(boxSh._2.cValue.length > SHARE_CONSENSUS_LIMIT){
@@ -164,6 +62,11 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
         logger.error(s"Current share consensus length: ${boxSh._2.cValue.length}")
         app.exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
       }
+      if (boxSh._1.getPoolOperators.cValue.exists(c => c._1 sameElements commandContract.getErgoTree.bytes)) {
+        if (voteTokenStr != "")
+          customCommand = true
+      }
+
       logger.info(s"==== Subpool ${boxSh._1.getSubpoolId} ====\n")
       val memberStrings = boxToMember(boxSh._1).cValue.map(m => m._2)
       logger.info(memberStrings.mkString("\n"))
@@ -177,13 +80,10 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
       app.exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
     }
 
-
-
     if(isFailureAttempt){
       logger.info("Is failure attempt!")
       boxToMember.foreach(m => logger.info(m.toString()))
       boxToMember.foreach(m => logger.info(m._2.cValue.mkString("Array(", ", ", ")")))
-
     }
 
     logger.info(s"boxToShare: ${boxToShare.size} boxToMember: ${boxToMember.size}")
@@ -192,11 +92,11 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     val totalShareScore = shareConsensus.cValue.map(sc => sc._2(0)).sum
     val totalHeld = blockReward
     //logger.info("Holding box length: " + holdingBoxes.length)
-    var lastConsensus = ShareConsensus.fromConversionValues(Array())
-    var lastFees = PoolFees.fromConversionValues(Array())
+    var lastConsensus = ShareConsensus.convert(Array())
+    var lastFees = PoolFees.convert(Array())
     logger.info(s"Total Share Score: $totalShareScore Total Held: $totalHeld")
-    for(box <- metadataInputs){
-      lastConsensus = ShareConsensus.fromConversionValues(lastConsensus.cValue++box.getShareConsensus.cValue)
+    for(box <- boxToShare.keys){
+      lastConsensus = ShareConsensus.convert(lastConsensus.cValue++box.getShareConsensus.cValue)
       lastFees = box.getPoolFees
     }
     logger.info(s"LastConsensusSize: ${lastConsensus.cValue.length} LastPoolFees: ${lastFees.cValue.length}")
@@ -276,9 +176,9 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 
         val inputBoxes = List(boxToFees(metadataBox)(0))
         // TODO: Take from config instead
-        val FEE_ADDRESS = Address.create("9gCs2eUmwMjZR636hCedfCJLP9etrtPKnAYUkwMjpAaLjvBpTgF")
-        val newPoolFees = PoolFees.fromConversionValues(Array((FEE_ADDRESS.getErgoAddress.script.bytes, 10)))
-        val newPoolOperators = PoolOperators.fromConversionValues(Array(
+
+
+        val newPoolOperators = PoolOperators.convert(Array(
           (commandContract.getErgoTree.bytes, "Vote Token Distributor"),
           (address.getErgoAddress.script.bytes, address.toString),
         ))
@@ -304,7 +204,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
             .withHolding(holdingContract, holdingInputs)
             .setConsensus(boxToShare(metadataBox))
             .setMembers(boxToMember(metadataBox))
-            .setPoolFees(newPoolFees)
+            .setPoolFees(poolFees)
             .setPoolOps(newPoolOperators)
         if(voteTokenStr != "" && customCommand) {
           logger.info("Custom token id set, adding tokens to command output")
@@ -488,23 +388,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     None
   }
 
-  def addMemberToSubpool(metadataBox: MetadataInputBox, sc: (Array[Byte], Array[Long]), memberVal: (Array[Byte], String)): Unit = {
-    val newShareConsensus = ShareConsensus.fromConversionValues(Array(sc))
-    val newMemberList = MemberList.fromConversionValues(Array(memberVal))
-    if (boxToShare.contains(metadataBox)) {
-      val updatedShareConsensus = ShareConsensus.fromConversionValues(boxToShare(metadataBox).cValue ++ Array(sc))
-      val updatedMemberList = MemberList.fromConversionValues(boxToMember(metadataBox).cValue ++ Array(memberVal))
-      boxToShare = boxToShare.updated(metadataBox, updatedShareConsensus)
-      boxToMember = boxToMember.updated(metadataBox, updatedMemberList)
-    } else {
-      boxToShare = boxToShare ++ Map((metadataBox, newShareConsensus))
-      boxToMember = boxToMember ++ Map((metadataBox, newMemberList))
-    }
-    if (metadataBox.getPoolOperators.cValue.exists(c => c._1 sameElements commandContract.getErgoTree.bytes)) {
-      if (voteTokenStr != "")
-        customCommand = true
-    }
-  }
+
 
   /**
    * Creates tx to collect fee boxes from node wallet and use them in subsequent transactions
