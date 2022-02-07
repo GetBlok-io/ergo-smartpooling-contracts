@@ -64,10 +64,10 @@ class CustomSettingsCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
 
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
       val outB = txB.outBoxBuilder()
-      val payoutAddress = Address.create("9f7CQ2bdMMkqaa1bLcD8xUjyik9NmBCbyXrsSJhFrcafJiriWTo")
+      val payoutAddress = Address.create("9fuWDTpbo4gAczS9ooyLgNXyBsMf1eaZd633YBUrDi1H3r55Kcv")
       // TODO: Remove constant values for tokens and place them into config
       val payoutBox = outB
-        .value(((BigDecimal(4.944) * Parameters.OneErg).toLong) + (txFee))
+        .value(((BigDecimal(3.544) * Parameters.OneErg).toLong) + (txFee))
         .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
         .build()
 

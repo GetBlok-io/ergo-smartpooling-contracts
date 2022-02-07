@@ -27,7 +27,7 @@ object SmartPoolingApp{
     val usage = "Usage: java -jar SmartPoolingApp.jar -c=smart/pool/path/config.json [-v | -g | -d blockHeight | -h blockHeight ]"
     var txCommand = EmptyCommand
 
-    var numInput = 0
+    var numInput = -1
     var blockHeights = Array[Int]()
 
 //    var isAPI = false
@@ -122,12 +122,12 @@ object SmartPoolingApp{
         txCommand match {
           case GenerateMetadataCmd =>
             cmd = new GenerateMetadataCmd(config.get)
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new GenerateMultipleCmd(config.get, numInput)
             }
             logger.info(s"SmartPool Command: ${GenerateMetadataCmd.toString}")
           case DistributeRewardsCmd =>
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new DistributeRewardsCmd(config.get, numInput)
             }else if(blockHeights.length > 0){
               cmd = new DistributeMultipleCmd(config.get, blockHeights)
@@ -136,7 +136,7 @@ object SmartPoolingApp{
             }
             logger.info(s"SmartPool Command: ${DistributeRewardsCmd.toString}")
           case DistributeFailedCmd =>
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new DistributeFailedCmd(config.get, numInput)
             }else{
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
@@ -152,14 +152,14 @@ object SmartPoolingApp{
             cmd = new ResetToPendingCmd(config.get)
             logger.info(s"SmartPool Command: ${ResetStatusCmd.toString}")
           case CheckAndCleanDbCmd =>
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new CheckAndCleanDbCmd(config.get, numInput)
               logger.info(s"SmartPool Command: ${CheckAndCleanDbCmd.toString}")
             } else {
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
             }
           case SendToHoldingCmd =>
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new SendToHoldingCmd(config.get, numInput)
             } else if(blockHeights.length > 0) {
               cmd = new SendMultipleToHoldingCmd(config.get, blockHeights)

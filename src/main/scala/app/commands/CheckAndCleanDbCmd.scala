@@ -46,6 +46,13 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
   }
 
   def executeCommand: Unit = {
+
+    logger.info("Command is routing into VoteCollection!")
+    val voteCollectionCmd = new VoteCollectionCmd(config)
+    voteCollectionCmd.initiateCommand
+    voteCollectionCmd.executeCommand
+
+
     logger.info("Command has begun execution")
     logger.info(s"Now checking and cleaning db using boxes from boxIndex for blockHeight $blockHeight")
     logger.info("Now retrieving all boxes from boxIndex")
@@ -112,6 +119,9 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
 //    distributeRewardsCmd.initiateCommand
 //    distributeRewardsCmd.executeCommand
 //    distributeRewardsCmd.recordToDb
+//    val customSettingsCmd = new CustomSettingsCmd(config)
+//    customSettingsCmd.initiateCommand
+//    customSettingsCmd.executeCommand
     if(boxIndex.forall(br => br.status == "success")) {
       logger.info("All boxes in box response have status succcess!")
       exit(logger, ExitCodes.SUCCESS)

@@ -420,7 +420,7 @@ object TestCommands {
     val voteNo = ProxyBallotContract.generateContract(ctx, recordingId, voteYes = false, recordingId).getAddress
     println("Vote Yes: " + voteYes.toString)
     println("Vote No: " + voteYes.toString)
-    val recordingContract = RecordingContract.generateContract(ctx, recordingId, voteYes, voteNo)
+    val recordingContract = RecordingContract.generateContract(ctx, recordingId, voteYes, voteNo, 1000)
     println("Recording: " + recordingContract.getAddress)
     txB = ctx.newTxBuilder()
 

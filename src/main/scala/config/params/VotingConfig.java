@@ -6,6 +6,7 @@ public class VotingConfig {
     private long voteTokensToMint;
     private long povTokensToMint;
     private double povIncentive;
+    private int voteEndHeight;
 
 
     public VotingConfig(){
@@ -14,6 +15,7 @@ public class VotingConfig {
         voteTokensToMint = 0;
         povTokensToMint = 0;
         povIncentive = 0.0;
+        voteEndHeight = 0;
     }
 
     public String getVoteTokenId() {
@@ -55,5 +57,13 @@ public class VotingConfig {
 
     public void setPovIncentive(double povIncentive) {
         this.povIncentive = povIncentive;
+    }
+
+    public int getVoteEndHeight() {
+        return voteEndHeight;
+    }
+
+    public void setVoteEndHeight(int voteEndHeight) {
+        this.voteEndHeight = voteEndHeight;
     }
 }
