@@ -79,6 +79,29 @@ object BoxHelpers {
     None
   }
 
+  def findExactBox(value: Long, totalBoxes: Array[InputBox]): Option[InputBox] = {
+    for(box <- totalBoxes) {
+      if (box.getValue.toLong == value) {
+          return Some(box)
+      }
+    }
+    None
+  }
+
+  // Pre-load all boxes for given address into array
+  def loadBoxes(ctx: BlockchainContext, holdingAddress: Address): Array[InputBox] = {
+    var offset = 0
+    var boxesToSearch = ctx.getUnspentBoxesFor(holdingAddress, offset, BOX_SELECTOR_LIMIT*2)
+    var boxes = Array.empty[InputBox]
+    while(boxesToSearch.size() > 0) {
+      boxes = boxes.++(boxesToSearch.asScala)
+      offset = offset + (BOX_SELECTOR_LIMIT * 2)
+      boxesToSearch = ctx.getUnspentBoxesFor(holdingAddress, offset, BOX_SELECTOR_LIMIT*2)
+    }
+    boxes
+  }
+
+
   def findIdealHoldingBoxes(ctx: BlockchainContext, holdingAddress: Address, holdingValue: Long, storedPaymentValue: Long): List[InputBox] ={
     logger.info("Searching for ideal holding boxes...")
 

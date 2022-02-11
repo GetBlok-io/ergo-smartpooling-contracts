@@ -1,6 +1,7 @@
 package registers
 
 import org.ergoplatform.appkit.{ErgoId, ErgoType, ErgoValue, InputBox}
+import sigmastate.eval.CostingSigmaDslBuilder.Colls
 import special.collection.Coll
 
 import java.nio.charset.StandardCharsets

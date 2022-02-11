@@ -1,8 +1,8 @@
 package app
 
-import app.AppCommand.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, GenerateRecordingCmd, InitializeVoteTokensCmd, PayoutBalancesCmd, ResetStatusCmd, SendToHoldingCmd, ViewMetadataCmd, VoteCollectionCmd}
+import app.AppCommand.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, GenerateRecordingCmd, InitializeVoteTokensCmd, PayoutBalancesCmd, ResetStatusCmd, ScanMetadataCmd, SendToHoldingCmd, ViewMetadataCmd, VoteCollectionCmd}
 import app.api.{ApiCommand, GenerateVoteTxApi}
-import app.commands.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, GenerateMultipleCmd, GenerateRecordingCmd, InitVoteTokensCmd, PayoutLastBalancesCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd, VoteCollectionCmd}
+import app.commands.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeMultipleCmd, DistributeRewardsCmd, GenerateMetadataCmd, GenerateMultipleCmd, GenerateRecordingCmd, InitVoteTokensCmd, PayoutLastBalancesCmd, ResetToPendingCmd, GrabFromMetadataCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd, VoteCollectionCmd}
 import org.slf4j.LoggerFactory
 import config.{ConfigHandler, SmartPoolConfig}
 import logging.LoggingHandler
@@ -27,7 +27,7 @@ object SmartPoolingApp{
     val usage = "Usage: java -jar SmartPoolingApp.jar -c=smart/pool/path/config.json [-v | -g | -d blockHeight | -h blockHeight ]"
     var txCommand = EmptyCommand
 
-    var numInput = 0
+    var numInput = -1
     var blockHeights = Array[Int]()
 
 //    var isAPI = false
@@ -70,6 +70,8 @@ object SmartPoolingApp{
               txCommand = GenerateRecordingCmd
             case "vc" =>
               txCommand = VoteCollectionCmd
+            case "scanMetadata" =>
+              txCommand = ScanMetadataCmd
 //            case "api" =>
 //              isAPI = true
 //            case "buildvote" if isAPI =>
@@ -122,12 +124,12 @@ object SmartPoolingApp{
         txCommand match {
           case GenerateMetadataCmd =>
             cmd = new GenerateMetadataCmd(config.get)
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new GenerateMultipleCmd(config.get, numInput)
             }
             logger.info(s"SmartPool Command: ${GenerateMetadataCmd.toString}")
           case DistributeRewardsCmd =>
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new DistributeRewardsCmd(config.get, numInput)
             }else if(blockHeights.length > 0){
               cmd = new DistributeMultipleCmd(config.get, blockHeights)
@@ -136,7 +138,7 @@ object SmartPoolingApp{
             }
             logger.info(s"SmartPool Command: ${DistributeRewardsCmd.toString}")
           case DistributeFailedCmd =>
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new DistributeFailedCmd(config.get, numInput)
             }else{
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
@@ -152,14 +154,14 @@ object SmartPoolingApp{
             cmd = new ResetToPendingCmd(config.get)
             logger.info(s"SmartPool Command: ${ResetStatusCmd.toString}")
           case CheckAndCleanDbCmd =>
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new CheckAndCleanDbCmd(config.get, numInput)
               logger.info(s"SmartPool Command: ${CheckAndCleanDbCmd.toString}")
             } else {
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
             }
           case SendToHoldingCmd =>
-            if(numInput != 0) {
+            if(numInput != -1) {
               cmd = new SendToHoldingCmd(config.get, numInput)
             } else if(blockHeights.length > 0) {
               cmd = new SendMultipleToHoldingCmd(config.get, blockHeights)
@@ -173,6 +175,8 @@ object SmartPoolingApp{
             cmd = new GenerateRecordingCmd(config.get)
           case VoteCollectionCmd =>
             cmd = new VoteCollectionCmd(config.get)
+          case ScanMetadataCmd =>
+            cmd = new GrabFromMetadataCmd(config.get, numInput)
           case _ =>
             exit(logger, ExitCodes.NO_COMMAND_TO_USE)
         }

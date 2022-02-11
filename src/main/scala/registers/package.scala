@@ -1,4 +1,5 @@
 import org.ergoplatform.appkit.ErgoType
+import sigmastate.eval.CostingSigmaDslBuilder.Colls
 import special.collection.Coll
 
 package object registers {

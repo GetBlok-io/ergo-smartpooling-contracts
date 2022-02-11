@@ -27,16 +27,16 @@ object ProxyBallotContract{
   def script(voteYes: Boolean): String =
     s"""
     {
-       val tokensExist = SELF.tokens.size > 1 && INPUTS(0).tokens.size > 1
+       val tokensExist = SELF.tokens.size > 0 && INPUTS(0).tokens.size > 0
 
        // Arbitrary difference to ensure different proposition bytes
        val regCheck = ${if(voteYes) "INPUTS(0).R4[Long].isDefined" else "INPUTS(0).R5[Long].isDefined"}
 
        val tokensValid =
         if(tokensExist){
-          SELF.tokens(0)._1 == const_voteTokenId && INPUTS(0).tokens(0)._1 == const_recordingNFT
+          INPUTS(0).tokens(0)._1 == const_recordingNFT
         }else{
-          true
+          false
         }
 
        sigmaProp(tokensValid) && sigmaProp(regCheck)

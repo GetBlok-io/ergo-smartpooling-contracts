@@ -22,7 +22,7 @@ class GenerateRecordingCmd(config: SmartPoolConfig) extends SmartPoolCmd(config)
   private var recordingNFT: ErgoId = _
   private var recordingContract: RecordingContract = _
   private var commandContract: CommandContract = _
-
+  private var voteEndHeight = 0;
   private var secretStorage: SecretStorage = _
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
@@ -72,8 +72,8 @@ class GenerateRecordingCmd(config: SmartPoolConfig) extends SmartPoolCmd(config)
 
       logger.info("Vote Yes Address: " + voteYes.getAddress)
       logger.info("Vote No Address: " + voteNo.getAddress)
-
-      recordingContract = RecordingContract.generateContract(ctx, voteTokenId, voteYes.getAddress, voteNo.getAddress)
+      voteEndHeight = ctx.getHeight + 10080
+      recordingContract = RecordingContract.generateContract(ctx, voteTokenId, voteYes.getAddress, voteNo.getAddress, voteEndHeight)
       val recordingAddress = recordingContract.getAddress
       logger.info("Recording Address: " + recordingAddress)
       logger.info("Recording NFT: " + recordingNFT)
@@ -102,7 +102,7 @@ class GenerateRecordingCmd(config: SmartPoolConfig) extends SmartPoolCmd(config)
 
       val tokenInputBox = tokenBox.convertToInputWith(tokenTxId, 0)
       val inputBoxes = List(tokenInputBox)
-
+      logger.info(s"Vote ending height: ${voteEndHeight}")
       logger.info("Parameters given:")
       logger.info(s"RecordingValue=${recordingValue / Parameters.OneErg} ERG")
       logger.info(s"TxFee=${txFee.toDouble / Parameters.OneErg} ERG")
@@ -115,7 +115,7 @@ class GenerateRecordingCmd(config: SmartPoolConfig) extends SmartPoolCmd(config)
           .outputs(recordingOutput.asOutBox)
           .fee(txFee)
           .sendChangeTo(nodeAddress.getErgoAddress)
-        .build()
+          .build()
       logger.info("Tx has been built")
 
 
@@ -144,11 +144,13 @@ class GenerateRecordingCmd(config: SmartPoolConfig) extends SmartPoolCmd(config)
 
     logger.info("The following information will be updated:")
     logger.info(s"Recording Id: ${voteConf.getPovTokenId}(old) -> $recordingNFT")
+    logger.info(s"Recording Id: ${voteConf.getVoteEndHeight}(old) -> $voteEndHeight")
 
 
     val newConfig = config.copy()
 
     newConfig.getParameters.getVotingConf.setPovTokenId(recordingNFT.toString)
+    newConfig.getParameters.getVotingConf.setVoteEndHeight(voteEndHeight)
     ConfigHandler.writeConfig(AppParameters.configFilePath, newConfig)
     logger.info("Config file has been successfully updated")
     exit(logger, ExitCodes.SUCCESS)
@@ -156,4 +158,3 @@ class GenerateRecordingCmd(config: SmartPoolConfig) extends SmartPoolCmd(config)
 
 
 }
-

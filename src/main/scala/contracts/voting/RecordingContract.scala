@@ -7,6 +7,8 @@ import registers.{BytesColl, VoteRegister}
 import scorex.crypto.hash.Blake2b256
 import sigmastate.Values
 
+import scala.collection.JavaConverters.collectionAsScalaIterableConverter
+
 class RecordingContract(ergoContract: ErgoContract) extends ErgoContract {
   override def getConstants: Constants = ergoContract.getConstants
 
@@ -25,7 +27,7 @@ object RecordingContract {
   // TODO: Add vote ending height
   // TODO: Add second vote token
   val script: String =
-    s"""
+  s"""
     {
        val inputsValid = INPUTS.forall{
         (box: Box) =>
@@ -36,13 +38,15 @@ object RecordingContract {
           }
        }
 
+       val heightValid = HEIGHT < const_voteEndHeight
+
        val registersUpdated =
         if(inputsValid){
           val newYesVotes = INPUTS.fold(0L, {
             (accum: Long, box: Box) =>
               if(box.propositionBytes == const_voteYesBytes){
                 if(box.tokens.size > 0){
-                  if(box.tokens(0)._1 == const_voteTokenId){
+                  if(box.tokens(0)._1 == const_voteTokenId || box.tokens(0)._1 == const_otrTokenId){
                     accum + box.tokens(0)._2
                   }else{
                     accum
@@ -59,8 +63,16 @@ object RecordingContract {
             (accum: Long, box: Box) =>
               if(box.propositionBytes == const_voteNoBytes){
                 if(box.tokens.size > 0){
-                  if(box.tokens(0)._1 == const_voteTokenId){
-                    accum + box.tokens(0)._2
+                  if(box.tokens(0)._1 == const_voteTokenId || box.tokens(0)._1 == const_otrTokenId){
+                    if(box.tokens.size > 1){
+                      if(box.tokens(1)._1 == const_voteTokenId || box.tokens(1)._1 == const_otrTokenId){
+                        accum + box.tokens(0)._2 + box.tokens(1)._2
+                      }else{
+                        accum + box.tokens(0)._2
+                      }
+                    }else{
+                      accum + box.tokens(0)._2
+                    }
                   }else{
                     accum
                   }
@@ -90,7 +102,7 @@ object RecordingContract {
           false
         }
 
-       sigmaProp(registersUpdated)
+       sigmaProp(registersUpdated) && sigmaProp(heightValid)
     }
       """.stripMargin
 
@@ -102,14 +114,18 @@ object RecordingContract {
    * @param changeAddress
    * @return
    */
-  def generateContract(ctx: BlockchainContext, voteTokenId: ErgoId, voteYes: Address, voteNo: Address): RecordingContract = {
+  def generateContract(ctx: BlockchainContext, voteTokenId: ErgoId, voteYes: Address, voteNo: Address, voteEndHeight: Int): RecordingContract = {
     val voteYesBytes = BytesColl.convert(voteYes.getErgoAddress.script.bytes)
     val voteNoBytes = BytesColl.convert(voteNo.getErgoAddress.script.bytes)
     val voteTokenBytes = BytesColl.convert(voteTokenId.getBytes)
+    val otherTokenBytes = BytesColl.convert(ErgoId.create("a243398b94d8638f1d7e81e411851adec8c2735ca813c3e3d4bc8443fdc434e0").getBytes)
+
     val constants = ConstantsBuilder.create()
       .item("const_voteTokenId", voteTokenBytes.nValue)
+      .item("const_otrTokenId", otherTokenBytes.nValue)
       .item("const_voteYesBytes", voteYesBytes.nValue)
       .item("const_voteNoBytes", voteNoBytes.nValue)
+      .item("const_voteEndHeight", voteEndHeight)
       .build()
     val contract: ErgoContract = ctx.compileContract(constants, script)
     new RecordingContract(contract)
@@ -132,7 +148,7 @@ object RecordingContract {
                             yesBoxes: Array[InputBox], noBoxes:Array[InputBox], voteTokenId: ErgoId): RecordingOutBox = {
     val outB = ctx.newTxBuilder().outBoxBuilder()
     val recordingToken = new ErgoToken(recordingBox.recordingNFT, 1L)
-
+    val otherTokenId = ErgoId.create("a243398b94d8638f1d7e81e411851adec8c2735ca813c3e3d4bc8443fdc434e0")
     val newYesVotes = yesBoxes
       .filter(ib => ib.getTokens.size() > 0)
       .filter(ib => ib.getTokens.get(0).getId == voteTokenId)
@@ -141,12 +157,24 @@ object RecordingContract {
 
     val newNoVotes = noBoxes
       .filter(ib => ib.getTokens.size() > 0)
-      .filter(ib => ib.getTokens.get(0).getId == voteTokenId)
+      .filter(ib => ib.getTokens.asScala.exists(t => t.getId == voteTokenId))
+      .map(ib => ib.getTokens.asScala.find(t => t.getId == voteTokenId).get.getValue)
+      .sum
+    val otrYesVotes = yesBoxes
+      .filter(ib => ib.getTokens.size() > 0)
+      .filter(ib => ib.getTokens.get(0).getId == otherTokenId)
       .map(ib => ib.getTokens.get(0).getValue)
       .sum
 
-    val updatedYesVotes = recordingBox.yesVotes + newYesVotes
-    val updatedNoVotes = recordingBox.noVotes + newNoVotes
+    val otrNoVotes = noBoxes
+      .filter(ib => ib.getTokens.size() > 0)
+      .filter(ib => ib.getTokens.asScala.exists(t => t.getId == otherTokenId))
+      .map(ib => ib.getTokens.asScala.find(t => t.getId == otherTokenId).get.getValue)
+      .sum
+
+
+    val updatedYesVotes = recordingBox.yesVotes + newYesVotes + otrYesVotes
+    val updatedNoVotes = recordingBox.noVotes + newNoVotes + otrNoVotes
 
 
     val asOutBox = outB
@@ -159,5 +187,3 @@ object RecordingContract {
   }
 
 }
-
-

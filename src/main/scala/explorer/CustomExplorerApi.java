@@ -39,4 +39,9 @@ public interface CustomExplorerApi {
             @retrofit2.http.Path("p1") String p1
     );
 
+    @GET("api/v1/transactions/{p1}")
+    Call<OutputRequest> getTxOutputsById(
+            @retrofit2.http.Path("p1") String p1
+    );
+
 }

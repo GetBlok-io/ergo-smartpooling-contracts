@@ -71,7 +71,7 @@ package object app {
     type AppCommand
     val EmptyCommand, GenerateMetadataCmd, ModifySmartPoolCmd, DistributeRewardsCmd, ViewMetadataCmd, SendToHoldingCmd,
     ResetStatusCmd, CheckAndCleanDbCmd, PayoutBalancesCmd, DistributeFailedCmd, InitializeVoteTokensCmd, InitializePOVTokensCmd,
-    GenerateRecordingCmd, VoteCollectionCmd = Value
+    GenerateRecordingCmd, VoteCollectionCmd, ScanMetadataCmd = Value
   }
 
 }

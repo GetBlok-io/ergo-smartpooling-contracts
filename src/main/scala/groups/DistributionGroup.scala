@@ -57,11 +57,16 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     boxToMember = subpoolSelector.memberMap
 
     for(boxSh <- boxToShare){
+      logger.info(s"Subpool ${boxSh._1.getSubpoolId} has ${boxSh._2.cValue.length} members")
       if(boxSh._2.cValue.length > SHARE_CONSENSUS_LIMIT){
         logger.error(s"There was an error assigning a share consensus to subpool ${boxSh._1.getSubpoolId}")
         logger.error(s"Current share consensus length: ${boxSh._2.cValue.length}")
         app.exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
       }
+//      if(boxSh._2.cValue.length == 0 || boxSh._2.cValue.map(c => c._2(0)).sum == 0){
+//        logger.info(s"Subpool ${boxSh._1.getSubpoolId} removed from maps due to having 0 new members or shares!")
+//        removeFromMaps(boxSh._1)
+//      }
       if (boxSh._1.getPoolOperators.cValue.exists(c => c._1 sameElements commandContract.getErgoTree.bytes)) {
         if (voteTokenStr != "")
           customCommand = true
@@ -100,6 +105,8 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
       lastFees = box.getPoolFees
     }
     logger.info(s"LastConsensusSize: ${lastConsensus.cValue.length} LastPoolFees: ${lastFees.cValue.length}")
+
+    var holdingBoxes = BoxHelpers.loadBoxes(ctx, holdingContract.getAddress)
     var holdingBoxesList = List[InputBox]()
     for(box <- boxToShare.keys) {
       val shCons = box.getShareConsensus //TODO UNCOMMENT
@@ -112,11 +119,12 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
       if (boxValueHeld != 0) {
 
         logger.info(s"Stored payment is not 0 for box, now searching for exact holding box with value $boxValueHeld")
-        val exactStoredBox = BoxHelpers.findExactBox(ctx, holdingContract.getAddress, boxValueHeld, holdingBoxesList)
+        val exactStoredBox = BoxHelpers.findExactBox(boxValueHeld, holdingBoxes)
         if (exactStoredBox.isDefined) {
           logger.info("Exact Holding Box Value: " + exactStoredBox.get.getValue)
           logger.info("Exact storage box id: " + exactStoredBox.get.getId)
-          holdingBoxesList = holdingBoxesList ++ List(exactStoredBox.get)
+          require(boxValueHeld == exactStoredBox.get.getValue)
+          holdingBoxes = holdingBoxes.filter(i => i.getId != exactStoredBox.get.getId)
           boxToStorage = boxToStorage ++ Map((box, exactStoredBox.get))
         } else {
           throw new StoredPaymentNotFoundException
@@ -128,18 +136,27 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 
     var exactHoldingMap = Map[MetadataInputBox, InputBox]()
     for(hv <- boxToValue) {
-      logger.info("Searching for exact holding box with value " + hv._2._1)
-      val exactHoldingBox = BoxHelpers.findExactBox(ctx, holdingContract.getAddress, hv._2._1, holdingBoxesList)
-      if(exactHoldingBox.isEmpty){
-        logger.info("An exact holding box could not be found, a new holding chain is being created")
-        withHoldingChain = true
-      }else{
-        logger.info("An exact holding box was found!")
-        logger.info("Current withHoldingChain: " + withHoldingChain)
-        holdingBoxesList = holdingBoxesList++List(exactHoldingBox.get)
-        exactHoldingMap = exactHoldingMap++Map((hv._1, exactHoldingBox.get))
-        logger.info("Current holdingBoxesList: " + holdingBoxesList.length)
+      if (!withHoldingChain) {
+        logger.info("Searching for exact holding box with value " + hv._2._1)
+        val exactHoldingBox = BoxHelpers.findExactBox(hv._2._1, holdingBoxes)
+        if (exactHoldingBox.isEmpty) {
+          logger.info("An exact holding box could not be found, a new holding chain is being created")
+          withHoldingChain = true
+
+        } else {
+          logger.info("An exact holding box was found!")
+          logger.info("Current withHoldingChain: " + withHoldingChain)
+          require(hv._2._1 == exactHoldingBox.get.getValue)
+          holdingBoxes = holdingBoxes.filter(i => i.getId != exactHoldingBox.get.getId)
+          exactHoldingMap = exactHoldingMap ++ Map((hv._1, exactHoldingBox.get))
+          logger.info("Current holdingBoxesList: " + holdingBoxes.length)
+        }
       }
+      if(hv._2._1 == 0 && hv._2._2 == 0){
+        logger.info(s"Subpool ${hv._1.getSubpoolId} has 0 value locked or added! Now removing from maps.")
+        removeFromMaps(hv._1)
+      }
+
     }
 
     boxToFees = collectFeeBoxes(withHoldingChain)
@@ -408,7 +425,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
         val voteTokenId = ErgoId.create(voteTokenStr)
         val totalTokenAmnt = boxToValue(boxSh._1)._1 + boxToValue(boxSh._1)._2
         commandFeeOutput.tokens(new ErgoToken(voteTokenId, totalTokenAmnt))
-        logger.info(s"Added $totalTokenAmnt tokens to commandFeeOutput box.")
+        logger.info(s"Added $totalTokenAmnt tokens to commandFeeOutput box for subpool ${boxSh._1.getSubpoolId}")
 
       }
       val commandFee = commandFeeOutput.build()
@@ -445,6 +462,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
         if(exactTokenBox.isDefined){
           logger.info("Exact token box found, now adding to fee input boxes.")
           feeInputBoxes.add(exactTokenBox.get)
+          logger.info(s"Token Box: \n " + exactTokenBox.get.toJson(true))
         }else{
           throw new ExactTokenBoxNotFoundException
         }

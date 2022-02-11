@@ -19,8 +19,8 @@ abstract class SmartPoolCmd(config: SmartPoolConfig) {
   protected val holdConf: HoldingConfig = paramsConf.getHoldingConf
   protected val voteConf: VotingConfig = paramsConf.getVotingConf
 
-  val explorerUrl: String = RestApiErgoClient.getDefaultExplorerUrl(nodeConf.getNetworkType)
-
+  val explorerUrl: String = "https://ergo.watch/tmp-for-getblok/"
+  //val explorerUrl: String = RestApiErgoClient.defaultTestnetExplorerUrl
   // Create ErgoClient instance (represents connection to node)
   val ergoClient =  RestApiErgoClient.create(nodeConf.getNodeApi.getApiUrl, nodeConf.getNetworkType, nodeConf.getNodeApi.getApiKey, explorerUrl)
 

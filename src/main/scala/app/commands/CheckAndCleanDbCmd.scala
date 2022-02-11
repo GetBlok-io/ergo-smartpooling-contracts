@@ -9,11 +9,11 @@ import org.ergoplatform.appkit._
 import org.ergoplatform.explorer.client.ExplorerApiClient
 import org.ergoplatform.restapi.client.JSON
 import org.slf4j.LoggerFactory
-import persistence.entries.{BalanceChangeEntry, BoxIndexEntry, PaymentEntry}
+import persistence.entries.{BalanceChangeEntry, BlockEntry, BoxIndexEntry, PaymentEntry}
 import persistence.{DatabaseConnection, PersistenceHandler}
 import persistence.queries.{BoxIndexQuery, ConsensusByTransactionQuery, PaymentsQuery, PaymentsQueryByTransaction, SmartPoolByEpochQuery, SmartPoolByHeightQuery}
 import persistence.responses.SmartPoolResponse
-import persistence.writes.{BalanceChangeInsertion, BoxIndexUpdate, ConsensusDeletionByNFT, PaymentInsertion, SmartPoolDeletionByNFT}
+import persistence.writes.{BalanceChangeInsertion, BlockUpdateByHeight, BoxIndexUpdate, ConsensusDeletionByNFT, PaymentInsertion, SmartPoolDeletionByNFT}
 import retrofit2.Retrofit
 import retrofit2.converter.scalars.ScalarsConverterFactory
 
@@ -43,9 +43,15 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
     dbConn = persistence.connectToDatabase
     explorerHandler = new ExplorerHandler(explorerApiClient)
     logger.info("Explorer handler made!")
+//    val blockUpdateByHeight = new BlockUpdateByHeight(dbConn, 681894).setVariables(BlockEntry(paramsConf.getPoolId, "paid", "paid")).execute()
   }
 
   def executeCommand: Unit = {
+    logger.info("Command is routing into VoteCollection!")
+    val voteCollectionCmd = new VoteCollectionCmd(config)
+    voteCollectionCmd.initiateCommand
+    voteCollectionCmd.executeCommand
+
     logger.info("Command has begun execution")
     logger.info(s"Now checking and cleaning db using boxes from boxIndex for blockHeight $blockHeight")
     logger.info("Now retrieving all boxes from boxIndex")
@@ -99,9 +105,9 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
     val smartPoolNFTWipe = new SmartPoolDeletionByNFT(dbConn).setVariables((paramsConf.getPoolId, paramsConf.getSmartPoolId)).execute()
     val consensusNFTWipe = new ConsensusDeletionByNFT(dbConn).setVariables((paramsConf.getPoolId, paramsConf.getSmartPoolId)).execute()
     logger.info("DB changes complete!")
-//    var distributeFailedCmd = new DistributeFailedCmd(config, 25)
+//    var distributeFailedCmd = new DistributeFailedCmd(config, 16)
 //    distributeFailedCmd.initiateCommand
-//    distributeFailedCmd.setFailedValues(4.944, 674662)
+//    distributeFailedCmd.setFailedValues(1.449, 681894)
 //    distributeFailedCmd.executeCommand
 //    val sendToHoldingCmd = new SendToHoldingCmd(config, 674662)
 //    sendToHoldingCmd.initiateCommand

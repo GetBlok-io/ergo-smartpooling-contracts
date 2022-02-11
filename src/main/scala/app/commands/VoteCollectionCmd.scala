@@ -9,6 +9,7 @@ import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import org.slf4j.LoggerFactory
+import registers.BytesColl
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 
@@ -25,7 +26,7 @@ class VoteCollectionCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
     // Make sure smart pool id is not set
-   // assert(voteConf.getVoteTokenId == "")
+    // assert(voteConf.getVoteTokenId == "")
 
     assert(walletConf.getSecretStoragePath != "")
 
@@ -66,11 +67,11 @@ class VoteCollectionCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
 
       val voteYes = ProxyBallotContract.generateContract(ctx, voteTokenId, voteYes=true, recordingNFT)
       val voteNo = ProxyBallotContract.generateContract(ctx, voteTokenId, voteYes=false, recordingNFT)
-
+      val voteEndHeight = voteConf.getVoteEndHeight
       logger.info("Vote Yes Address: " + voteYes.getAddress)
       logger.info("Vote No Address: " + voteNo.getAddress)
-
-      recordingContract = RecordingContract.generateContract(ctx, voteTokenId, voteYes.getAddress, voteNo.getAddress)
+      logger.info("Vote End Height: " + voteEndHeight)
+      recordingContract = RecordingContract.generateContract(ctx, voteTokenId, voteYes.getAddress, voteNo.getAddress, voteEndHeight)
       val recordingAddress = recordingContract.getAddress
       logger.info("Recording Address: " + recordingAddress)
       logger.info("Recording NFT: " + recordingNFT)
@@ -80,13 +81,13 @@ class VoteCollectionCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
 
       logger.info("Current RecordingBox: " + recordingBox.toString)
 
-      val yesBoxes = ctx.getUnspentBoxesFor(voteYes.getAddress, 0, 100).asScala.toArray
+      val yesBoxes = ctx.getUnspentBoxesFor(voteYes.getAddress, 0, 25).asScala.toArray.filter(ib => ib.getTokens.size() > 0)
 
-      val noBoxes = ctx.getUnspentBoxesFor(voteNo.getAddress, 0, 100).asScala.toArray
+      val noBoxes = ctx.getUnspentBoxesFor(voteNo.getAddress, 0, 25).asScala.toArray.filter(ib => ib.getTokens.size() > 0)
 
       logger.info("Current YesBoxes: " + yesBoxes.length)
       logger.info("Current NoBoxes: " + noBoxes.length)
-
+      val otherTokenId = ErgoId.create("a243398b94d8638f1d7e81e411851adec8c2735ca813c3e3d4bc8443fdc434e0")
       val newYesVotes = yesBoxes
         .filter(ib => ib.getTokens.size() > 0)
         .filter(ib => ib.getTokens.get(0).getId == voteTokenId)
@@ -95,24 +96,58 @@ class VoteCollectionCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
 
       val newNoVotes = noBoxes
         .filter(ib => ib.getTokens.size() > 0)
-        .filter(ib => ib.getTokens.get(0).getId == voteTokenId)
+        .filter(ib => ib.getTokens.asScala.exists(t => t.getId == voteTokenId))
+        .map(ib => ib.getTokens.asScala.find(t => t.getId == voteTokenId).get.getValue)
+        .sum
+      val otrYesVotes = yesBoxes
+        .filter(ib => ib.getTokens.size() > 0)
+        .filter(ib => ib.getTokens.get(0).getId == otherTokenId)
         .map(ib => ib.getTokens.get(0).getValue)
+        .sum
+
+      val otrNoVotes = noBoxes
+        .filter(ib => ib.getTokens.size() > 0)
+        .filter(ib => ib.getTokens.asScala.exists(t => t.getId == otherTokenId))
+        .map(ib => ib.getTokens.asScala.find(t => t.getId == otherTokenId).get.getValue)
+        .sum
+
+      val burnedOtrYesVotes = yesBoxes
+        .filter(ib => ib.getTokens.size() > 1)
+        .filter(ib => ib.getTokens.get(1).getId == otherTokenId)
+        .map(ib => ib.getTokens.get(1).getValue)
+        .sum
+      val burnedYesVotes = yesBoxes
+        .filter(ib => ib.getTokens.size() > 1)
+        .filter(ib => ib.getTokens.get(1).getId == voteTokenId)
+        .map(ib => ib.getTokens.get(1).getValue)
         .sum
 
       logger.info("Current YesVotes: " + newYesVotes)
       logger.info("Current NoVotes: " + newNoVotes)
 
+      logger.info("Other YesVotes: " + otrYesVotes)
+      logger.info("Other NoVotes: " + otrNoVotes)
+
+      logger.info("burnedOtrYesVotes: " + burnedOtrYesVotes)
+      logger.info("burnedYesVotes: " + burnedYesVotes)
+      if(newYesVotes + newNoVotes + otrNoVotes == 0){
+        logger.info("All votes are 0, now returning out of command execution...")
+        return
+      }
 
       val recordingOutBox = RecordingContract.buildNextRecordingBox(ctx, recordingBox, recordingContract, yesBoxes, noBoxes, voteTokenId)
       val boxesToSpend = Array(recordingBox.asInput)++yesBoxes++noBoxes
-      //var changeAddress = Address.create("CHANGE_ADDRY") //TODO Change this
-      val changeAddress = nodeAddress
+      var changeAddress = Address.create("9ermaskfcE8GvBW389wE21G2GF7Voy8qMrG4wNeNBNqWwpHS9hK") //TODO Change this
+      // changeAddress = nodeAddress
       val totalValue = BoxHelpers.sumBoxes(yesBoxes.toList) + BoxHelpers.sumBoxes(noBoxes.toList)
-      val txFee = if(totalValue > paramsConf.getInitialTxFee) paramsConf.getInitialTxFee else totalValue
+      val txFee = if(totalValue > Parameters.MinFee * 5) paramsConf.getInitialTxFee else totalValue
       logger.info("Recording Out Box: " + recordingOutBox)
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
-
+      var tokensToBurn = Array(new ErgoToken(voteTokenId, newNoVotes + newYesVotes + burnedYesVotes))
       // TODO: Remove constant values for tokens and place them into config
+      if(otrNoVotes > 0 || otrYesVotes > 0 || burnedOtrYesVotes > 0){
+        tokensToBurn = tokensToBurn ++ Array(new ErgoToken(otherTokenId, otrNoVotes + otrYesVotes + burnedOtrYesVotes))
+      }
 
       val recordingTx =
         txB
@@ -120,7 +155,7 @@ class VoteCollectionCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
           .fee(txFee)
           .outputs(recordingOutBox.asOutBox)
           .sendChangeTo(changeAddress.getErgoAddress)
-          .tokensToBurn(new ErgoToken(voteTokenId, newNoVotes + newYesVotes))
+          .tokensToBurn(tokensToBurn: _*)
           .build()
 
       val recTxSigned = prover.sign(recordingTx)
@@ -133,29 +168,25 @@ class VoteCollectionCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
       recTxSigned.toJson(true)
     })
     logger.info("Command has finished execution")
-    exit(logger, ExitCodes.SUCCESS)
+
   }
 
   def recordToDb: Unit = {
 
-    logger.info("Recording tx info into config...")
-
-    logger.info("The following information will be updated:")
+    exit(logger, ExitCodes.SUCCESS)
 
 
-
-//    val newConfig = config.copy()
-//    newConfig.getParameters.setSmartPoolId(smartPoolId.toString)
-//    newConfig.getParameters.getMetaConf.setMetadataId(metadataId.toString)
-//    newConfig.getParameters.getMetaConf.setMetadataAddress(metadataAddress.toString)
-//    newConfig.getParameters.getHoldingConf.setHoldingAddress(holdingContract.getAddress.toString)
-//    newConfig.getParameters.setPoolOperators(Array(commandContract.getAddress.toString))
-//    newConfig.getParameters.getHoldingConf.setHoldingType("default")
-//
-//    ConfigHandler.writeConfig(AppParameters.configFilePath, newConfig)
+    //    val newConfig = config.copy()
+    //    newConfig.getParameters.setSmartPoolId(smartPoolId.toString)
+    //    newConfig.getParameters.getMetaConf.setMetadataId(metadataId.toString)
+    //    newConfig.getParameters.getMetaConf.setMetadataAddress(metadataAddress.toString)
+    //    newConfig.getParameters.getHoldingConf.setHoldingAddress(holdingContract.getAddress.toString)
+    //    newConfig.getParameters.setPoolOperators(Array(commandContract.getAddress.toString))
+    //    newConfig.getParameters.getHoldingConf.setHoldingType("default")
+    //
+    //    ConfigHandler.writeConfig(AppParameters.configFilePath, newConfig)
     logger.info("Config file has been successfully updated")
   }
 
 
 }
-

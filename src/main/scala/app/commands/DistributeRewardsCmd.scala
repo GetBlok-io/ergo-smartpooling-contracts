@@ -39,9 +39,6 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
   private var memberList: MemberList = _
   private var shareConsensus: ShareConsensus = _
 
-  private var txId: String = _
-  private var nextCommandBox: CommandInputBox = _
-  private var signedTx: SignedTransaction = _
   private var dbConn: DatabaseConnection = _
 
   def initiateCommand: Unit = {
@@ -70,8 +67,8 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
     }
 
     // Lets ensure that blocks are only set to confirmed once we pay them out.
-    // TODO: CHANGE BACK AFTER TEST
-   // require(block.status == "confirmed", "Block status is not confirmed")
+
+    require(block.status == "confirmed", "Block status is not confirmed")
 
     // Assertions to make sure config is setup for command
     require(holdConf.getHoldingAddress != "", "Holding address is not defined")
@@ -222,9 +219,6 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
             exit(logger, ExitCodes.HOLDING_NOT_COVERED)
         }
       }
-
-      var holdingBoxes = ctx.getUnspentBoxesFor(holdingContract.getAddress, 0, 30).asScala.filter(i => i.getValue == blockReward).toList
-
 
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
       val distributionGroup = new DistributionGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,
