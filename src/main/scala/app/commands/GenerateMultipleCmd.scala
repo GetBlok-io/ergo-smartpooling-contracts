@@ -2,7 +2,7 @@ package app.commands
 
 import app.{AppCommand, AppParameters}
 import boxes.{BoxHelpers, MetadataInputBox}
-import config.{ConfigHandler, SmartPoolConfig}
+import configs.{ConfigHandler, SmartPoolConfig}
 import contracts.command.{CommandContract, PKContract}
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import contracts.{MetadataContract, holding}
@@ -10,7 +10,7 @@ import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import org.slf4j.LoggerFactory
-import persistence.PersistenceHandler
+import persistence.{BoxIndex, BoxStatus, PersistenceHandler}
 import persistence.entries.BoxIndexEntry
 import persistence.writes.{BoxIndexDeletion, BoxIndexInsertion}
 import registers.PoolInfo
@@ -184,14 +184,8 @@ class GenerateMultipleCmd(config: SmartPoolConfig, generationAmount: Int) extend
     val dbConn = persistence.connectToDatabase
 
     val boxWipe = new BoxIndexDeletion(dbConn).execute()
-    for(box <- metadataBoxes){
-      val metaInfo = PoolInfo.fromNormalValues(box.getRegisters.get(3).getValue.asInstanceOf[Coll[Long]])
-
-
-      val boxEntry = BoxIndexEntry(paramsConf.getPoolId, box.getId.toString, txId, 0L, "success", smartPoolId.toString, metaInfo.getSubpoolId().toString, Array(0L))
-      logger.info("Now inserting into box index for box with id " + box.getId.toString)
-      val boxInsertion = new BoxIndexInsertion(dbConn).setVariables(boxEntry).execute()
-    }
+    val boxIndex = new BoxIndex(dbConn, paramsConf.getPoolId, Array())
+    boxIndex.writeGenerated(metadataBoxes.toArray, txId, smartPoolId)
 
   }
 

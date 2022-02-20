@@ -24,7 +24,7 @@ import scala.collection.mutable.ArrayBuffer
  */
 class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContract(holdingContract) {
   import SimpleHoldingContract._
-  val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DIST_TX)
+  val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_HOLD_CONTRACT)
   final val MIN_PAYMENT_THRESHOLD = Parameters.OneErg / 10L // TODO: Make this an AppParameter
   override def applyToCommand(commandTx: CreateCommandTx): CommandOutputBuilder = {
     val metadataBox = commandTx.metadataInputBox

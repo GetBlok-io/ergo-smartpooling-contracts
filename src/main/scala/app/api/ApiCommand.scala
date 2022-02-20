@@ -1,9 +1,9 @@
 package app.api
 
 import app.AppParameters
-import config.SmartPoolConfig
-import config.node.{SmartPoolNodeConfig, SmartPoolWalletConfig}
-import config.params.{CommandConfig, HoldingConfig, MetadataConfig, SmartPoolParameters, VotingConfig}
+import configs.SmartPoolConfig
+import configs.node.{SmartPoolNodeConfig, SmartPoolWalletConfig}
+import configs.params.{CommandConfig, HoldingConfig, MetadataConfig, SmartPoolParameters, VotingConfig}
 import org.ergoplatform.appkit.{ErgoClient, RestApiErgoClient}
 
 abstract class ApiCommand(config: SmartPoolConfig, args: Array[String]) {

@@ -1,4 +1,4 @@
-package config.params;
+package configs.params;
 
 public class VotingConfig {
     private String voteTokenId;

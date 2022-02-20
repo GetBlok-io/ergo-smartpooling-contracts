@@ -1,4 +1,4 @@
-package config;
+package configs;
 
 public class LoggingConfig {
     private String fileLoggingLevel;

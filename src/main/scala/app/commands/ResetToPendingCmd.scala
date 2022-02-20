@@ -1,7 +1,7 @@
 package app.commands
 
 import app.AppCommand
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import logging.LoggingHandler
 import org.slf4j.LoggerFactory
 import persistence.entries.BlockEntry

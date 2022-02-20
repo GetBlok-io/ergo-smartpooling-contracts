@@ -22,6 +22,8 @@ import org.ergoplatform.explorer.client.model.TotalBalance;
 import org.ergoplatform.explorer.client.model.TransactionInfo;
 import org.ergoplatform.explorer.client.model.UnknownErr;
 
+import java.util.List;
+
 /**
  * Custom explorer api to get around crashes caused by additional registers field in TransactionInfo
  */
@@ -40,8 +42,14 @@ public interface CustomExplorerApi {
     );
 
     @GET("api/v1/transactions/{p1}")
-    Call<OutputRequest> getTxOutputsById(
+    Call<TransactionInfo> getFullTxById(
             @retrofit2.http.Path("p1") String p1
     );
+
+    @GET("api/v1/addresses/{p1}/transactions")
+    Call<ItemsB> getTxsByAddress(
+            @retrofit2.http.Path("p1") String p1            ,     @retrofit2.http.Query("offset") Integer offset                ,     @retrofit2.http.Query("limit") Integer limit
+    );
+
 
 }

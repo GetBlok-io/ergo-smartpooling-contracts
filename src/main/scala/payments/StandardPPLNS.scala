@@ -14,7 +14,7 @@ object StandardPPLNS {
 
   def buildMinerScores(sharesResponseList: Array[Array[ShareResponse]]): Map[String, BigDecimal] = {
     logger.info("Building miner scores for payment.")
-    var entireShareScore = BigDecimal("0")
+    var entireShareScore = BigDecimal("0.0")
     var scoreMap = Map[String, BigDecimal]()
     var done = false
 
@@ -28,15 +28,21 @@ object StandardPPLNS {
         var totalScore: BigDecimal = BigDecimal("0.0")
         logger.info("Current entire share score: " + entireShareScore)
         logger.info(s"Now iterating through ${shareScores.length} until entireShareScore >= 0.5")
-        logger.info(shareScores(0)._2.toString())
-        logger.info(shareScores(0)._1)
 
         for (sc <- shareScores) {
           if (entireShareScore < PPLNS_WINDOW && !done) {
             var shScore = sc._2
             if (entireShareScore + shScore >= PPLNS_WINDOW) {
+              logger.info("Last share found!")
+              logger.info("Current Miner: " + sc._1)
+              logger.info("Old Entire ShareScore: " + entireShareScore)
+              logger.info("Old sharescore: " + shScore)
+
               shScore = PPLNS_WINDOW - entireShareScore
+              logger.info("New ShareScore: " + entireShareScore)
               done = true
+              logger.info("Current Share Map: ")
+              // logger.info("Share Map: " + scoreMap.map(sm => (sm._1, sm._2 * 10000000L))mkString("\n"))
             }
             if (scoreMap.contains(sc._1)) {
               scoreMap = scoreMap.updated(sc._1, scoreMap(sc._1) + shScore)
@@ -48,9 +54,14 @@ object StandardPPLNS {
             if(entireShareScore >= PPLNS_WINDOW){
               logger.info("Entire share score is greater than PPLNS window!")
               logger.info(s"Entire Share Score: " + entireShareScore + " PPLNS window: " + PPLNS_WINDOW)
-              logger.info(s"Now returning score map with $scoreMap miners")
+              logger.info(s"Total Share Score: " + totalScore)
+              logger.info(s"Now returning score map...")
+
+              logger.info(s"New scoreMap: ${scoreMap.map(sm => (sm._1, sm._2 * 10000000L))}")
               return scoreMap
             }
+          }else{
+            return scoreMap
           }
         }
         logger.info("Entire Share Score: " + entireShareScore)

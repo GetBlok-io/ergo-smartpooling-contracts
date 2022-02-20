@@ -1,4 +1,4 @@
-package config.node;
+package configs.node;
 
 import org.ergoplatform.appkit.NetworkType;
 

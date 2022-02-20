@@ -1,4 +1,4 @@
-package config.node;
+package configs.node;
 
 public class SmartPoolWalletConfig {
     private String secretStoragePath;;

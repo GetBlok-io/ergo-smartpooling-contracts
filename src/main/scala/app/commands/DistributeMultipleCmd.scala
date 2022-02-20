@@ -2,7 +2,7 @@ package app.commands
 
 import app.{AppCommand, AppParameters, ExitCodes, exit}
 import boxes.{BoxHelpers, CommandInputBox}
-import config.{ConfigHandler, SmartPoolConfig}
+import configs.{ConfigHandler, SmartPoolConfig}
 import contracts.command.{PKContract, PKTokenContract, VoteTokensContract}
 import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}

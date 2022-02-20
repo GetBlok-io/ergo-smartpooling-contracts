@@ -1,7 +1,7 @@
 package logging
 
 import app.AppParameters
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import org.slf4j.{Logger, LoggerFactory}
 
 import java.util.Date
@@ -31,6 +31,7 @@ object LoggingHandler {
 
     val LOG_COMMAND_TX = "CommandTx"
     val LOG_DIST_TX = "DistributionTx"
+    val LOG_HOLD_CONTRACT = "HoldingContract"
     val LOG_GEN_TX = "GenesisTx"
     val LOG_MOD_TX = "ModificationTx"
     val LOG_REGROUP_TX = "RegroupTx"
@@ -39,14 +40,17 @@ object LoggingHandler {
     val LOG_DIST_GRP = "DistributionGroup"
     val LOG_SUB_SEL = "SubpoolSelector"
     val LOG_HOLD_GRP = "HoldingGroup"
+    val LOG_HOLD_CHAIN = "HoldingChain"
+    val LOG_CMD_CHAIN = "CommandChain"
+    val LOG_DIST_CHAIN = "DistributionChain"
 
     val loggerNames = List(
       LOG_MAIN, LOG_TEST,
       LOG_PERSISTENCE, LOG_PAYMENT_HANDLER, LOG_GEN_METADATA_CMD, LOG_MODIFY_SMARTPOOL_CMD, LOG_DISTRIBUTE_REWARDS_CMD,
       LOG_SEND_TO_HOLDING_CMD, LOG_RESET_STATUS_CMD, LOG_NODE_HANDLER, LOG_PAY_BALANCES_CMD, LOG_CLEAN_DB_CMD, LOG_INIT_VOTE_CMD,
       LOG_GEN_RECORDING_CMD, LOG_VOTE_COLLECTION_CMD,
-      LOG_COMMAND_TX, LOG_DIST_TX, LOG_GEN_TX, LOG_MOD_TX, LOG_BOX_HELPER, LOG_REGROUP_TX,
-      LOG_DIST_GRP, LOG_HOLD_GRP, LOG_SUB_SEL
+      LOG_COMMAND_TX, LOG_DIST_TX, LOG_GEN_TX, LOG_MOD_TX, LOG_BOX_HELPER, LOG_REGROUP_TX, LOG_HOLD_CONTRACT,
+      LOG_DIST_GRP, LOG_HOLD_GRP, LOG_SUB_SEL, LOG_HOLD_CHAIN, LOG_DIST_CHAIN, LOG_CMD_CHAIN
 
     )
 

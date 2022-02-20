@@ -1,4 +1,4 @@
-package config;
+package configs;
 
 public class PersistenceConfig {
     private String host;

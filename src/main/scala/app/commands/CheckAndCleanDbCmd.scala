@@ -2,7 +2,7 @@ package app.commands
 
 import app.{AppCommand, ExitCodes, exit}
 import boxes.MetadataInputBox
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import explorer.ExplorerHandler
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
@@ -105,10 +105,11 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
     val smartPoolNFTWipe = new SmartPoolDeletionByNFT(dbConn).setVariables((paramsConf.getPoolId, paramsConf.getSmartPoolId)).execute()
     val consensusNFTWipe = new ConsensusDeletionByNFT(dbConn).setVariables((paramsConf.getPoolId, paramsConf.getSmartPoolId)).execute()
     logger.info("DB changes complete!")
-//    var distributeFailedCmd = new DistributeFailedCmd(config, 16)
+//    var distributeFailedCmd = new DistributeFailedCmd(config, 27)
 //    distributeFailedCmd.initiateCommand
-//    distributeFailedCmd.setFailedValues(1.449, 681894)
+//    distributeFailedCmd.setFailedValues(0.251, 687001)
 //    distributeFailedCmd.executeCommand
+//    exit(logger, ExitCodes.SUCCESS)
 //    val sendToHoldingCmd = new SendToHoldingCmd(config, 674662)
 //    sendToHoldingCmd.initiateCommand
 //    sendToHoldingCmd.setBlockReward((BigDecimal(4.944) * Parameters.OneErg).toLong)
@@ -118,8 +119,12 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
 //    distributeRewardsCmd.initiateCommand
 //    distributeRewardsCmd.executeCommand
 //    distributeRewardsCmd.recordToDb
+//      var cSett = new CustomSettingsCmd(config)
+//    cSett.initiateCommand
+//
+//    cSett.executeCommand
     if(boxIndex.forall(br => br.status == "success")) {
-      logger.info("All boxes in box response have status succcess!")
+      logger.info("All boxes in box response have status success!")
       exit(logger, ExitCodes.SUCCESS)
     }else {
       logger.warn("There were errors found in the current box index!")

@@ -1,7 +1,7 @@
 package app.commands
 
 import app.{AppCommand, AppParameters, ExitCodes, exit}
-import config.{ConfigHandler, SmartPoolConfig}
+import configs.{ConfigHandler, SmartPoolConfig}
 import contracts.command.{CommandContract, PKContract}
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import contracts.voting.{ProxyBallotContract, RecordingContract}

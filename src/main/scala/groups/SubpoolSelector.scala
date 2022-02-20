@@ -97,7 +97,7 @@ class SubpoolSelector() {
 
     var openSubpools = boxToShare.keys.filter(m => boxToShare(m).cValue.length < SHARE_CONSENSUS_LIMIT).toArray.sortBy(m => m.getSubpoolId)
 
-//    openSubpools = metadataInputs
+    //openSubpools = metadataInputs
 
     var currentSubpool = 0
     logger.info(s"There are a total of ${openSubpools.length} open subpools")

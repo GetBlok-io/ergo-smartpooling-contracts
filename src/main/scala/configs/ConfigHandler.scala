@@ -1,8 +1,8 @@
-package config
+package configs
 
 import com.google.gson.GsonBuilder
-import config.node.{SmartPoolAPIConfig, SmartPoolNodeConfig, SmartPoolWalletConfig}
-import config.params.SmartPoolParameters
+import configs.node.{SmartPoolAPIConfig, SmartPoolNodeConfig, SmartPoolWalletConfig}
+import configs.params.SmartPoolParameters
 import org.ergoplatform.appkit.NetworkType
 import org.ergoplatform.appkit.config.ErgoNodeConfig
 

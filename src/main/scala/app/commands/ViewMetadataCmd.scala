@@ -2,7 +2,7 @@ package app.commands
 
 import app.AppCommand
 import boxes.MetadataInputBox
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.slf4j.LoggerFactory

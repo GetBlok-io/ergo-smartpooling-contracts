@@ -2,7 +2,7 @@ package app.commands
 
 import app.{AppCommand, ExitCodes, exit}
 import boxes.BoxHelpers
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import explorer.ExplorerHandler
 import logging.LoggingHandler
 import org.ergoplatform.appkit._

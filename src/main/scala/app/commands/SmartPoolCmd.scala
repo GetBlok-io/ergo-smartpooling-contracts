@@ -1,10 +1,10 @@
 package app.commands
 
 import app.{AppCommand, AppParameters}
-import config.SmartPoolConfig
-import config.node.{SmartPoolNodeConfig, SmartPoolWalletConfig}
-import config.params.{CommandConfig, HoldingConfig, MetadataConfig, SmartPoolParameters, VotingConfig}
-import org.ergoplatform.appkit.RestApiErgoClient
+import configs.SmartPoolConfig
+import configs.node.{SmartPoolNodeConfig, SmartPoolWalletConfig}
+import configs.params.{CommandConfig, HoldingConfig, MetadataConfig, SmartPoolParameters, VotingConfig}
+import org.ergoplatform.appkit.{NetworkType, RestApiErgoClient}
 import org.ergoplatform.explorer.client.ExplorerApiClient
 
 abstract class SmartPoolCmd(config: SmartPoolConfig) {
@@ -19,8 +19,8 @@ abstract class SmartPoolCmd(config: SmartPoolConfig) {
   protected val holdConf: HoldingConfig = paramsConf.getHoldingConf
   protected val voteConf: VotingConfig = paramsConf.getVotingConf
 
-  val explorerUrl: String = "https://ergo.watch/tmp-for-getblok/"
-  //val explorerUrl: String = RestApiErgoClient.defaultTestnetExplorerUrl
+  //val explorerUrl: String = "https://ergo.watch/tmp-for-getblok/"
+  val explorerUrl: String = if(nodeConf.getNetworkType == NetworkType.MAINNET) "https://ergo.watch/tmp-for-getblok/" else RestApiErgoClient.defaultTestnetExplorerUrl
   // Create ErgoClient instance (represents connection to node)
   val ergoClient =  RestApiErgoClient.create(nodeConf.getNodeApi.getApiUrl, nodeConf.getNetworkType, nodeConf.getNodeApi.getApiKey, explorerUrl)
 

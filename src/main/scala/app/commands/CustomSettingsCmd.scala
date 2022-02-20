@@ -2,7 +2,7 @@ package app.commands
 
 import app.{AppCommand, ExitCodes, exit}
 import boxes.{BoxHelpers, CommandInputBox, MetadataInputBox}
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import contracts.command.VoteTokensContract
 import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
@@ -68,7 +68,7 @@ class CustomSettingsCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
       // TODO: Remove constant values for tokens and place them into config
       val payoutBox = outB
         .value(((BigDecimal(3.544) * Parameters.OneErg).toLong) + (txFee))
-        .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
+        .contract(new ErgoTreeContract(payoutAddress.getErgoAddress.script))
         .build()
 
       val payoutTx =
@@ -86,7 +86,7 @@ class CustomSettingsCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
       payoutTxId
     })
     logger.info("Command has finished execution")
-    exit(logger, ExitCodes.SUCCESS)
+
   }
 
   def recordToDb: Unit = {

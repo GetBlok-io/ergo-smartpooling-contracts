@@ -1,8 +1,7 @@
-package config.params;
+package configs.params;
 
 import org.ergoplatform.appkit.Parameters;
 
-import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
 

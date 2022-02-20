@@ -1,7 +1,7 @@
 package app.commands
 
 import app.{AppCommand, ExitCodes, exit}
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import contracts.holding.SimpleHoldingContract
 import logging.LoggingHandler
 import org.ergoplatform.appkit._

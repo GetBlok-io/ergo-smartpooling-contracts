@@ -1,7 +1,7 @@
 package app.commands
 
 import app.{AppCommand, AppParameters}
-import config.{ConfigHandler, SmartPoolConfig}
+import configs.{ConfigHandler, SmartPoolConfig}
 import contracts.command.CommandContract
 import logging.LoggingHandler
 import org.ergoplatform.appkit._

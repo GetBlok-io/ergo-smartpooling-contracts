@@ -4,7 +4,7 @@ import app.api.models.APIMapper
 import app.api.models.APIModels.{FullUnsignedTransaction, ReducedTransaction}
 import boxes.BoxHelpers
 import com.google.gson.Gson
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import contracts.voting.ProxyBallotContract
 import org.ergoplatform.appkit.JavaHelpers.UniversalConverter
 import org.ergoplatform.appkit.impl.ScalaBridge.{isoErgoTransactionDataInput, isoErgoTransactionInput, isoErgoTransactionOutput}

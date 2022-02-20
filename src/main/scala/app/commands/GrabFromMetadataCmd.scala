@@ -2,7 +2,7 @@ package app.commands
 
 import app.{AppCommand, ExitCodes, exit}
 import boxes.{CommandInputBox, MetadataInputBox}
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import explorer.ExplorerHandler
@@ -45,7 +45,7 @@ class GrabFromMetadataCmd(config: SmartPoolConfig, subpoolId: Int) extends Smart
   def executeCommand: Unit = {
     logger.info("Command has begun execution")
     val txid = "6e7104610cbc84c5f5a088f3b9804f917e6ba18e5bc40286143d312275375576"
-    val txInfo = explorerHandler.getTxOutputs(txid)
+    val txInfo = explorerHandler.getTx(txid)
     val blockHeight = config.getFailure.getFailedBlock
     if(txInfo.isDefined) {
       ergoClient.execute(ctx => {
@@ -61,10 +61,10 @@ class GrabFromMetadataCmd(config: SmartPoolConfig, subpoolId: Int) extends Smart
         val membersSerialized = metadataInputBox.getMemberList.cValue.map(m => m._2)
         val feesSerialized = metadataInputBox.getPoolFees.cValue.map(f => f._2.toLong)
         val opsSerialized = metadataInputBox.getPoolOperators.cValue.map(o => o._2)
-        val outputMap: Map[String, Long] = txInfo.get.getOutputs.map {
+        val outputMap: Map[String, Long] = txInfo.get.getOutputs.asScala.map {
           o =>
             logger.info(s"Adding address ${o.getAddress} with value ${o.getValue}")
-            (o.getAddress, o.getValue)
+            (o.getAddress, o.getValue.toLong)
         }.toMap
 
         val smartPoolEntry = SmartPoolEntry(config.getParameters.getPoolId, txid, metadataInputBox.getCurrentEpoch,

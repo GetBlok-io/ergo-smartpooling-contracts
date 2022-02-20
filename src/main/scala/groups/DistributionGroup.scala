@@ -2,10 +2,11 @@ package groups
 
 import app.ExitCodes
 import boxes.{BoxHelpers, CommandInputBox, CommandOutBox, MetadataInputBox}
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import contracts.command.{CommandContract, PKContract}
 import contracts.holding.HoldingContract
 import groups.chains.{HoldingChain, HoldingChainException}
+import groups.exceptions.{ExactTokenBoxNotFoundException, StoredPaymentNotFoundException}
 import logging.LoggingHandler
 import org.ergoplatform.appkit.impl.{ErgoTreeContract, InputBoxImpl}
 import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoId, ErgoProver, ErgoToken, InputBox, OutBox, Parameters, SignedTransaction}
@@ -44,7 +45,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 
   final val SHARE_CONSENSUS_LIMIT = 10
   final val STANDARD_FEE = Parameters.MinFee * 5
-  final val FEE_ADDRESS = Address.create("9gCs2eUmwMjZR636hCedfCJLP9etrtPKnAYUkwMjpAaLjvBpTgF")
+
   var customCommand = false
   var voteTokenStr = config.getParameters.getVotingConf.getVoteTokenId
   override def buildGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
@@ -376,37 +377,6 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 
   def successfulTxs: Map[MetadataInputBox, SignedTransaction] = _txs
 
-  def findMetadata(metadataArray: Array[MetadataInputBox], consensusVal: (Array[Byte], Array[Long])): Option[MetadataInputBox] = {
-    for(box <- metadataArray){
-      val shCons = box.getShareConsensus
-      if(shCons.cValue.exists(c => c._1 sameElements consensusVal._1)){
-        if(boxToShare.contains(box)){
-          if(boxToShare(box).cValue.length < SHARE_CONSENSUS_LIMIT)
-            return Some(box)
-        }else{
-            return Some(box)
-        }
-
-      }
-//      if(!boxToShare.contains(box)){
-//        return Some(box)
-//      }
-    }
-
-    for(box <- metadataArray){
-      if(boxToShare.contains(box)) {
-        if (boxToShare(box).cValue.length < SHARE_CONSENSUS_LIMIT) {
-          return Some(box)
-        }
-      }else{
-        return Some(box)
-      }
-    }
-    None
-  }
-
-
-
   /**
    * Creates tx to collect fee boxes from node wallet and use them in subsequent transactions
    */
@@ -464,6 +434,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
           feeInputBoxes.add(exactTokenBox.get)
           logger.info(s"Token Box: \n " + exactTokenBox.get.toJson(true))
         }else{
+          logger.error("No token box could be found!")
           throw new ExactTokenBoxNotFoundException
         }
       }

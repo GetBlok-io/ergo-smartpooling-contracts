@@ -2,7 +2,7 @@ package app.commands
 
 import app.{AppCommand, ExitCodes, exit}
 import boxes.{BoxHelpers, RecordingInputBox}
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import contracts.command.CommandContract
 import contracts.voting.{ProxyBallotContract, RecordingContract}
 import logging.LoggingHandler

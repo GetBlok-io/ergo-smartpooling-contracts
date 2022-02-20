@@ -15,7 +15,9 @@ package object payments {
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PAYMENT_HANDLER)
   final val ERGO_SHARE_CONSTANT = BigDecimal("256")
   final val PPLNS_WINDOW = BigDecimal("0.5")
-  var minerScores = Map[String, BigDecimal]()
+  final val QUERY_SIZE = 50000
+
+
 
 
 }

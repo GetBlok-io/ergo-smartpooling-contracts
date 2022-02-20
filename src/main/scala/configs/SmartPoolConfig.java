@@ -1,9 +1,9 @@
-package config;
+package configs;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import config.node.SmartPoolNodeConfig;
-import config.params.SmartPoolParameters;
+import configs.node.SmartPoolNodeConfig;
+import configs.params.SmartPoolParameters;
 
 import java.io.File;
 import java.io.FileNotFoundException;

@@ -1,7 +1,7 @@
 package groups.chains
 
 import boxes.MetadataInputBox
-import config.SmartPoolConfig
+import configs.SmartPoolConfig
 import contracts.holding.HoldingContract
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
