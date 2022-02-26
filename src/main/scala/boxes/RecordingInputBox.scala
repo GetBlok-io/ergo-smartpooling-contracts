@@ -59,4 +59,5 @@ class RecordingInputBox(inputBox: InputBox, rercordingNFTId: ErgoId) extends Inp
 
   override def getId: ErgoId = asInput.getId
 
+  override def getBytes: Array[Byte] = asInput.getBytes
 }

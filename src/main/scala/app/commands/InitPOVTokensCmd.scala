@@ -69,7 +69,7 @@ class InitPOVTokensCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
             "This token is used as a part of GetBlok.io's PoV system. Each PoV token owned by GetBlok.io's " +
               "wallet address is proof that GetBlok.io has successfully voted according to the decision given to it by its miners.",
             0)
-          .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
+          .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script, nodeAddress.getNetworkType))
           .build()
         povOutputs = povOutputs++List(povBox)
       }

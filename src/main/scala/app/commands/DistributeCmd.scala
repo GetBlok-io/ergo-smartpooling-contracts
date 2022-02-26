@@ -3,7 +3,7 @@ package app.commands
 import app.{AppCommand, ExitCodes, exit}
 import boxes.MetadataInputBox
 import configs.SmartPoolConfig
-import contracts.command.VoteTokensContract
+import contracts.command.{PKContract, VoteTokensContract}
 import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import groups.{DistributionGroup, DistributionGroup2}
@@ -14,14 +14,14 @@ import payments.{ShareCollector, SimplePPLNS, StandardPPLNS}
 import persistence.entries.{BoxIndexEntry, ConsensusEntry, SmartPoolEntry}
 import persistence.queries.{BlockByHeightQuery, BoxIndexQuery, MinimumPayoutsQuery}
 import persistence.writes.{BoxIndexUpdate, ConsensusInsertion, SmartPoolDataInsertion}
-import persistence.{BoxIndex, DatabaseConnection, PersistenceHandler}
+import persistence.{BoxIndex, BoxStatus, DatabaseConnection, PersistenceHandler}
 import registers.{MemberList, PoolFees, ShareConsensus}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, mapAsScalaMapConverter, seqAsJavaListConverter}
 import scala.util.Try
 
 
-class DistributeRewardsCmd2(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
+class DistributeCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DISTRIBUTE_REWARDS_CMD)
 
@@ -79,17 +79,25 @@ class DistributeRewardsCmd2(config: SmartPoolConfig, blockHeight: Int) extends S
     blockReward = (block.reward * Parameters.OneErg).toLong
 
     val initBoxIdx = BoxIndex.fromDatabase(dbConn, paramsConf.getPoolId)
-    if(initBoxIdx.getUsed.size == initBoxIdx.getUsed.getConfirmed.size){
+    if(initBoxIdx.getUsed.size == initBoxIdx.getUsed.getConfirmed.size && initBoxIdx.getSuccessful.size == 0 && initBoxIdx.getFailed.size == 0){
+      logger.info(s"UsedBoxes: ${initBoxIdx.getUsed.size} Used+ConfirmedBoxes: ${initBoxIdx.getUsed.getConfirmed.size}")
       // All used blocks = all used + confirmed blocks, so all subpools in use are confirmed
       if(initBoxIdx.getUsed.getConfirmed.getByBlock(blockHeight).size == 0){
+        logger.info("No boxes found for current block distribution")
         // All used + confirmed blocks have not distributed a block at this height
         if(initBoxIdx.getUsed.getConfirmed.getByBlock(initBoxIdx.getUsed.boxes.head._2.blocks(0)).size == initBoxIdx.getUsed.getConfirmed.size){
-          // All used + confirmed blocks have distributed the same block
-          // Now we can initiate holding command
-          val sendToHoldingCmd = new SendToHoldingCmd(config, blockHeight)
-          sendToHoldingCmd.initiateCommand
-          sendToHoldingCmd.executeCommand
-          sendToHoldingCmd.recordToDb
+          logger.info("Boxes for distribution are confirmed boxes")
+          if(!initBoxIdx.getUsed.boxes.exists(i => i._2.status == BoxStatus.INITIATED)) {
+            logger.info("No initiated boxes found!")
+            // All used + confirmed blocks have distributed the same block
+            // Now we can initiate holding command
+            logger.info("Now sending to holding")
+            val sendToHoldingCmd = new SendToHoldingCmd(config, blockHeight)
+            sendToHoldingCmd.initiateCommand
+            sendToHoldingCmd.executeCommand
+            sendToHoldingCmd.recordToDb
+            exit(logger, ExitCodes.HOLDING_NOT_COVERED)
+          }
         }
       }
     }
@@ -144,7 +152,7 @@ class DistributeRewardsCmd2(config: SmartPoolConfig, blockHeight: Int) extends S
       logger.info("Now attempting to retrieve metadata box from blockchain")
 
       val voteTokenId = ErgoId.create(voteConf.getVoteTokenId)
-      val commandContract = VoteTokensContract.generateContract(ctx, voteTokenId, nodeAddress)
+      val commandContract = new PKContract(nodeAddress)
 
       logger.info(s"Command Contract: ${commandContract.getAddress}")
       logger.info("Pool Fees Map: ")
@@ -161,7 +169,7 @@ class DistributeRewardsCmd2(config: SmartPoolConfig, blockHeight: Int) extends S
       var isFailureAttempt = false // Boolean that determines whether or not this distribution chain is resending txs for a failed attempt.
       if(totalIdx.getFailed.boxes.nonEmpty || totalIdx.getSuccessful.boxes.nonEmpty){
         isFailureAttempt = true
-        boxIndex = totalIdx.getUsed
+        boxIndex = totalIdx.getUsed // Index filtering happens at subpool selection
 
       }
 
@@ -180,9 +188,10 @@ class DistributeRewardsCmd2(config: SmartPoolConfig, blockHeight: Int) extends S
         totalIdx.writeFailures(executed.failed, Array(blockHeight))
       }
       logger.info("Now evaluating completed boxes...")
+      totalIdx.writeSuccessful(executed.completed, Array(blockHeight))
       for(boxPair <- executed.completed){
         val metadataInputBox = boxPair._1
-        totalIdx.writeSuccessful(executed.completed, Array(blockHeight))
+
 
         logger.info("SmartPool Data now being built and inserted into database.")
 
@@ -221,11 +230,16 @@ class DistributeRewardsCmd2(config: SmartPoolConfig, blockHeight: Int) extends S
         logger.info(s"$rowsInserted rows were inserted!")
 
       }
-
+      if(isFailureAttempt){
+        logger.warn("Now exiting due to failure attempt")
+        exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
+      }
 
 
     })
     logger.info("Command has finished execution")
+
+
   }
 
   def recordToDb: Unit = {

@@ -9,36 +9,29 @@ import persistence.responses.ShareResponse
 import java.sql.PreparedStatement
 import java.time.{LocalDateTime, ZoneId}
 
-class SharesArchiveInsertion(dbConn: DatabaseConnection) extends DatabaseWrite[ShareResponse](dbConn){
+class SharesArchiveInsertion(dbConn: DatabaseConnection, querySize: Int, offset: Int) extends DatabaseWrite[ShareResponse](dbConn){
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
 
   override val insertionString: String =
     """INSERT INTO
-      | shares_archive (poolid, blockheight, difficulty, networkdifficulty, miner, worker, useragent, ipaddress, source, created)
-      | VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?);""".stripMargin
+      | shares_archive SELECT * FROM shares WHERE poolid = ? AND created < ? FETCH NEXT ? ROWS ONLY OFFSET ?""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(insertionString)
 
   override def setVariables(shareResponse: ShareResponse): DatabaseWrite[ShareResponse] = {
 
     asStatement.setString(1, shareResponse.poolId)
-    asStatement.setLong(2, shareResponse.height)
-    asStatement.setDouble(3, shareResponse.diff.doubleValue())
-    asStatement.setDouble(4, shareResponse.netDiff.doubleValue())
-    asStatement.setString(5, shareResponse.minerAddress)
-    asStatement.setString(6, shareResponse.worker)
-    asStatement.setString(7, shareResponse.userAgent)
-    asStatement.setString(8, shareResponse.ipAddress)
-    asStatement.setString(9, shareResponse.source)
-    asStatement.setObject(10, LocalDateTime.ofInstant(shareResponse.created.toInstant, ZoneId.systemDefault()))
 
+    asStatement.setObject(2, LocalDateTime.ofInstant(shareResponse.created.toInstant, ZoneId.systemDefault()))
+    asStatement.setInt(3, querySize)
+    asStatement.setInt(4, offset)
     this
   }
 
   override def execute(): Long = {
-    //logger.info("Executing update")
+    logger.info("Executing update")
     val rowsInserted = asStatement.executeUpdate()
     asStatement.close()
-    //logger.info(s"Update executed. ${rowsInserted} Rows inserted into db.")
+    logger.info(s"Update executed. ${rowsInserted} Rows inserted into db.")
     rowsInserted
   }
 }

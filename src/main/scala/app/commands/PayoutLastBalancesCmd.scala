@@ -77,7 +77,7 @@ class PayoutLastBalancesCmd(config: SmartPoolConfig) extends SmartPoolCmd(config
           outBoxes = outBoxes ++ Array(ctx.newTxBuilder()
             .outBoxBuilder()
             .value(dustRemoved)
-            .contract(new ErgoTreeContract(Address.create(b.address).getErgoAddress.script))
+            .contract(new ErgoTreeContract(Address.create(b.address).getErgoAddress.script, nodeAddress.getNetworkType))
             .build())
         }
       }

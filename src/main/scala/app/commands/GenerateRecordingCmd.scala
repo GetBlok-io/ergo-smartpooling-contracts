@@ -86,7 +86,7 @@ class GenerateRecordingCmd(config: SmartPoolConfig) extends SmartPoolCmd(config)
       val tokenBox = outB
         .value(recordingValue + (txFee))
         .mintToken(recordingToken, "GetBlok.io Recording Box Token", "This token identifies this box to be a part of GetBlok.io's proof-of-vote protocol.", 0)
-        .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
+        .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script, nodeAddress.getNetworkType))
         .build()
 
       val tokenTx =

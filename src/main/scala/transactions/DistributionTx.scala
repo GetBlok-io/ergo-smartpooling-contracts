@@ -123,9 +123,9 @@ class DistributionTx(unsignedTxBuilder: UnsignedTransactionBuilder) extends Meta
     for(hb <- holdingOutputs){
       logger.info("Output Box Val: " + hb.asOutBox.getValue)
       if(_tokenToDistribute != null) {
-        if (hb.asOutBox.token(_tokenToDistribute.getId) != null) {
-          logger.info("Holding Box Token: " + hb.asOutBox.token(_tokenToDistribute.getId).getId)
-          logger.info("Holding Box Token Amnt: " + hb.asOutBox.token(_tokenToDistribute.getId).getValue)
+        if (hb.asOutBox.getTokens.asScala.exists(t => t.getId == _tokenToDistribute.getId)) {
+          logger.info("Holding Box Token: " + hb.asOutBox.getTokens.asScala.find(t => t.getId == _tokenToDistribute.getId).get)
+          logger.info("Holding Box Token Amnt: " + hb.getTokens.asScala.find(t => t.getId == _tokenToDistribute.getId).get)
         }
       }
     }

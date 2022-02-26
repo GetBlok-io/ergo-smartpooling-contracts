@@ -31,6 +31,7 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
   def initiateCommand: Unit = {
     logger.info("Initiating command...")
     // Basic assertions
+
     require(holdConf.getHoldingAddress != "")
     require(holdConf.getHoldingType == "default")
     require(paramsConf.getSmartPoolId != "")

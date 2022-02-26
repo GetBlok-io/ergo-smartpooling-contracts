@@ -13,7 +13,7 @@ import java.util.Date
 class SharesBeforeCreatedQuery(dbConn: DatabaseConnection, poolId: String, created: Date) extends DatabaseQuery[Array[ShareResponse]](dbConn) {
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
   override val queryString: String =
-    """SELECT * FROM shares WHERE poolid = ? AND created < ?""".stripMargin
+    """SELECT * FROM shares WHERE poolid = ? AND created < ? FETCH NEXT ? """.stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(queryString)
 
   override def setVariables(): DatabaseQuery[Array[ShareResponse]] = {

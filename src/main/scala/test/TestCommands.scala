@@ -112,7 +112,7 @@ object TestCommands {
       .value(rewardsValue/3)
       .build()
     val rewardsOutput3 = ctx.newTxBuilder().outBoxBuilder()
-      .contract(new ErgoTreeContract(rewardsAddress.getErgoAddress.script))
+      .contract(new ErgoTreeContract(rewardsAddress.getErgoAddress.script, rewardsAddress.getNetworkType))
       .value(rewardsValue/3)
       .build()
     val holdingOutput3 = ctx.newTxBuilder().outBoxBuilder()
@@ -155,7 +155,7 @@ object TestCommands {
     val tokenBox = outB
       .value(initValue + (Parameters.MinFee * 4))
       .mintToken(smartPoolToken, "SmartPool Test Token", "Test Token For SmartPool", 0)
-      .contract(new ErgoTreeContract(poolOperator.getErgoAddress.script))
+      .contract(new ErgoTreeContract(poolOperator.getErgoAddress.script, poolOperator.getNetworkType))
       .build()
 
     val tokenTx = txB.boxesToSpend(boxesToSpend).fee(Parameters.MinFee * 2).outputs(tokenBox).sendChangeTo(poolOperator.getErgoAddress).build()
@@ -408,7 +408,7 @@ object TestCommands {
     val tokenBox = outB
       .value(initValue + (Parameters.MinFee * 1))
       .mintToken(recordingToken, "Recording Box NFT", "Test Token Recording Box", 0)
-      .contract(new ErgoTreeContract(poolOperator.getErgoAddress.script))
+      .contract(new ErgoTreeContract(poolOperator.getErgoAddress.script, poolOperator.getNetworkType))
       .build()
 
     val tokenTx = txB.boxesToSpend(boxesToSpend).fee(Parameters.MinFee * 1).outputs(tokenBox).sendChangeTo(poolOperator.getErgoAddress).build()

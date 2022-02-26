@@ -11,9 +11,11 @@ import logging.LoggingHandler
 import org.ergoplatform.appkit.impl.{ErgoTreeContract, InputBoxImpl}
 import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoId, ErgoProver, ErgoToken, InputBox, OutBox, Parameters, SignedTransaction}
 import org.slf4j.{Logger, LoggerFactory}
+import persistence.BoxStatus
+import persistence.models.Models.BoxEntry
+import persistence.responses.BoxIndexResponse
 import registers.{MemberList, PoolFees, PoolOperators, ShareConsensus}
 import transactions.{CreateCommandTx, DistributionTx}
-import transactions.models.TransactionGroup
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 import scala.util.Try
@@ -23,7 +25,7 @@ import scala.util.Try
 
 class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBox], prover: ErgoProver, address: Address,
                         blockReward: Long, holdingContract: HoldingContract, commandContract: CommandContract, config: SmartPoolConfig,
-                        shareConsensus: ShareConsensus, memberList: MemberList, poolFees: PoolFees, isFailureAttempt: Boolean, failureIds: Array[String]) extends TransactionGroup[Map[MetadataInputBox, String]]{
+                        shareConsensus: ShareConsensus, memberList: MemberList, poolFees: PoolFees, isFailureAttempt: Boolean, boxIndex: Array[BoxIndexResponse]) extends TransactionGroup[Map[MetadataInputBox, String]]{
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DIST_GRP)
   private[this] var _completed = Map[MetadataInputBox, String]()
@@ -47,7 +49,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
   final val STANDARD_FEE = Parameters.MinFee * 5
 
   var customCommand = false
-  var voteTokenStr = config.getParameters.getVotingConf.getVoteTokenId
+  var voteTokenStr = ""
   override def buildGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
     logger.info("Now building DistributionGroup")
 
@@ -56,6 +58,17 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     val membersLeft = subpoolSelector.selectDefaultSubpools(metadataInputs, shareConsensus, memberList)._2
     boxToShare = subpoolSelector.shareMap
     boxToMember = subpoolSelector.memberMap
+
+    if(isFailureAttempt){
+      for(box <- boxToShare){
+        val boxIndexEntry = boxIndex.find(b => b.subpoolId == box._1.getSubpoolId.toString)
+        if(boxIndexEntry.get.status == BoxStatus.SUCCESS){
+          removeFromMaps(box._1)
+        }
+      }
+      val subpoolString = "Failure attempt with subpools " ++ boxToShare.keys.flatMap(b => b.getSubpoolId.toString + ", ")
+      logger.info(subpoolString)
+    }
 
     for(boxSh <- boxToShare){
       logger.info(s"Subpool ${boxSh._1.getSubpoolId} has ${boxSh._2.cValue.length} members")
@@ -68,10 +81,10 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 //        logger.info(s"Subpool ${boxSh._1.getSubpoolId} removed from maps due to having 0 new members or shares!")
 //        removeFromMaps(boxSh._1)
 //      }
-      if (boxSh._1.getPoolOperators.cValue.exists(c => c._1 sameElements commandContract.getErgoTree.bytes)) {
-        if (voteTokenStr != "")
-          customCommand = true
-      }
+//      if (boxSh._1.getPoolOperators.cValue.exists(c => c._1 sameElements commandContract.getErgoTree.bytes)) {
+//        if (voteTokenStr != "")
+//          customCommand = false
+//      }
 
       logger.info(s"==== Subpool ${boxSh._1.getSubpoolId} ====\n")
       val memberStrings = boxToMember(boxSh._1).cValue.map(m => m._2)
@@ -197,7 +210,6 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
 
 
         val newPoolOperators = PoolOperators.convert(Array(
-          (commandContract.getErgoTree.bytes, "Vote Token Distributor"),
           (address.getErgoAddress.script.bytes, address.toString),
         ))
 
@@ -389,7 +401,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     for(boxSh <- boxToShare){
      // val txFee = boxSh._2.cValue.length * Parameters.MinFee
      // val holdingFee = txB.outBoxBuilder().value(txFee).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
-      val commandFeeOutput = txB.outBoxBuilder().value(cmdConf.getCommandValue + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script))
+      val commandFeeOutput = txB.outBoxBuilder().value(cmdConf.getCommandValue + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script, address.getNetworkType))
       if(voteTokenStr != "" && customCommand){
         // If vote token id exists, lets send vote tokens equal to total amount in holding contracts
         val voteTokenId = ErgoId.create(voteTokenStr)
@@ -400,7 +412,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
       }
       val commandFee = commandFeeOutput.build()
       if(withHolding) {
-        val regroupFee = txB.outBoxBuilder().value(boxToValue(boxSh._1)._1 + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
+        val regroupFee = txB.outBoxBuilder().value(boxToValue(boxSh._1)._1 + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script, address.getNetworkType)).build()
         totalFees = totalFees + cmdConf.getCommandValue + STANDARD_FEE + boxToValue(boxSh._1)._1 + STANDARD_FEE
         boxToOutputs = boxToOutputs++Map((boxSh._1, Array(commandFee, regroupFee)))
       }else {

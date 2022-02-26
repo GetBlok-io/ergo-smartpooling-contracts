@@ -40,10 +40,10 @@ class BoxIndexUpdate2(dbConn: DatabaseConnection) extends DatabaseWrite[BoxEntry
   }
 
   override def execute(): Long = {
-    logger.info("Executing update")
+
     val rowsInserted = asStatement.executeUpdate()
     asStatement.close()
-    logger.info(s"Update executed. ${rowsInserted} Rows inserted into db.")
+
     rowsInserted
   }
 }

@@ -50,4 +50,5 @@ class CommandInputBox(inputBox: InputBox, commandContract: CommandContract) exte
 
   override def getErgoTree: Values.ErgoTree = contract.getErgoTree
 
+  override def getBytes: Array[Byte] = asInput.getBytes
 }

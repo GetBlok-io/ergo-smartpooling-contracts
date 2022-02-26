@@ -249,7 +249,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         logger.info(s" Value from shares for address ${addr}: ${boxValue._2}")
         if(boxValue._2 > 0) {
           val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
-          val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
+          val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script, addr.getNetworkType))
           outBoxMap = outBoxMap++Map((newOutBox, (boxValue._2, true)))
         }
     }
@@ -260,14 +260,14 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
         val boxValue = feeList.filter{poolFeeVal: (Coll[Byte], Long) => poolFeeVal._1 == addrBytes.nValue}(0)
         if(boxValue._2 > 0) {
           println(s"Fee Value for address ${addr}: ${boxValue._2}")
-          val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script))
+          val newOutBox = outB.value(boxValue._2).contract(new ErgoTreeContract(addr.getErgoAddress.script, addr.getNetworkType))
           outBoxMap = outBoxMap++Map((newOutBox, (boxValue._2, false)))
         }
     }
 
     if(changeValue > 0) {
       val outB = distributionTx.asUnsignedTxB.outBoxBuilder()
-      val newOutBox = outB.value(changeValue).contract(new ErgoTreeContract(holdingAddress.getErgoAddress.script))
+      val newOutBox = outB.value(changeValue).contract(new ErgoTreeContract(holdingAddress.getErgoAddress.script, holdingAddress.getNetworkType))
       outBoxMap = outBoxMap++Map((newOutBox, (changeValue, false)))
     }
     new HoldingOutputBuilder(outBoxMap)

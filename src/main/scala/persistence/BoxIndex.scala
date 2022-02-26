@@ -13,7 +13,8 @@ import persistence.writes.{BoxIndexInsertion, BoxIndexInsertion2, BoxIndexUpdate
 class BoxIndex(dbConn: DatabaseConnection, poolId: String, boxEntries: Array[BoxEntry]) {
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
   var boxes: Map[Int, BoxEntry] = boxEntries.map(b => (b.subpoolId, b)).toMap
-
+  private var metadataInputs: Array[MetadataInputBox] = _
+  private var holdingMap: Array[MetadataInputBox] = _
   def getSuccessful: BoxIndex = new BoxIndex(dbConn, poolId, boxes.filter(b => b._2.status == BoxStatus.SUCCESS).values.toArray)
   def getFailed: BoxIndex = new BoxIndex(dbConn, poolId, boxes.filter(b => b._2.status == BoxStatus.FAILURE).values.toArray)
   def getConfirmed: BoxIndex = new BoxIndex(dbConn, poolId, boxes.filter(b => b._2.status == BoxStatus.CONFIRMED).values.toArray)
@@ -25,21 +26,34 @@ class BoxIndex(dbConn: DatabaseConnection, poolId: String, boxEntries: Array[Box
   def size: Int = this.boxes.size
   def head: (Int, BoxEntry) = this.boxes.head
 
-  def grabFromContext(ctx: BlockchainContext): Array[MetadataInputBox] =
-    boxes.map(b => b._2.grabFromContext(ctx).get).toArray.sortBy(m => m.getSubpoolId)
+  def grabFromContext(ctx: BlockchainContext): Array[MetadataInputBox] = {
+    if(metadataInputs == null) {
+      metadataInputs = boxes.map(b => b._2.grabFromContext(ctx).get).toArray.sortBy(m => m.getSubpoolId)
+    }
+    metadataInputs
+  }
 
-  def getHoldingBoxes(ctx: BlockchainContext): Map[MetadataInputBox, InputBox] =
-    boxes.filter(b => b._2.holdingVal != 0).map(b => (b._2.grabFromContext(ctx).get, b._2.holdingFromContext(ctx).get))
+  def getHoldingBoxes(ctx: BlockchainContext): Map[MetadataInputBox, InputBox] = {
+    if(metadataInputs == null)
+      boxes.filter(b => b._2.holdingVal > 0).map(b => (b._2.grabFromContext(ctx).get, b._2.holdingFromContext(ctx).get))
+    else
+      metadataInputs.filter(b => this(b.getSubpoolId.toInt).holdingVal > 0).map(b => (b, this(b.getSubpoolId.toInt).holdingFromContext(ctx).get)).toMap
+  }
 
-  def getStorageBoxes(ctx: BlockchainContext): Map[MetadataInputBox, InputBox] =
-    boxes.filter(b => b._2.storedVal != 0).map(b => (b._2.grabFromContext(ctx).get, b._2.storageFromContext(ctx).get))
+  def getStorageBoxes(ctx: BlockchainContext): Map[MetadataInputBox, InputBox] = {
+    if(metadataInputs == null) {
+      boxes.filter(b => b._2.storedVal > 0).map(b => (b._2.grabFromContext(ctx).get, b._2.storageFromContext(ctx).get))
+    }else{
+      metadataInputs.filter(b => this(b.getSubpoolId.toInt).storedVal > 0).map(b => (b, this(b.getSubpoolId.toInt).storageFromContext(ctx).get)).toMap
+    }
+  }
 
   def writeFailures(failed: Map[MetadataInputBox, String], blockHeights: Array[Long]): Long = {
     var numBoxes = 0L
     for(boxPair <- failed){
       val metadataInputBox = boxPair._1
       val entry = this(metadataInputBox.getSubpoolId.toInt)
-      val boxIndexEntry = BoxEntry(poolId, metadataInputBox.getId.toString, boxPair._2,
+      val boxIndexEntry = BoxEntry(poolId, entry.boxId, boxPair._2,
         metadataInputBox.getCurrentEpoch, BoxStatus.FAILURE, entry.smartPoolNft,
         entry.subpoolId, blockHeights, entry.holdingId, entry.holdingVal, entry.storedId, entry.storedVal)
       val rowsUpdated = new BoxIndexUpdate2(dbConn).setVariables(boxIndexEntry).execute()
@@ -62,7 +76,7 @@ class BoxIndex(dbConn: DatabaseConnection, poolId: String, boxEntries: Array[Box
       val metadataInputBox = boxPair._1
       val entry = this(metadataInputBox.getSubpoolId.toInt)
 
-      val boxIndexEntry = BoxEntry(poolId, metadataInputBox.getId.toString, boxPair._2,
+      val boxIndexEntry = BoxEntry(poolId, entry.boxId, boxPair._2,
         metadataInputBox.getCurrentEpoch, BoxStatus.SUCCESS, metadataInputBox.getSmartPoolId.toString,
         entry.subpoolId, blockHeights, entry.holdingId, entry.holdingVal, entry.storedId, entry.storedVal)
       val rowsUpdated = new BoxIndexUpdate2(dbConn).setVariables(boxIndexEntry).execute()
@@ -85,7 +99,7 @@ class BoxIndex(dbConn: DatabaseConnection, poolId: String, boxEntries: Array[Box
       val metadataInputBox = boxPair._1
       val entry = this(metadataInputBox.getSubpoolId.toInt)
 
-      val boxIndexEntry = BoxEntry(poolId, entry.boxId, entry.txId,
+      val boxIndexEntry = BoxEntry(poolId, metadataInputBox.getId.toString, entry.txId,
         metadataInputBox.getCurrentEpoch, BoxStatus.CONFIRMED, entry.smartPoolNft,
         entry.subpoolId, entry.blocks, BoxEntry.EMPTY, 0L, boxPair._2.getId.toString, boxPair._2.getValue)
       val rowsUpdated = new BoxIndexUpdate2(dbConn).setVariables(boxIndexEntry).execute()
@@ -98,6 +112,29 @@ class BoxIndex(dbConn: DatabaseConnection, poolId: String, boxEntries: Array[Box
     confirmed.keys.foreach(
       m =>
         logger.info(s"Subpool ${m.getSubpoolId} has status ${BoxStatus.CONFIRMED.toUpperCase}")
+    )
+    numBoxes
+  }
+
+  def writeEmptyConfirmed(confirmed: Array[MetadataInputBox]): Long = {
+    var numBoxes = 0L
+    for(box <- confirmed){
+      val metadataInputBox = box
+      val entry = this(metadataInputBox.getSubpoolId.toInt)
+
+      val boxIndexEntry = BoxEntry(poolId, metadataInputBox.getId.toString, entry.txId,
+        metadataInputBox.getCurrentEpoch, BoxStatus.CONFIRMED, entry.smartPoolNft,
+        entry.subpoolId, entry.blocks, BoxEntry.EMPTY, 0L, BoxEntry.EMPTY, 0L)
+      val rowsUpdated = new BoxIndexUpdate2(dbConn).setVariables(boxIndexEntry).execute()
+      if(rowsUpdated > 0){
+        numBoxes = numBoxes + rowsUpdated
+        boxes = boxes.updated(entry.subpoolId, entry)
+      }
+    }
+    logger.info(s"$numBoxes subpools completed successfully")
+    confirmed.foreach(
+      m =>
+        logger.info(s"Subpool ${m.getSubpoolId} has status ${BoxStatus.CONFIRMED.toUpperCase} with no storage")
     )
     numBoxes
   }

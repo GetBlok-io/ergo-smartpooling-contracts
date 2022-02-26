@@ -26,7 +26,7 @@ class BoxIndexQuery2(dbConn: DatabaseConnection) extends DatabaseQuery[Array[Box
     rt = asStatement.executeQuery()
 
     while(rt.next()) {
-      logger.info("Response was found for BoxIndex query!")
+      //logger.info("Response was found for BoxIndex query!")
       _response = _response++Array(BoxEntry(
         rt.getString(1),
         rt.getString(2),

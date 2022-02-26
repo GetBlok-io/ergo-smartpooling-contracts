@@ -1,25 +1,16 @@
 package app.commands
 
 import app.{AppCommand, ExitCodes, exit}
-import boxes.{CommandInputBox, MetadataInputBox}
+import boxes.MetadataInputBox
 import configs.SmartPoolConfig
-import contracts.holding
-import contracts.holding.{HoldingContract, SimpleHoldingContract}
 import explorer.ExplorerHandler
 import logging.LoggingHandler
-import node.NodeScanner
 import org.ergoplatform.appkit._
-import org.ergoplatform.appkit.impl.{BlockchainContextBase, ErgoTreeContract}
 import org.ergoplatform.explorer.client.ExplorerApiClient
-import org.ergoplatform.restapi.client.ApiClient
 import org.slf4j.{Logger, LoggerFactory}
-import persistence.{DatabaseConnection, PersistenceHandler}
 import persistence.entries.{BoxIndexEntry, ConsensusEntry, SmartPoolEntry}
-import persistence.responses.SmartPoolResponse
 import persistence.writes.{BoxIndexUpdate, ConsensusInsertion, SmartPoolDataInsertion}
-import registers.{MemberList, ShareConsensus}
-import sigmastate.Values.ErgoTree
-import sigmastate.eval.CostingSigmaDslBuilder.Colls
+import persistence.{DatabaseConnection, PersistenceHandler}
 import sigmastate.serialization.ErgoTreeSerializer
 
 import scala.collection.JavaConverters.collectionAsScalaIterableConverter

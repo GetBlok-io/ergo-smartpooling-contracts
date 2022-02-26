@@ -26,7 +26,7 @@ abstract class OutputTemplate(outBox: OutBox, metadataRegs: MetadataRegisters) e
     (shareConsensus.getNormalValue, memberList.getNormalValue, poolFees.getNormalValue, poolInfo.getNormalValue, poolOps.getNormalValue)
   }
 
-  override def token(id: ErgoId): ErgoToken = asOutBox.token(id)
+  override def getTokens: java.util.List[ErgoToken] = asOutBox.getTokens
 
   /**
    * Get copy of metadata registers. Actual MetadataRegisters is not returned since OutBox is immutable

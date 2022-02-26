@@ -12,7 +12,6 @@ import org.ergoplatform.appkit.impl.{ErgoTreeContract, InputBoxImpl}
 import org.ergoplatform.appkit._
 import org.slf4j.{Logger, LoggerFactory}
 import registers.{MemberList, PoolFees, PoolOperators, ShareConsensus}
-import transactions.models.TransactionGroup
 import transactions.{CreateCommandTx, DistributionTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
@@ -90,14 +89,15 @@ class HoldingGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBo
     for(hv <- boxToValue) {
       if (hv._2 != 0) {
         logger.info("Searching for exact holding box with value " + hv._2)
-        val exactHoldingBox = BoxHelpers.findExactBox(hv._2, holdingBoxes)
-        if (exactHoldingBox.isDefined) {
-          logger.info(s"Exact holding box was found for subpool ${hv._1.getSubpoolId}. This box will not be present in the holdingChain!")
-          holdingBoxes = holdingBoxes.filter(i => i.getId != exactHoldingBox.get.getId)
-          boxToExact = boxToExact ++ Map((hv._1, exactHoldingBox.get))
-          boxToValue = boxToValue -- Array(hv._1)
-          logger.info("Current holdingBoxesList: " + holdingBoxes.length)
-        }
+//        val exactHoldingBox = BoxHelpers.findExactBox(hv._2, holdingBoxes)
+//        if (exactHoldingBox.isDefined) {
+//          logger.info(s"Exact holding box was found for subpool ${hv._1.getSubpoolId}. This box will not be present in the holdingChain!")
+//          holdingBoxes = holdingBoxes.filter(i => i.getId != exactHoldingBox.get.getId)
+//          boxToExact = boxToExact ++ Map((hv._1, exactHoldingBox.get))
+//          boxToValue = boxToValue -- Array(hv._1)
+//          logger.info("Current holdingBoxesList: " + holdingBoxes.length)
+//        }
+
       } else {
         logger.info(s"Subpool ${hv._1.getSubpoolId} has 0 value locked or added! Now removing from maps.")
         removeFromMaps(hv._1)
@@ -157,7 +157,7 @@ class HoldingGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBo
     var boxToCollectedInputs = Map.empty[MetadataInputBox, InputBox]
 
     for(boxVal <- boxToValue){
-      val initBox = txB.outBoxBuilder().value(boxVal._2 + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script)).build()
+      val initBox = txB.outBoxBuilder().value(boxVal._2 + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script, address.getNetworkType)).build()
       totalFees = totalFees + boxVal._2  + STANDARD_FEE
       boxToOutputs = boxToOutputs++Map((boxVal._1, initBox))
     }
@@ -180,7 +180,7 @@ class HoldingGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBo
     var inputsAdded = Array[InputBox]()
     val collectedInputs = signedTx.getOutputsToSpend
 
-    for(box <- boxToShare.keys){
+    for(box <- boxToValue.keys){
       val outBox = boxToOutputs(box)
       val collectionVal = outBox.getValue
       val collectedBox = collectedInputs.asScala.filter(fb => fb.getValue == collectionVal && !(inputsAdded.exists(ib => ib.getId == fb.getId))).head

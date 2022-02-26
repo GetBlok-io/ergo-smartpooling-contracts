@@ -76,7 +76,7 @@ class GenerateMetadataCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) 
       val tokenBox = outB
         .value(metadataValue + (txFee))
         .mintToken(smartPoolToken, "GetBlok.io SmartPool Display Token", "This token identifies this box to be a part of GetBlok.io's smart-contract based mining pool", 0)
-        .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
+        .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script, nodeAddress.getNetworkType))
         .build()
 
       val tokenTx =

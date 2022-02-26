@@ -19,31 +19,32 @@ object BoxHelpers {
   /**
    * Linear search to select metadata box using given parameters
    */
-  def selectCurrentMetadata(ctx: BlockchainContext, smartPoolId: ErgoId, metadataAddress: Address, metadataValue: Long): MetadataInputBox = {
+  def searchMetadataFromCtx(ctx: BlockchainContext, smartPoolId: ErgoId, metadataAddress: Address, metadataValue: Long, subpoolId: Int): MetadataInputBox = {
     logger.info("Searching for metadata box...")
     var offset = 0
-    var boxesToSearch = ctx.getUnspentBoxesFor(metadataAddress, offset, BOX_SELECTOR_LIMIT)
+    var boxesToSearch = ctx.getUnspentBoxesFor(metadataAddress, offset, BOX_SELECTOR_LIMIT * 2)
     if(boxesToSearch.size() > 0) {
-      var metadataInputBox = boxesToSearch.get(0)
       while (boxesToSearch.asScala.nonEmpty) {
         for (box <- boxesToSearch.asScala) {
           if (box.getValue == metadataValue) {
-            if (box.getTokens.asScala.nonEmpty){
+            if (box.getTokens.asScala.nonEmpty) {
               val boxTokens = box.getTokens
-              if(boxTokens.get(0).getId.toString == smartPoolId.toString && boxTokens.get(0).getValue == 1){
+              if (boxTokens.get(0).getId.toString == smartPoolId.toString && boxTokens.get(0).getValue == 1) {
                 logger.info("Metadata candidate found!")
-                return new MetadataInputBox(box, smartPoolId)
+                val currentMetaBox = new MetadataInputBox(box, smartPoolId)
+                if (currentMetaBox.getSubpoolId == subpoolId.toLong) {
+                  return currentMetaBox
+                }
               }
             }
           }
         }
         offset = offset + boxesToSearch.size()
-        boxesToSearch = ctx.getUnspentBoxesFor(metadataAddress, offset, BOX_SELECTOR_LIMIT)
+        boxesToSearch = ctx.getUnspentBoxesFor(metadataAddress, offset, BOX_SELECTOR_LIMIT * 2)
       }
-      new MetadataInputBox(metadataInputBox, smartPoolId)
-    }else{
-      throw new InvalidArguments("Could not find any box with given parameters!")
     }
+    throw new InvalidArguments("Could not find any box with given parameters!")
+
   }
 
   def minBox(boxOne: InputBox, boxTwo: InputBox): InputBox ={

@@ -20,7 +20,7 @@ import transactions.{CreateCommandTx, DistributionTx, RegroupTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
 import scala.util.Try
-
+@deprecated // Done automatically through interaction of CleanDb and DistributeCmd
 class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends SmartPoolCmd(config) {
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DISTRIBUTE_REWARDS_CMD)
@@ -148,7 +148,7 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
       logger.info(metadataBox.toString)
       val voteTokenId = ErgoId.create(voteConf.getVoteTokenId)
       val commandTx = new CreateCommandTx(ctx.newTxBuilder())
-      val commandContract = VoteTokensContract.generateContract(ctx,voteTokenId, nodeAddress)
+      val commandContract = new PKContract(nodeAddress)
 
       var inputBoxes = ctx.getWallet.getUnspentBoxes(cmdConf.getCommandValue + commandTx.txFee).get().asScala.toList
       val tokenBoxes = inputBoxes.filter(ib => ib.getTokens.asScala.exists(t => t.getId.toString == voteTokenId.toString))
@@ -193,7 +193,6 @@ class DistributeFailedCmd(config: SmartPoolConfig, subpoolid: Int) extends Smart
           .holdingInputs(holdingBoxesList)
           .holdingContract(holdingContract)
           .operatorAddress(nodeAddress)
-          .tokenToDistribute(commandBox.getTokens.get(0))
           .buildMetadataTx()
       val signedDistTx = prover.sign(unsignedDistTx)
       logger.info("Distribution Tx successfully signed.")

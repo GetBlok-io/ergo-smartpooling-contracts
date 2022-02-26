@@ -1,5 +1,6 @@
 package boxes.models
 
+import app.AppParameters
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import org.ergoplatform.appkit._
 import registers._
@@ -15,7 +16,7 @@ abstract class InputTemplate(inputBox: InputBox) extends InputBox{
   val poolFees: PoolFees = new PoolFees(asInput.getRegisters.get(2).getValue.asInstanceOf[Coll[(Coll[Byte], Int)]])
   val poolInfo: PoolInfo = new PoolInfo(asInput.getRegisters.get(3).getValue.asInstanceOf[Coll[Long]])
   val poolOps: PoolOperators = new PoolOperators(asInput.getRegisters.get(4).getValue.asInstanceOf[Coll[(Coll[Byte], Coll[Byte])]])
-  val contract: ErgoContract = new ErgoTreeContract(asInput.getErgoTree)
+  val contract: ErgoContract = new ErgoTreeContract(asInput.getErgoTree, AppParameters.networkType)
   private val metadataRegisters: MetadataRegisters = new MetadataRegisters(shareConsensus, memberList, poolFees, poolInfo, poolOps)
 
   def getRawMetaDataInfo: (Coll[(Coll[Byte], Coll[Long])], Coll[(Coll[Byte], Coll[Byte])], Coll[(Coll[Byte], Int)], Coll[Long], Coll[(Coll[Byte], Coll[Byte])]) = {

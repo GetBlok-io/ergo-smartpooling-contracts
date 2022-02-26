@@ -2,7 +2,7 @@ package app
 
 import app.AppCommand.{CheckAndCleanDbCmd, DistributeFailedCmd, DistributeRewardsCmd, EmptyCommand, GenerateMetadataCmd, GenerateRecordingCmd, InitializeVoteTokensCmd, PayoutBalancesCmd, ResetStatusCmd, ScanMetadataCmd, SendToHoldingCmd, ViewMetadataCmd, VoteCollectionCmd}
 import app.api.{ApiCommand, GenerateVoteTxApi}
-import app.commands.{CheckAndCleanDbCmd, CheckAndCleanDbCmd2, DistributeFailedCmd, DistributeMultipleCmd, DistributeRewardsCmd, DistributeRewardsCmd2, GenerateMetadataCmd, GenerateMultipleCmd, GenerateRecordingCmd, GrabFromMetadataCmd, InitVoteTokensCmd, PayoutLastBalancesCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd, VoteCollectionCmd}
+import app.commands.{CheckAndCleanDbCmd, CleanDbCmd, DistributeFailedCmd, DistributeMultipleCmd, DistributeRewardsCmd, DistributeCmd, GenerateMetadataCmd, GenerateMultipleCmd, GenerateRecordingCmd, GrabFromMetadataCmd, InitVoteTokensCmd, PayoutLastBalancesCmd, ResetToPendingCmd, SendMultipleToHoldingCmd, SendToHoldingCmd, SmartPoolCmd, ViewMetadataCmd, VoteCollectionCmd}
 import org.slf4j.LoggerFactory
 import configs.{ConfigHandler, SmartPoolConfig}
 import logging.LoggingHandler
@@ -62,8 +62,6 @@ object SmartPoolingApp{
               txCommand = CheckAndCleanDbCmd
             case "pb" =>
               txCommand = PayoutBalancesCmd
-            case "fd" =>
-              txCommand = DistributeFailedCmd
             case "ivt" =>
               txCommand = InitializeVoteTokensCmd
             case "gr" =>
@@ -130,16 +128,7 @@ object SmartPoolingApp{
             logger.info(s"SmartPool Command: ${GenerateMetadataCmd.toString}")
           case DistributeRewardsCmd =>
             if(numInput != -1) {
-              cmd = new DistributeRewardsCmd2(config.get, numInput)
-            }else if(blockHeights.length > 0){
-              cmd = new DistributeMultipleCmd(config.get, blockHeights)
-            }else{
-              exit(logger, ExitCodes.INVALID_ARGUMENTS)
-            }
-            logger.info(s"SmartPool Command: ${DistributeRewardsCmd.toString}")
-          case DistributeFailedCmd =>
-            if(numInput != -1) {
-              cmd = new DistributeFailedCmd(config.get, numInput)
+              cmd = new DistributeCmd(config.get, numInput)
             }else{
               exit(logger, ExitCodes.INVALID_ARGUMENTS)
             }
@@ -155,7 +144,7 @@ object SmartPoolingApp{
             logger.info(s"SmartPool Command: ${ResetStatusCmd.toString}")
           case CheckAndCleanDbCmd =>
             if(numInput != -1) {
-              cmd = new CheckAndCleanDbCmd2(config.get, numInput)
+              cmd = new CleanDbCmd(config.get, numInput)
               logger.info(s"SmartPool Command: ${CheckAndCleanDbCmd.toString}")
             } else {
               exit(logger, ExitCodes.INVALID_ARGUMENTS)

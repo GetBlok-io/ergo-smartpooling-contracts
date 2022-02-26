@@ -84,7 +84,7 @@ class GenerateMultipleCmd(config: SmartPoolConfig, generationAmount: Int) extend
       val tokenBox = outB
         .value((metadataValue * generationAmount) + (txFee))
         .mintToken(smartPoolToken, "GetBlok.io SmartPool Display Token", "This token identifies this box as a subpool under GetBlok.io's smart-contract based mining pool", 0)
-        .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script))
+        .contract(new ErgoTreeContract(nodeAddress.getErgoAddress.script, nodeAddress.getNetworkType))
         .build()
 
       val tokenTx =

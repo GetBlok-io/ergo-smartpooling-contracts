@@ -63,4 +63,6 @@ class MetadataInputBox(inputBox: InputBox, smartPoolNFTId: ErgoId) extends Input
   }
 
   def getSmartPoolId: ErgoId = this.smartPoolId
+
+  override def getBytes: Array[Byte] = asInput.getBytes
 }

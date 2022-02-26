@@ -3,8 +3,11 @@ package boxes
 import boxes.models.OutputTemplate
 import org.ergoplatform.appkit._
 import registers._
+import sigmastate.Values
 import sigmastate.serialization.ErgoTreeSerializer
 import special.collection.Coll
+
+import java.util
 
 /**
  * Wrapper class that wraps output boxes as metadata boxes / command boxes
@@ -35,7 +38,11 @@ class RecordingOutBox(outBox: OutBox, yesVoteReg: VoteRegister, noVoteReg: VoteR
 
   override def getCreationHeight: Int = asOutBox.getCreationHeight
 
-  override def token(id: ErgoId): ErgoToken = asOutBox.token(id)
+  override def getTokens: java.util.List[ErgoToken] = asOutBox.getTokens
 
+  override def getRegisters: util.List[ErgoValue[_]] = asOutBox.getRegisters
 
+  override def getErgoTree: Values.ErgoTree = asOutBox.getErgoTree
+
+  override def getBytesWithNoRef: Array[Byte] = asOutBox.getBytesWithNoRef
 }

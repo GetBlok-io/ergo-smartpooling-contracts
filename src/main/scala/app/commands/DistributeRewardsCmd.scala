@@ -24,7 +24,7 @@ import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, mapA
 import scala.util.Try
 
 
-
+@deprecated //Use DistributeCmd instead
 class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DISTRIBUTE_REWARDS_CMD)
@@ -126,7 +126,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       logger.warn("Using hard-coded PK Command Contract, ensure this value is added to configuration file later for more command box options")
       logger.info("Now attempting to retrieve metadata box from blockchain")
       val voteTokenId = ErgoId.create(voteConf.getVoteTokenId)
-      val commandContract = VoteTokensContract.generateContract(ctx, voteTokenId, nodeAddress)
+      val commandContract = new PKContract(nodeAddress)
       logger.info(s"Command Contract: ${commandContract.getAddress}")
       logger.info("Pool Fees Map: ")
       val feeMap = paramsConf.getFees.asScala.map{
@@ -141,36 +141,16 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       val boxIndex = new BoxIndexQuery(dbConn).setVariables().execute().getResponse
       var isFailureAttempt = false // Boolean that determines whether or not this distribution chain is resending txs for a failed attempt.
       var metaIds = Array[String]()
-      var failureIds = Array[String]()
+
       if(boxIndex.forall(br => br.status == "success")){
         metaIds = boxIndex.map(br => br.boxId)
       }else{
         logger.info(s"currentMemberList: ${memberList.cValue.length}")
         logger.info(s"currentShareCons: ${shareConsensus.cValue.length}")
         metaIds = boxIndex.map(br => br.boxId)
-        logger.info("")
+        logger.info("Failure attempt")
         isFailureAttempt = true
 
-        val failedSubpools =  Array("25")
-        failureIds =  boxIndex.filter(b => failedSubpools.contains(b.subpoolId)).map(b => b.boxId)
-        val successBoxes =  boxIndex.filter(b => !failedSubpools.contains(b.subpoolId)).map(b => new MetadataInputBox(ctx.getBoxesById(b.boxId).head, smartPoolId))
-        metaIds = failureIds
-        memberList = MemberList.convert(
-          memberList.cValue.filterNot(m => successBoxes.exists(ib => ib.memberList.cValue.exists(im => im._2 == m._2)
-          )))
-
-        shareConsensus = ShareConsensus.convert(
-          shareConsensus.cValue.filter(sc => memberList.cValue.exists(m => m._1 sameElements sc._1)
-          ))
-        logger.warn(s"Failure retrial for ${metaIds.length} subpools")
-        logger.warn(s"There are currently ${memberList.cValue.length} members and ${shareConsensus.cValue.length} consensus values")
-        logger.info(failureIds.mkString("Array(", ", ", ")"))
-        logger.info(s"newMemberList: ${memberList.cValue.length}")
-        logger.info(s"newShareCons: ${shareConsensus.cValue.length}")
-        logger.info("Share consensus: " + shareConsensus.cValue.mkString("Array(", ", ", ")"))
-        logger.info("Member List: " + memberList.cValue.mkString("Array(", ", ", ")"))
-        // blockReward = (BigDecimal(6.61) * Parameters.OneErg).toLong
-        exit(logger, ExitCodes.COMMAND_FAILED)
       }
       val metadataRetrieval = Try{ctx.getBoxesById(metaIds:_*)}
 
@@ -195,7 +175,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
 
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
       val distributionGroup = new DistributionGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,
-        holdingContract, commandContract, config, shareConsensus, memberList, poolFees, isFailureAttempt, failureIds)
+        holdingContract, commandContract, config, shareConsensus, memberList, poolFees, isFailureAttempt, boxIndex)
       val executed = distributionGroup.buildGroup.executeGroup
       logger.info("Total Distribution Groups: " + metadataBoxes.length)
       logger.info("Distribution Groups Executed: " + executed.completed.size)

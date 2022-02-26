@@ -1,11 +1,11 @@
 name := "ergo-smartpool-contracts"
 
-version := "0.2"
+version := "0.9"
 
 scalaVersion := "2.12.10"
 
 libraryDependencies ++= Seq(
-  "org.ergoplatform" %% "ergo-appkit" % "4.0.7",
+  "org.ergoplatform" %% "ergo-appkit" % "develop-d90135c5-SNAPSHOT",
   "org.slf4j" % "slf4j-jdk14" % "1.7.32",
   "org.postgresql" % "postgresql" % "42.3.1"
 )

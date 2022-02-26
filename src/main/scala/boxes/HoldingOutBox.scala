@@ -1,6 +1,9 @@
 package boxes
 
 import org.ergoplatform.appkit._
+import sigmastate.Values
+
+import java.util
 
 /**
  * Wrapper class that wraps output boxes as command boxes
@@ -23,7 +26,13 @@ class HoldingOutBox(outBox: OutBox)
 
   override def getCreationHeight: Int = asOutBox.getCreationHeight
 
-  override def token(id: ErgoId): ErgoToken = asOutBox.token(id)
+  override def getTokens: java.util.List[ErgoToken] = asOutBox.getTokens
 
   override def convertToInputWith(txId: String, outputIndex: Short): InputBox = asOutBox.convertToInputWith(txId, outputIndex)
+
+  override def getRegisters: util.List[ErgoValue[_]] = asOutBox.getRegisters
+
+  override def getErgoTree: Values.ErgoTree = asOutBox.getErgoTree
+
+  override def getBytesWithNoRef: Array[Byte] = asOutBox.getBytesWithNoRef
 }

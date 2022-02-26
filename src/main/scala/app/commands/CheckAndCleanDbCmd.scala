@@ -1,7 +1,7 @@
 package app.commands
 
 import app.{AppCommand, ExitCodes, exit}
-import boxes.MetadataInputBox
+import boxes.{BoxHelpers, MetadataInputBox}
 import configs.SmartPoolConfig
 import explorer.ExplorerHandler
 import logging.LoggingHandler
@@ -10,7 +10,7 @@ import org.ergoplatform.explorer.client.ExplorerApiClient
 import org.ergoplatform.restapi.client.JSON
 import org.slf4j.LoggerFactory
 import persistence.entries.{BalanceChangeEntry, BlockEntry, BoxIndexEntry, PaymentEntry}
-import persistence.{DatabaseConnection, PersistenceHandler}
+import persistence.{BoxStatus, DatabaseConnection, PersistenceHandler}
 import persistence.queries.{BoxIndexQuery, ConsensusByTransactionQuery, PaymentsQuery, PaymentsQueryByTransaction, SmartPoolByEpochQuery, SmartPoolByHeightQuery}
 import persistence.responses.SmartPoolResponse
 import persistence.writes.{BalanceChangeInsertion, BlockUpdateByHeight, BoxIndexUpdate, ConsensusDeletionByNFT, PaymentInsertion, SmartPoolDeletionByNFT}
@@ -22,8 +22,7 @@ import retrofit2.converter.scalars.ScalarsConverterFactory
  * Only cleans if there exists a transaction during a certain epoch who's confirmation > 1
  */
 
-// TODO: Add confirmation number to config file
-// TODO: Use node instead of explorer?
+@deprecated
 class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd(config) {
   val logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_CLEAN_DB_CMD)
 
@@ -43,14 +42,10 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
     dbConn = persistence.connectToDatabase
     explorerHandler = new ExplorerHandler(explorerApiClient)
     logger.info("Explorer handler made!")
-//    val blockUpdateByHeight = new BlockUpdateByHeight(dbConn, 681894).setVariables(BlockEntry(paramsConf.getPoolId, "paid", "paid")).execute()
+
   }
 
   def executeCommand: Unit = {
-    logger.info("Command is routing into VoteCollection!")
-    val voteCollectionCmd = new VoteCollectionCmd(config)
-    voteCollectionCmd.initiateCommand
-    voteCollectionCmd.executeCommand
 
     logger.info("Command has begun execution")
     logger.info(s"Now checking and cleaning db using boxes from boxIndex for blockHeight $blockHeight")
@@ -105,44 +100,43 @@ class CheckAndCleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends Smar
     val smartPoolNFTWipe = new SmartPoolDeletionByNFT(dbConn).setVariables((paramsConf.getPoolId, paramsConf.getSmartPoolId)).execute()
     val consensusNFTWipe = new ConsensusDeletionByNFT(dbConn).setVariables((paramsConf.getPoolId, paramsConf.getSmartPoolId)).execute()
     logger.info("DB changes complete!")
-//    var distributeFailedCmd = new DistributeFailedCmd(config, 27)
-//    distributeFailedCmd.initiateCommand
-//    distributeFailedCmd.setFailedValues(0.251, 687001)
-//    distributeFailedCmd.executeCommand
-//    exit(logger, ExitCodes.SUCCESS)
-//    val sendToHoldingCmd = new SendToHoldingCmd(config, 674662)
-//    sendToHoldingCmd.initiateCommand
-//    sendToHoldingCmd.setBlockReward((BigDecimal(4.944) * Parameters.OneErg).toLong)
-//    sendToHoldingCmd.executeCommand
-//    exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
-//val distributeRewardsCmd = new DistributeRewardsCmd(config, 674662)
-//    distributeRewardsCmd.initiateCommand
-//    distributeRewardsCmd.executeCommand
-//    distributeRewardsCmd.recordToDb
-//      var cSett = new CustomSettingsCmd(config)
-//    cSett.initiateCommand
-//
-//    cSett.executeCommand
+
+    val failedPools = confirmations.filter(b => b._2 == -1)
+    if(failedPools.length > 0){
+      logger.info("The following pools lacked confirmations: " ++ failedPools.flatMap(p => "\n" + p._1.subpoolId))
+
+      exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
+      if(failedPools.length != confirmations.length){
+        logger.info("Some pools have already confirmed, now checking if this counts as a failure")
+        val confirmedPools = confirmations.filter(b => b._2 != -1)
+        if(confirmedPools.length > 20 && confirmedPools.forall(p => p._2 > 20)){
+          logger.info("There are more than 20 confirmed pools, each with more than 20 confirmations. Now setting unconfirmed pools to failures.")
+          ergoClient.execute{
+            ctx =>
+              for(poolFailure <- failedPools) {
+
+                val metadataInputBox = BoxHelpers.searchMetadataFromCtx(ctx, ErgoId.create(paramsConf.getSmartPoolId),
+                  Address.create(metaConf.getMetadataAddress), metaConf.getMetadataValue, poolFailure._1.subpoolId.toInt)
+                val boxIndexEntry = BoxIndexEntry(paramsConf.getPoolId, metadataInputBox.getId.toString, "re-attempt",
+                  metadataInputBox.getCurrentEpoch, "failure", paramsConf.getSmartPoolId, metadataInputBox.getSubpoolId.toString, poolFailure._1.blocks)
+                val boxIndexUpdate = new BoxIndexUpdate(dbConn).setVariables(boxIndexEntry).execute()
+                logger.info(s"Subpool ${metadataInputBox.getSubpoolId} updated with box id from blockchain along with new failure status")
+              }
+          }
+
+        }else{
+          logger.info("Not all pools fully")
+        }
+      }
+      exit(logger, ExitCodes.COMMAND_FAILED)
+    }
+
     if(boxIndex.forall(br => br.status == "success")) {
       logger.info("All boxes in box response have status success!")
       exit(logger, ExitCodes.SUCCESS)
     }else {
       logger.warn("There were errors found in the current box index!")
 
-     // logger.warn("Now initiating failed redistribiution")
-      val failIndex = boxIndex.filter(b => b.status == "failure")
-      for(b <- failIndex){
-//        val boxEntry = BoxIndexEntry(b.poolId, b.boxId, "d220fac50ff3b8a06b4a62dd78f6707e5f0fde2d395db88ad25523ae82291212", b.epoch, "success", b.smartPoolNft, b.subpoolId, Array(0))
-//        logger.info(boxEntry.toString)
-//        logger.info("subpool id " + boxEntry.subpoolId)
-//        val boxIndexUpdate = new BoxIndexUpdate(dbConn).setVariables(boxEntry).execute()
-//        exit(logger, ExitCodes.SUCCESS)
-        if(b.subpoolId == "24") {
-
-        }
-
-      }
-      exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
     }
 
     exit(logger, ExitCodes.SUCCESS)

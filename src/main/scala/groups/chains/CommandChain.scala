@@ -31,30 +31,34 @@ class CommandChain(ctx: BlockchainContext, boxToFees: Map[MetadataInputBox, Inpu
 
   private var boxToCommand = Map.empty[MetadataInputBox, CommandInputBox]
 
-  var tokenAssigned: String = config.getParameters.getVotingConf.getVoteTokenId
+  var tokenAssigned: String = ""
 
   def executeChain: CommandChain = {
+    logger.info(boxToHolding.map(h => ("Subpool " + h._1.getSubpoolId + s" with id ${h._1.getId}", "Holding: " + h._2.getId.toString)).toString())
+    logger.info(boxToStorage.map(h => ("Subpool " + h._1.getSubpoolId + s" with id ${h._1.getId}", "Storage: " + h._2.getId.toString)).toString())
     logger.info("Now executing CommandChain")
     var boxToCmdOutput = Map.empty[MetadataInputBox, CommandOutBox]
     for (metadataBox <- boxToShare.keys) {
       val commandChain = Try {
+        logger.info(s"Creating tx for subpool ${metadataBox.getSubpoolId}")
         val commandTx = new CreateCommandTx(ctx.newTxBuilder())
-
+        logger.info(s"Current holding size: ${boxToHolding.size} Current Storage size: ${boxToStorage.size}")
         val inputBoxes = List(boxToFees(metadataBox))
         // TODO: Take from config instead
-
+        logger.info("Fee boxes inserted")
         val newPoolOperators = PoolOperators.convert(Array(
-          (commandContract.getErgoTree.bytes, "Vote Token Distributor"),
           (address.getErgoAddress.script.bytes, address.toString),
         ))
-
+        logger.info("New pool ops created")
         var holdingInputs = List(boxToHolding(metadataBox))
+        logger.info("Holding box added")
         if (boxToStorage.contains(metadataBox)) {
           holdingInputs = holdingInputs ++ List(boxToStorage(metadataBox))
+          logger.info("Storage box added")
         }
-
+        logger.info("Holding inputs created")
         commandContractToUse = new PKContract(address)
-        logger.info("Metadata box operators: " + metadataBox.getPoolOperators.cValue.toString)
+
         if(metadataBox.getPoolOperators.cValue.exists(op => op._1 sameElements commandContract.getErgoTree.bytes)){
           logger.info("MetadataBox has custom command contract in pool operators, now prioritizing custom command contract.")
           commandContractToUse = commandContract

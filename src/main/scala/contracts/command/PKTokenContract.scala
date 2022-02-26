@@ -5,7 +5,7 @@ import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import transactions.DistributionTx
 
-class PKTokenContract(p2pkAddress: Address, voteTokenId: ErgoId) extends CommandContract(new ErgoTreeContract(p2pkAddress.getErgoAddress.script)) {
+class PKTokenContract(p2pkAddress: Address, voteTokenId: ErgoId) extends CommandContract(new ErgoTreeContract(p2pkAddress.getErgoAddress.script, p2pkAddress.getNetworkType)) {
 
   override def getAddress: Address = p2pkAddress
 

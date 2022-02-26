@@ -14,7 +14,6 @@ import org.slf4j.{Logger, LoggerFactory}
 import persistence.{BoxIndex, BoxStatus}
 import registers.{MemberList, PoolFees, PoolOperators, ShareConsensus}
 import sigmastate.Values.ErgoTree
-import transactions.models.TransactionGroup
 import transactions.{CreateCommandTx, DistributionTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
@@ -49,13 +48,14 @@ class DistributionGroup2(ctx: BlockchainContext, boxIndex: BoxIndex, prover: Erg
 
   final val SHARE_CONSENSUS_LIMIT = 10
   final val STANDARD_FEE = Parameters.MinFee * 5
-  var customCommand = true
-  var tokenAssigned: String = config.getParameters.getVotingConf.getVoteTokenId
+
+  var tokenAssigned: String = ""
 
   override def buildGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
     logger.info("Now building DistributionGroup")
     if(!isFailureAttempt) {
       require(boxIndex.boxes.forall(b => b._2.status == BoxStatus.INITIATED), "Not all boxes were initiated!")
+      logger.info("Now grabbing inputs, holding, and storage boxes from context")
       metadataInputs = boxIndex.grabFromContext(ctx)
       boxToHolding = boxIndex.getHoldingBoxes(ctx)
       boxToStorage = boxIndex.getStorageBoxes(ctx)
@@ -106,7 +106,7 @@ class DistributionGroup2(ctx: BlockchainContext, boxIndex: BoxIndex, prover: Erg
     if(membersLeft.length > 0){
       logger.warn("There are still members left after adding to existing subpools. Now exiting...")
       logger.warn("Members to add: " + membersLeft.map(m => m._2).mkString("\n"))
-      //TODO: Add new member addition to epoch 0 subpools. Should not be needed for a while until greater than 250 members join the pool.
+
       app.exit(logger, ExitCodes.SUBPOOL_TX_FAILED)
     }
 
@@ -158,7 +158,7 @@ class DistributionGroup2(ctx: BlockchainContext, boxIndex: BoxIndex, prover: Erg
     var boxToOutputs = Map.empty[MetadataInputBox, Array[OutBox]]
     var boxToFeeInputs = Map.empty[MetadataInputBox, InputBox]
     for(boxSh <- boxToShare){
-      val commandFeeOutput = txB.outBoxBuilder().value(cmdConf.getCommandValue + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script))
+      val commandFeeOutput = txB.outBoxBuilder().value(cmdConf.getCommandValue + STANDARD_FEE).contract(new ErgoTreeContract(address.getErgoAddress.script, address.getNetworkType))
       if(tokenAssigned != ""){
         // If vote token id exists, lets send vote tokens equal to total amount in holding contracts
         if(boxSh._1.getPoolOperators.cValue.exists(o => o._1 sameElements commandContract.getErgoTree.bytes)) {

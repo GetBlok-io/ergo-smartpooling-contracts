@@ -17,9 +17,9 @@ object Models {
     def storageFromContext(ctx: BlockchainContext): Try[InputBox] = Try{ctx.getBoxesById(storedId).head}
   }
   object BoxEntry{
-    val EMPTY = "None"
-    val DIST_TX = "DistTx"
-    val CMD_TX = "CmdTx"
+    val EMPTY = "none"
+    val DIST_TX = "distTx"
+    val CMD_TX = "cmdTx"
     val EMPTY_LONG = 0L
     val EMPTY_INT = 0
   }

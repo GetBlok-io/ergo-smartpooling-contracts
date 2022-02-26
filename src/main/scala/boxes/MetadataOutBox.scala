@@ -41,4 +41,9 @@ class MetadataOutBox(outBox: OutBox, metadataRegisters: MetadataRegisters, smart
     asString
   }
 
+  override def getRegisters: util.List[ErgoValue[_]] = asOutBox.getRegisters
+
+  override def getErgoTree: Values.ErgoTree = asOutBox.getErgoTree
+
+  override def getBytesWithNoRef: Array[Byte] = asOutBox.getBytesWithNoRef
 }

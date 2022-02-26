@@ -68,7 +68,7 @@ class CustomSettingsCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
       // TODO: Remove constant values for tokens and place them into config
       val payoutBox = outB
         .value(((BigDecimal(3.544) * Parameters.OneErg).toLong) + (txFee))
-        .contract(new ErgoTreeContract(payoutAddress.getErgoAddress.script))
+        .contract(new ErgoTreeContract(payoutAddress.getErgoAddress.script, nodeAddress.getNetworkType))
         .build()
 
       val payoutTx =

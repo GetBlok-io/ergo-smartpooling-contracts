@@ -1,4 +1,4 @@
-package transactions.models
+package groups
 
 /**
  * Group of transaction chains to build and execute

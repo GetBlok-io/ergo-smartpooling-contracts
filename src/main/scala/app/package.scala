@@ -8,29 +8,32 @@ import java.util.logging.Level
 package object app {
 
   object ExitCodes {
-    final val SUCCESS = 0
-    final val INVALID_ARGUMENTS = 1
+    final val SUCCESS =                         0
+    final val INVALID_ARGUMENTS =               1
 
-    final val CONFIG_NOT_FOUND = 100
-    final val INVALID_CONFIG = 101
-    final val NO_SMARTPOOL_ID_IN_CONFIG = 102
-    final val NO_CONSENSUS_PATH_IN_CONFIG = 103
-    final val NO_WALLET = 104
+    final val CONFIG_NOT_FOUND =                100
+    final val INVALID_CONFIG =                  101
+    final val NO_SMARTPOOL_ID_IN_CONFIG =       102
+    final val NO_CONSENSUS_PATH_IN_CONFIG =     103
+    final val NO_WALLET =                       104
 
-    final val INVALID_NODE_ADDRESS = 105
-    final val INVALID_NODE_APIKEY = 106
+    final val INVALID_NODE_ADDRESS =            105
+    final val INVALID_NODE_APIKEY =             106
 
-    final val NO_COMMAND_TO_USE = 200
-    final val COMMAND_FAILED = 201
-    final val LOGGING_INIT_FAILURE = 202
+    final val NO_COMMAND_TO_USE =               200
+    final val COMMAND_FAILED =                  201
+    final val LOGGING_INIT_FAILURE =            202
 
-    final val HOLDING_NOT_COVERED = 203
-    final val FAILED_TO_RETRIEVE_METADATA = 204
-    final val NO_CONFIRMED_TXS_FOUND = 205
-    final val REGROUP_TX_SENT = 206
-    final val TX_GROUPING = 207
-    final val SUBPOOL_TX_FAILED = 208
-    final val NOT_ALL_SUBPOOLS_RETRIEVED = 209
+    final val HOLDING_NOT_COVERED =             203
+    final val FAILED_TO_RETRIEVE_METADATA =     204
+    final val NO_CONFIRMED_TXS_FOUND =          205
+    final val REGROUP_TX_SENT =                 206
+    final val TX_GROUPING =                     207
+    final val SUBPOOL_TX_FAILED =               208
+    final val NOT_ALL_SUBPOOLS_RETRIEVED =      209
+
+    final val HOLDING_SENT =                    300
+    final val FAILURE_RETRIAL =                 301
 
   }
 

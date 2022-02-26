@@ -124,7 +124,7 @@ class DistributeMultipleCmd(config: SmartPoolConfig, blockHeights: Array[Int]) e
 
       logger.warn("Using hard-coded PK Command Contract, ensure this value is added to configuration file later for more command box options")
       logger.info("Now attempting to retrieve metadata box from blockchain")
-      val selectMetadataBox = Try {BoxHelpers.selectCurrentMetadata(ctx, smartPoolId, Address.create(metaConf.getMetadataAddress), metaConf.getMetadataValue)}
+      val selectMetadataBox = Try {BoxHelpers.searchMetadataFromCtx(ctx, smartPoolId, Address.create(metaConf.getMetadataAddress), metaConf.getMetadataValue, 0)}
 
       if(selectMetadataBox.isFailure){
         logger.warn("Metadata box could not be retrieved!")

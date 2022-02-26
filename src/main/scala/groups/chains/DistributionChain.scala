@@ -30,7 +30,7 @@ class DistributionChain(ctx: BlockchainContext, boxToCommand: Map[MetadataInputB
   private var boxToTx = Map.empty[MetadataInputBox, SignedTransaction]
 
 
-  var tokenAssigned: String = config.getParameters.getVotingConf.getVoteTokenId
+  var tokenAssigned: String = ""
 
   def executeChain: DistributionChain = {
     logger.info("Now executing DistributionChain")
