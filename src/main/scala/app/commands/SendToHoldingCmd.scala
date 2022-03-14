@@ -5,13 +5,14 @@ import boxes.MetadataInputBox
 import configs.SmartPoolConfig
 import contracts.holding
 import contracts.holding.SimpleHoldingContract
-import groups.{DistributionGroup, HoldingGroup}
+import groups.{HoldingGroup, TotalGroup}
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.slf4j.{Logger, LoggerFactory}
 import payments.{ShareCollector, SimplePPLNS, StandardPPLNS}
 import persistence.entries.BoxIndexEntry
-import persistence.{BoxIndex, BoxStatus, DatabaseConnection, PersistenceHandler}
+import persistence.models.Models.BoxTag
+import persistence.{BoxIndex, DatabaseConnection, PersistenceHandler}
 import persistence.queries.{BlockByHeightQuery, BoxIndexQuery, BoxIndexQuery2, MinimumPayoutsQuery}
 import persistence.responses.BoxIndexResponse
 import registers.{MemberList, ShareConsensus}
@@ -106,10 +107,11 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
     blockReward = blockReward - (blockReward % Parameters.MinFee)
     logger.info(s"Rounding block reward to minimum box amount: $blockReward")
     boxIndex = BoxIndex.fromDatabase(dbConn, paramsConf.getPoolId)
-
+    if(!paramsConf.eventsEnabled)
+      boxIndex = boxIndex.getNormal
 
     ergoClient.execute((ctx: BlockchainContext) => {
-      val metadataBoxes = boxIndex.getConfirmed.grabFromContext(ctx)
+      boxIndex = boxIndex.getConfirmed
       val secretStorage = SecretStorage.loadFrom(walletConf.getSecretStoragePath)
       secretStorage.unlock(nodeConf.getWallet.getWalletPass)
 
@@ -118,13 +120,13 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
 
 
       val holdingContract = new holding.SimpleHoldingContract(SimpleHoldingContract.generateHoldingContract(ctx, Address.create(metaConf.getMetadataAddress), ErgoId.create(paramsConf.getSmartPoolId)))
-      val holdingGroup = new HoldingGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,
+      val holdingGroup = new HoldingGroup(ctx, boxIndex, prover, nodeAddress, blockReward,
         holdingContract, config, shareConsensus, memberList)
       val executed = holdingGroup.buildGroup.executeGroup
-      logger.info("Total Holding Groups: " + metadataBoxes.length)
+      logger.info("Total Holding Groups: " + boxIndex.size)
       logger.info("Holding Groups Executed: " + executed.completed.size)
       logger.info("Holding Groups Failed: " + executed.failed.size)
-      logger.info("Holding Groups Untouched: " + (metadataBoxes.length - (executed.failed.size + executed.completed.size)))
+      logger.info("Holding Groups Untouched: " + (boxIndex.size - (executed.failed.size + executed.completed.size)))
       completedMap = holdingGroup.boxes
     })
     logger.info("Command has finished execution")
@@ -140,7 +142,7 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
     blockReward = reward
   }
 
-  def applyMinimumPayouts(dbConn: DatabaseConnection, memberList: MemberList, shareConsensus: ShareConsensus): ShareConsensus ={
+  private def applyMinimumPayouts(dbConn: DatabaseConnection, memberList: MemberList, shareConsensus: ShareConsensus): ShareConsensus ={
     var newShareConsensus = ShareConsensus.convert(shareConsensus.cValue)
     logger.info(s"Now querying minimum payouts for ${newShareConsensus.cValue.length} different members in the smart pool.")
     for(member <- memberList.cValue){
@@ -150,9 +152,15 @@ class SendToHoldingCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartP
       if(settingsResponse.paymentthreshold > 0.1){
         val propBytesIndex = newShareConsensus.cValue.map(c => c._1).indexOf(member._1, 0)
         shareScore = newShareConsensus.cValue(propBytesIndex)._2(0)
+        val donationSettings = settingsResponse.donation
+        val ngoTag = BoxTag.NGO_TAGS.find(t => t.strTag == donationSettings)
+        var donationTag = 0L
+        if(ngoTag.isDefined)
+          donationTag = ngoTag.get.longTag
         newShareConsensus = ShareConsensus.convert(
           newShareConsensus.cValue.updated(propBytesIndex,
-            (member._1, Array(newShareConsensus.cValue(propBytesIndex)._2(0), (BigDecimal(settingsResponse.paymentthreshold) * BigDecimal(Parameters.OneErg)).toLong, newShareConsensus.cValue(propBytesIndex)._2(2)))))
+            (member._1, Array(newShareConsensus.cValue(propBytesIndex)._2(0), (BigDecimal(settingsResponse.paymentthreshold) * BigDecimal(Parameters.OneErg)).toLong,
+              newShareConsensus.cValue(propBytesIndex)._2(2), 0, donationTag))))
       }
       logger.info(s"Minimum Payout And Shares For Address ${member._2}: ${settingsResponse.paymentthreshold}")
     }

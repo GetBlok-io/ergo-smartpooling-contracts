@@ -54,7 +54,7 @@ object SimplePPLNS {
 
         val longArray =
           if(shareNumber >= 1) {
-            Some(Array(shareNumber, AppParameters.minimumPayout, 0L))
+            Some(Array(shareNumber, AppParameters.minimumPayout, 0L, 0L, 0L))
           } else {
             logger.warn(s"Share number for address ${sh._1} was too low to add to consensus")
             None
@@ -117,7 +117,7 @@ object SimplePPLNS {
 
         val longArray =
           if(shareNumber >= 1) {
-            Some(Array(shareNumber, AppParameters.minimumPayout, 0L))
+            Some(Array(shareNumber, AppParameters.minimumPayout, 0L, 0L, 0L))
           } else {
             logger.warn(s"Share number for address ${sh._1} was too low to add to consensus")
             None

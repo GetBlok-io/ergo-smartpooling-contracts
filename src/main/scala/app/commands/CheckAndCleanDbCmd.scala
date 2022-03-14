@@ -10,7 +10,7 @@ import org.ergoplatform.explorer.client.ExplorerApiClient
 import org.ergoplatform.restapi.client.JSON
 import org.slf4j.LoggerFactory
 import persistence.entries.{BalanceChangeEntry, BlockEntry, BoxIndexEntry, PaymentEntry}
-import persistence.{BoxStatus, DatabaseConnection, PersistenceHandler}
+import persistence.{DatabaseConnection, PersistenceHandler}
 import persistence.queries.{BoxIndexQuery, ConsensusByTransactionQuery, PaymentsQuery, PaymentsQueryByTransaction, SmartPoolByEpochQuery, SmartPoolByHeightQuery}
 import persistence.responses.SmartPoolResponse
 import persistence.writes.{BalanceChangeInsertion, BlockUpdateByHeight, BoxIndexUpdate, ConsensusDeletionByNFT, PaymentInsertion, SmartPoolDeletionByNFT}

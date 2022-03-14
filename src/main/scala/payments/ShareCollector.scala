@@ -72,25 +72,18 @@ object ShareCollector {
     logger.info(s"Last share has info: created - ${lastShare.created} height - ${lastShare.height} miner - ${lastShare.minerAddress}")
 
     var archiveNum = 0L
+    var deletionNum = 0L
     var currOffset = 0
 
-    var sharesInserted = new SharesArchiveInsertion(dbConn, QUERY_SIZE, currOffset).setVariables(lastShare).execute()
-    archiveNum = archiveNum + sharesInserted
-    while(sharesInserted > 0){
-      Thread.sleep(250)
-      currOffset = currOffset + sharesInserted.toInt
-      logger.info(s"$sharesInserted shares were inserted. Current offset: $currOffset")
-
-      sharesInserted = new SharesArchiveInsertion(dbConn, QUERY_SIZE, currOffset).setVariables(lastShare).execute()
-      archiveNum = archiveNum + sharesInserted
-    }
+    var sharesInserted = new SharesArchiveInsertion(dbConn).setVariables(lastShare).execute()
+    archiveNum = sharesInserted
     logger.info(s"Total of $archiveNum rows inserted into shares_archive.")
 
-//    if(archiveNum > 0){
-//      logger.info("Now deleting shares from shares table...")
-//      val shareDeletion = new SharesBeforeCreatedDeletion(dbConn).setVariables(lastShare).execute()
-//      logger.info(s"$shareDeletion shares were deleted from share table.")
-//    }
+    if(archiveNum > 0){
+      logger.info("Now deleting shares from shares table...")
+      val shareDeletion = new SharesBeforeCreatedDeletion(dbConn).setVariables(lastShare).execute()
+      logger.info(s"$shareDeletion shares were deleted from share table.")
+    }
     archiveNum
   }
 }

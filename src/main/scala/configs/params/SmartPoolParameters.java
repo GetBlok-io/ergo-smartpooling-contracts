@@ -14,7 +14,9 @@ public class SmartPoolParameters {
     private String paymentType;
     private long PPLNS_NUM_SHARES;
     private Map<String, Double> fees;
-
+    private boolean enableEvents;
+    private Map<String, Double> eventFees;
+//    private int numEventPools;
 
     private MetadataConfig metaConf;
     private CommandConfig commandConf;
@@ -37,6 +39,10 @@ public class SmartPoolParameters {
         votingConf = new VotingConfig();
         fees = new HashMap<String, Double>();
         fees.put("address", 1.0);
+        enableEvents = false;
+        eventFees = new HashMap<String, Double>();
+        eventFees.put("address", 1.0);
+//        numEventPools = 10;
     }
 
     public String getSmartPoolId() {
@@ -87,6 +93,9 @@ public class SmartPoolParameters {
         sp.setHoldingConf(this.holdingConf);
         sp.setVotingConf(this.votingConf);
         sp.setFees(this.fees);
+        sp.setEventFees(this.eventFees);
+        sp.setEnableEvents(this.enableEvents);
+//        sp.setNumEventPools(this.numEventPools);
         return sp;
     }
 
@@ -147,4 +156,27 @@ public class SmartPoolParameters {
         this.fees = fees;
     }
 
+    public boolean eventsEnabled() {
+        return enableEvents;
+    }
+
+    public void setEnableEvents(boolean enableEvents) {
+        this.enableEvents = enableEvents;
+    }
+
+    public Map<String, Double> getEventFees() {
+        return eventFees;
+    }
+
+    public void setEventFees(Map<String, Double> eventFees) {
+        this.eventFees = eventFees;
+    }
+//
+//    public int getNumEventPools() {
+//        return numEventPools;
+//    }
+//
+//    public void setNumEventPools(int numEventPools) {
+//        this.numEventPools = numEventPools;
+//    }
 }

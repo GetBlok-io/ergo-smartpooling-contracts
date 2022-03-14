@@ -79,8 +79,12 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
 
         // Custom epoch value being set to keep track of members whose payout must be flushed
         var epochLeft = 0L
+        var minerTag = 0L
         if(consVal._2.length > 3){
           epochLeft = consVal._2(3)
+        }
+        if(consVal._2.length > 4){
+          minerTag = consVal._2(4)
         }
         if(shareNum == 0){
           epochLeft = epochLeft + 1
@@ -125,7 +129,7 @@ class SimpleHoldingContract(holdingContract: ErgoContract) extends HoldingContra
 //        println(
 //          s"""Parameters - ShareNum: ${shareNum} - CurrentMinPayout: ${currentMinPayout} - ValueFromShares: ${valueFromShares}
 //             |shareValueGreater ${valueFromShares >= currentMinPayout} - """.stripMargin)
-        val newConsensusInfo = Array(shareNum, currentMinPayout, owedPayment, epochLeft)
+        val newConsensusInfo = Array(shareNum, currentMinPayout, owedPayment, epochLeft, minerTag)
         (consVal._1.toArray, newConsensusInfo)
     }
     val newShareConsensus = ShareConsensus.convert(updatedConsensus)

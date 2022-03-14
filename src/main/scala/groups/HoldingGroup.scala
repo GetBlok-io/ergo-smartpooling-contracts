@@ -11,6 +11,7 @@ import logging.LoggingHandler
 import org.ergoplatform.appkit.impl.{ErgoTreeContract, InputBoxImpl}
 import org.ergoplatform.appkit._
 import org.slf4j.{Logger, LoggerFactory}
+import persistence.BoxIndex
 import registers.{MemberList, PoolFees, PoolOperators, ShareConsensus}
 import transactions.{CreateCommandTx, DistributionTx}
 
@@ -18,7 +19,7 @@ import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqA
 import scala.util.Try
 
 
-class HoldingGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBox], prover: ErgoProver, address: Address,
+class HoldingGroup(ctx: BlockchainContext, boxIndex: BoxIndex, prover: ErgoProver, address: Address,
                    blockReward: Long, holdingContract: HoldingContract, config: SmartPoolConfig,
                    shareConsensus: ShareConsensus, memberList: MemberList) extends TransactionGroup[Map[MetadataInputBox, String]]{
 
@@ -32,6 +33,8 @@ class HoldingGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBo
   private val metaConf = config.getParameters.getMetaConf
   private val holdConf = config.getParameters.getHoldingConf
 
+  private var metadataInputs: Array[MetadataInputBox] = Array()
+  private var eventInputs: Array[MetadataInputBox] = Array()
   private var boxToShare = Map.empty[MetadataInputBox, ShareConsensus]
   private var boxToMember = Map.empty[MetadataInputBox, MemberList]
   private var boxToValue = Map.empty[MetadataInputBox, Long]
@@ -45,11 +48,24 @@ class HoldingGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBo
   override def buildGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
     logger.info("Now building DistributionGroup")
 
+    logger.info("Now grabbing inputs, holding, and storage boxes from context")
+    metadataInputs = boxIndex.getNormal.grabFromContext(ctx)
+    if(config.getParameters.eventsEnabled()) {
+      eventInputs = boxIndex.getSpecial.grabFromContext(ctx)
+    }
+
     logger.info(s"Using ${metadataInputs.length} metadata boxes, with ${shareConsensus.cValue.length} consensus vals")
-    val subpoolSelector = new SubpoolSelector
-    val membersLeft = subpoolSelector.selectDefaultSubpools(metadataInputs, shareConsensus, memberList)._2
-    boxToShare = subpoolSelector.shareMap
-    boxToMember = subpoolSelector.memberMap
+    val subpoolSelector = new SubpoolSelector(config)
+    var membersLeft: Array[(Array[Byte], String)] = Array.empty[(Array[Byte], String)]
+    if(!config.getParameters.eventsEnabled()) {
+      membersLeft = subpoolSelector.selectDefaultSubpools(metadataInputs, shareConsensus, memberList)._2
+      boxToShare = subpoolSelector.shareMap
+      boxToMember = subpoolSelector.memberMap
+    }else{
+      membersLeft = subpoolSelector.selectWithEventPools(metadataInputs, eventInputs, shareConsensus, memberList)._2
+      boxToShare = subpoolSelector.shareMap
+      boxToMember = subpoolSelector.memberMap
+    }
 
     for(boxSh <- boxToShare){
       logger.info(s"Subpool ${boxSh._1.getSubpoolId} has ${boxSh._2.cValue.length} members")

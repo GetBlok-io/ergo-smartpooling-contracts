@@ -11,6 +11,7 @@ import org.ergoplatform.explorer.client.ExplorerApiClient
 import org.slf4j.LoggerFactory
 import payments.ShareCollector
 import persistence.entries.{BalanceChangeEntry, PaymentEntry}
+import persistence.models.Models.BoxStatus
 import persistence.queries.{BoxIndexQuery, ConsensusByTransactionQuery, PaymentsQuery, PaymentsQueryByTransaction}
 import persistence.writes.{BalanceChangeInsertion, ConsensusDeletionByNFT, PaymentInsertion, SmartPoolDeletionByNFT}
 import persistence.{BoxIndex, DatabaseConnection, PersistenceHandler}
@@ -50,8 +51,17 @@ class CleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd
     logger.info("Command has begun execution")
     logger.info(s"Now checking and cleaning db using boxes from boxIndex for blockHeight $blockHeight")
     logger.info("Now retrieving all boxes from boxIndex")
-    val boxIndex = BoxIndex.fromDatabase(dbConn, paramsConf.getPoolId)
-
+    var boxIndex = BoxIndex.fromDatabase(dbConn, paramsConf.getPoolId)
+    if(!paramsConf.eventsEnabled()) {
+      boxIndex = boxIndex.getNormal
+      if(!boxIndex.getSpecial.boxes.forall(b => b._2.boxStatus == BoxStatus.RESERVED)){
+        boxIndex.getSpecial.setIndexStatus(BoxStatus.RESERVED)
+      }
+    } else{
+      if(boxIndex.getSpecial.boxes.forall(b => b._2.boxStatus == BoxStatus.RESERVED)){
+        boxIndex.getSpecial.setIndexStatus(BoxStatus.CONFIRMED)
+      }
+    }
     val txPair = for(boxResp <- boxIndex.getSuccessful.boxes) yield (boxResp, explorerHandler.getTx(boxResp._2.txId))
     ergoClient.execute { ctx: BlockchainContext =>
       var boxToStorage = Map.empty[MetadataInputBox, InputBox]
@@ -132,23 +142,22 @@ class CleanDbCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPoolCmd
 
     val newBoxIdx = BoxIndex.fromDatabase(dbConn, paramsConf.getPoolId)
     if(newBoxIdx.getSuccessful.boxes.isEmpty && newBoxIdx.getFailed.boxes.isEmpty && newBoxIdx.getInitiated.boxes.isEmpty) {
-//      logger.info("All boxes in box response have status confirmed!")
-//      logger.info("Now querying and deleting shares for this block height.")
-//      val initBlocks = newBoxIdx.getConfirmed.getUsed.boxes.head._2.blocks
-//      if(newBoxIdx.getConfirmed.getUsed.boxes.forall(b => b._2.blocks sameElements initBlocks)){
-//        logger.info("All used and confirmed boxes have same blocks distributed")
-//        val lastShare =
-//          if(nodeConf.getNetworkType == NetworkType.MAINNET)
-//            ShareCollector.queryToWindow(dbConn, paramsConf.getPoolId, initBlocks.head).flatten.minBy(s => s.created.getTime)
-//          else
-//            ShareCollector.querySharePage(dbConn, paramsConf.getPoolId, initBlocks.head, 0).minBy(s => s.created.getTime)
-//
-//        ShareCollector.removeBeforeLast(dbConn, paramsConf.getPoolId, lastShare)
-//        logger.info(s"Shares before ${lastShare.created.toString} with height ${lastShare.height} for block ${initBlocks.head} were transferred to archive.")
-//      }else{
-//        exit(logger, ExitCodes.NO_CONFIRMED_TXS_FOUND)
-//      }
-      exit(logger, ExitCodes.SUCCESS)
+      logger.info("All boxes in box response have status confirmed!")
+      logger.info("Now querying and deleting shares for this block height.")
+      val initBlocks = newBoxIdx.getConfirmed.getUsed.boxes.head._2.blocks
+      if(newBoxIdx.getConfirmed.getUsed.boxes.forall(b => b._2.blocks sameElements initBlocks)){
+        logger.info("All used and confirmed boxes have same blocks distributed")
+        val lastShare =
+          if(nodeConf.getNetworkType == NetworkType.MAINNET)
+            ShareCollector.queryToWindow(dbConn, paramsConf.getPoolId, initBlocks.head).flatten.minBy(s => s.created.getTime)
+          else
+            ShareCollector.querySharePage(dbConn, paramsConf.getPoolId, initBlocks.head, 0).minBy(s => s.created.getTime)
+
+        ShareCollector.removeBeforeLast(dbConn, paramsConf.getPoolId, lastShare)
+        logger.info(s"For Block Height ${initBlocks.head}")
+        logger.info(s"Shares before ${lastShare.created.toString} with height ${lastShare.height} were transferred to archive and deleted from shares table.")
+        exit(logger, ExitCodes.SUCCESS)
+      }
     }else {
       logger.warn("There were errors found in the current box index!")
       if(boxIndex.getUsed.boxes.forall(b => b._2.blocks sameElements boxIndex.getUsed.head._2.blocks)){

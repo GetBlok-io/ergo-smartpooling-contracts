@@ -74,8 +74,32 @@ class PoolInfo(normalValue: Coll[Long]) extends RegValue[Long, Long] {
 
     new PoolInfo(this.normalValue.updated(3, id))
   }
-  def getSubpoolId(): Long = {
+  def getSubpoolId: Long = {
     getValue(3)
+  }
+
+  override def toString: String = {
+    s"PoolInfo[$getSubpoolId]($getCurrentEpoch, $getCurrentEpochHeight)#$getTag"
+  }
+
+  def setTag(tag: Option[Long]): PoolInfo = {
+    if(tag.isDefined){
+      if(nValue.length > 4){
+        new PoolInfo(this.normalValue.updated(4, tag.get))
+      }else{
+        PoolInfo.convert(this.cValue ++ Array(tag.get))
+      }
+    }else{
+      this
+    }
+  }
+
+  def getTag: Option[Long] = {
+    if(nValue.length > 4){
+      Some(this.normalValue(4))
+    }else{
+      None
+    }
   }
 }
 

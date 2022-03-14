@@ -10,7 +10,7 @@ import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.ergoplatform.appkit.impl.ErgoTreeContract
 import org.slf4j.LoggerFactory
-import persistence.{BoxIndex, BoxStatus, PersistenceHandler}
+import persistence.{BoxIndex, PersistenceHandler}
 import persistence.entries.BoxIndexEntry
 import persistence.writes.{BoxIndexDeletion, BoxIndexInsertion}
 import registers.PoolInfo

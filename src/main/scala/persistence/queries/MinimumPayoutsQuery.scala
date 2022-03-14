@@ -25,11 +25,11 @@ class MinimumPayoutsQuery(dbConn: DatabaseConnection, poolId: String, address: S
 
     if(rt.next()) {
       _response = SettingsResponse(
-       rt.getString(1), rt.getString(2), rt.getDouble(3)
+       rt.getString(1), rt.getString(2), rt.getDouble(3), rt.getString(6)
       )
     }else{
       // We create a default response if no response is found.
-      _response = SettingsResponse(poolId, address, 0.1)
+      _response = SettingsResponse(poolId, address, 0.1, "")
     }
 
     this

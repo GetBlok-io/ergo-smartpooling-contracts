@@ -58,7 +58,7 @@ abstract class InputTemplate(inputBox: InputBox) extends InputBox{
   }
 
   def getSubpoolId: Long ={
-    poolInfo.getSubpoolId()
+    poolInfo.getSubpoolId
   }
 
   def getShareConsensus: ShareConsensus = {

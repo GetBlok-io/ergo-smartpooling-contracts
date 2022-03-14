@@ -17,7 +17,7 @@ import persistence.responses.ShareResponse
 import persistence.writes.{BoxIndexUpdate, ConsensusInsertion, PaymentInsertion, SmartPoolDataInsertion}
 import persistence.{DatabaseConnection, PersistenceHandler}
 import registers.{MemberList, PoolFees, ShareConsensus}
-import groups.DistributionGroup
+import groups.TotalGroup
 import transactions.{CreateCommandTx, DistributionTx, RegroupTx}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, mapAsScalaMapConverter, seqAsJavaListConverter}
@@ -174,7 +174,7 @@ class DistributeRewardsCmd(config: SmartPoolConfig, blockHeight: Int) extends Sm
       }
 
       logger.warn("Using hard-coded command value and tx fee, ensure this value is added to configuration file later for more command box options")
-      val distributionGroup = new DistributionGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,
+      val distributionGroup = new TotalGroup(ctx, metadataBoxes, prover, nodeAddress, blockReward,
         holdingContract, commandContract, config, shareConsensus, memberList, poolFees, isFailureAttempt, boxIndex)
       val executed = distributionGroup.buildGroup.executeGroup
       logger.info("Total Distribution Groups: " + metadataBoxes.length)

@@ -1,6 +1,8 @@
 package registers
 
-import org.ergoplatform.appkit.{ErgoType, ErgoValue}
+import app.AppParameters
+import org.ergoplatform.appkit.{Address, ErgoType, ErgoValue}
+import sigmastate.serialization.ErgoTreeSerializer
 import special.collection.Coll
 
 import java.nio.charset.StandardCharsets
@@ -21,7 +23,6 @@ class ShareConsensus(normalValue: Coll[(Coll[Byte], Coll[Long])]) extends RegVal
   override def getErgoValue: ErgoValue[Coll[(Coll[Byte], Coll[Long])]] = eValue
 
   override def getErgoType: ErgoType[(Coll[Byte], Coll[Long])] = eType
-
 
 
   override def append(otherNormalValues: Coll[(Coll[Byte], Coll[Long])]): ShareConsensus = {
@@ -51,7 +52,18 @@ class ShareConsensus(normalValue: Coll[(Coll[Byte], Coll[Long])]) extends RegVal
     convertValue(getValue(idx))
   }
 
-
+  override def toString: String = {
+    var prefix = s"SD("
+    this.cValue.foreach{
+      c =>
+        val serializer = new ErgoTreeSerializer
+        val address = Address.fromErgoTree(serializer.deserializeErgoTree(c._1), AppParameters.networkType)
+        val trunc = address.toString.take(6) + "..." + address.toString.takeRight(6)
+        val info = c._2.mkString("MemberInfo[", ", ", "], ")
+        prefix = prefix + s"$trunc: $info"
+    }
+    prefix + ")"
+  }
 
 
 }

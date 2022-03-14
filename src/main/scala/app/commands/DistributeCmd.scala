@@ -6,15 +6,16 @@ import configs.SmartPoolConfig
 import contracts.command.{PKContract, VoteTokensContract}
 import contracts.holding
 import contracts.holding.{HoldingContract, SimpleHoldingContract}
-import groups.{DistributionGroup, DistributionGroup2}
+import groups.{DistributionGroup2, TotalGroup}
 import logging.LoggingHandler
 import org.ergoplatform.appkit._
 import org.slf4j.{Logger, LoggerFactory}
 import payments.{ShareCollector, SimplePPLNS, StandardPPLNS}
 import persistence.entries.{BoxIndexEntry, ConsensusEntry, SmartPoolEntry}
+import persistence.models.Models.{BoxStatus, BoxTag}
 import persistence.queries.{BlockByHeightQuery, BoxIndexQuery, MinimumPayoutsQuery}
 import persistence.writes.{BoxIndexUpdate, ConsensusInsertion, SmartPoolDataInsertion}
-import persistence.{BoxIndex, BoxStatus, DatabaseConnection, PersistenceHandler}
+import persistence.{BoxIndex, DatabaseConnection, PersistenceHandler}
 import registers.{MemberList, PoolFees, ShareConsensus}
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, mapAsScalaMapConverter, seqAsJavaListConverter}
@@ -78,16 +79,19 @@ class DistributeCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPool
 
     blockReward = (block.reward * Parameters.OneErg).toLong
 
-    val initBoxIdx = BoxIndex.fromDatabase(dbConn, paramsConf.getPoolId)
+    var initBoxIdx = BoxIndex.fromDatabase(dbConn, paramsConf.getPoolId)
+    if(!paramsConf.eventsEnabled())
+      initBoxIdx = initBoxIdx.getNormal
+
     if(initBoxIdx.getUsed.size == initBoxIdx.getUsed.getConfirmed.size && initBoxIdx.getSuccessful.size == 0 && initBoxIdx.getFailed.size == 0){
       logger.info(s"UsedBoxes: ${initBoxIdx.getUsed.size} Used+ConfirmedBoxes: ${initBoxIdx.getUsed.getConfirmed.size}")
       // All used blocks = all used + confirmed blocks, so all subpools in use are confirmed
       if(initBoxIdx.getUsed.getConfirmed.getByBlock(blockHeight).size == 0){
         logger.info("No boxes found for current block distribution")
         // All used + confirmed blocks have not distributed a block at this height
-        if(initBoxIdx.getUsed.getConfirmed.getByBlock(initBoxIdx.getUsed.boxes.head._2.blocks(0)).size == initBoxIdx.getUsed.getConfirmed.size){
+//        if(initBoxIdx.getUsed.getConfirmed.getByBlock(initBoxIdx.getUsed.boxes.head._2.blocks(0)).size == initBoxIdx.getUsed.getConfirmed.size){
           logger.info("Boxes for distribution are confirmed boxes")
-          if(!initBoxIdx.getUsed.boxes.exists(i => i._2.status == BoxStatus.INITIATED)) {
+          if(!initBoxIdx.boxes.exists(i => i._2.boxStatus == BoxStatus.INITIATED)) {
             logger.info("No initiated boxes found!")
             // All used + confirmed blocks have distributed the same block
             // Now we can initiate holding command
@@ -98,7 +102,7 @@ class DistributeCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPool
             sendToHoldingCmd.recordToDb
             exit(logger, ExitCodes.HOLDING_NOT_COVERED)
           }
-        }
+        //}
       }
     }
 
@@ -164,7 +168,10 @@ class DistributeCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPool
       }.toArray
       val poolFees = PoolFees.convert(feeMap)
 
-      val totalIdx = BoxIndex.fromDatabase(dbConn, paramsConf.getPoolId)
+      var totalIdx = BoxIndex.fromDatabase(dbConn, paramsConf.getPoolId)
+      if(!paramsConf.eventsEnabled())
+        totalIdx = totalIdx.getNormal
+
       var boxIndex = totalIdx.getInitiated
       var isFailureAttempt = false // Boolean that determines whether or not this distribution chain is resending txs for a failed attempt.
       if(totalIdx.getFailed.boxes.nonEmpty || totalIdx.getSuccessful.boxes.nonEmpty){
@@ -267,14 +274,23 @@ class DistributeCmd(config: SmartPoolConfig, blockHeight: Int) extends SmartPool
       val minimumPayoutsQuery = new MinimumPayoutsQuery(dbConn, paramsConf.getPoolId, member._2)
       val settingsResponse = minimumPayoutsQuery.setVariables().execute().getResponse
       var shareScore = 0L
-      if(settingsResponse.paymentthreshold > 0.1){
+      if(settingsResponse.paymentthreshold >= 0.1 || settingsResponse.donation != null || settingsResponse.donation != ""){
         val propBytesIndex = newShareConsensus.cValue.map(c => c._1).indexOf(member._1, 0)
         shareScore = newShareConsensus.cValue(propBytesIndex)._2(0)
+        val donationSettings = settingsResponse.donation
+        val ngoTag = BoxTag.NGO_TAGS.find(t => t.strTag == donationSettings)
+        var donationTag = 0L
+        if(ngoTag.isDefined)
+          donationTag = ngoTag.get.longTag
+        val minerInfo = Array(newShareConsensus.cValue(propBytesIndex)._2(0), (BigDecimal(settingsResponse.paymentthreshold) * BigDecimal(Parameters.OneErg)).toLong,
+          newShareConsensus.cValue(propBytesIndex)._2(2), 0L, donationTag)
         newShareConsensus = ShareConsensus.convert(
           newShareConsensus.cValue.updated(propBytesIndex,
-            (member._1, Array(newShareConsensus.cValue(propBytesIndex)._2(0), (BigDecimal(settingsResponse.paymentthreshold) * BigDecimal(Parameters.OneErg)).toLong, newShareConsensus.cValue(propBytesIndex)._2(2)))))
+            (member._1, minerInfo)))
+
+        logger.info(s"${member._2} info after application: ${minerInfo.mkString("Array(", ", ", ")")}")
       }
-      logger.info(s"Minimum Payout And Shares For Address ${member._2}: ${settingsResponse.paymentthreshold}")
+      logger.info(s"${member._2} had no settings to update")
     }
     logger.info("Minimum payouts updated for all smart pool members!")
     newShareConsensus

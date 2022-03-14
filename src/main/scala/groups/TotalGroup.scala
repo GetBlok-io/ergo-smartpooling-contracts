@@ -11,8 +11,8 @@ import logging.LoggingHandler
 import org.ergoplatform.appkit.impl.{ErgoTreeContract, InputBoxImpl}
 import org.ergoplatform.appkit.{Address, BlockchainContext, ErgoId, ErgoProver, ErgoToken, InputBox, OutBox, Parameters, SignedTransaction}
 import org.slf4j.{Logger, LoggerFactory}
-import persistence.BoxStatus
-import persistence.models.Models.BoxEntry
+
+import persistence.models.Models.{BoxEntry, BoxStatus}
 import persistence.responses.BoxIndexResponse
 import registers.{MemberList, PoolFees, PoolOperators, ShareConsensus}
 import transactions.{CreateCommandTx, DistributionTx}
@@ -23,9 +23,14 @@ import scala.util.Try
 
 
 
-class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBox], prover: ErgoProver, address: Address,
-                        blockReward: Long, holdingContract: HoldingContract, commandContract: CommandContract, config: SmartPoolConfig,
-                        shareConsensus: ShareConsensus, memberList: MemberList, poolFees: PoolFees, isFailureAttempt: Boolean, boxIndex: Array[BoxIndexResponse]) extends TransactionGroup[Map[MetadataInputBox, String]]{
+
+/**
+ *  Handles total distribution in one group, deprecated due to inefficiency and inability to be modular
+ */
+@deprecated
+class TotalGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataInputBox], prover: ErgoProver, address: Address,
+                 blockReward: Long, holdingContract: HoldingContract, commandContract: CommandContract, config: SmartPoolConfig,
+                 shareConsensus: ShareConsensus, memberList: MemberList, poolFees: PoolFees, isFailureAttempt: Boolean, boxIndex: Array[BoxIndexResponse]) extends TransactionGroup[Map[MetadataInputBox, String]]{
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_DIST_GRP)
   private[this] var _completed = Map[MetadataInputBox, String]()
@@ -54,7 +59,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     logger.info("Now building DistributionGroup")
 
     logger.info(s"Using ${metadataInputs.length} metadata boxes, with ${shareConsensus.cValue.length} consensus vals")
-    val subpoolSelector = new SubpoolSelector
+    val subpoolSelector = new SubpoolSelector(config)
     val membersLeft = subpoolSelector.selectDefaultSubpools(metadataInputs, shareConsensus, memberList)._2
     boxToShare = subpoolSelector.shareMap
     boxToMember = subpoolSelector.memberMap
@@ -62,7 +67,7 @@ class DistributionGroup(ctx: BlockchainContext, metadataInputs: Array[MetadataIn
     if(isFailureAttempt){
       for(box <- boxToShare){
         val boxIndexEntry = boxIndex.find(b => b.subpoolId == box._1.getSubpoolId.toString)
-        if(boxIndexEntry.get.status == BoxStatus.SUCCESS){
+        if(boxIndexEntry.get.status == BoxStatus.SUCCESS.status){
           removeFromMaps(box._1)
         }
       }

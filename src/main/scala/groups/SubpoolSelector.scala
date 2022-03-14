@@ -1,22 +1,29 @@
 package groups
 
 import boxes.MetadataInputBox
+import configs.SmartPoolConfig
 import logging.LoggingHandler
 import org.ergoplatform.appkit.{Address, Parameters}
 import org.slf4j.{Logger, LoggerFactory}
-import registers.{MemberList, ShareConsensus}
+import persistence.models.Models.BoxTag
+import registers.{MemberList, PoolFees, PoolInfo, ShareConsensus}
 
-class SubpoolSelector() {
+import scala.collection.JavaConverters.mapAsScalaMapConverter
+
+class SubpoolSelector(config: SmartPoolConfig) {
 
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_SUB_SEL)
   final val MIN_PAYMENT_THRESHOLD = Parameters.OneErg / 10 // 0.1 ERG Min Payment
   final val SHARE_CONSENSUS_LIMIT = 10
   final val EPOCH_LEFT_LIMIT = 5L
   private var boxToShare: Map[MetadataInputBox, ShareConsensus] = Map.empty[MetadataInputBox, ShareConsensus]
-  private var boxToMember: Map[MetadataInputBox, MemberList] = Map.empty[MetadataInputBox, MemberList]
-
-  def shareMap: Map[MetadataInputBox, ShareConsensus] = boxToShare
-  def memberMap: Map[MetadataInputBox, MemberList] = boxToMember
+  private var boxToMember: Map[MetadataInputBox, MemberList]    = Map.empty[MetadataInputBox, MemberList]
+  private var boxToInfo: Map[MetadataInputBox, PoolInfo]        = Map.empty[MetadataInputBox, PoolInfo]
+  private var boxToPoolFees: Map[MetadataInputBox, PoolFees]        = Map.empty[MetadataInputBox, PoolFees]
+  def shareMap: Map[MetadataInputBox, ShareConsensus]   = boxToShare
+  def memberMap: Map[MetadataInputBox, MemberList]      = boxToMember
+  def infoMap: Map[MetadataInputBox, PoolInfo]          = boxToInfo
+  def poolFeeMap: Map[MetadataInputBox, PoolFees]       = boxToPoolFees
   /**
    * Selects default subpools for members based on last epoch placement.
    * Returns consensus and members that could not be placed
@@ -32,9 +39,14 @@ class SubpoolSelector() {
           logger.info(s"Placing members into share consensus for subpool ${metadataBox.getSubpoolId}")
           if (shareConsensus.cValue.exists(newSc => newSc._1 sameElements oldSc._1)) {
             var sc = shareConsensus.cValue.find(newSc => newSc._1 sameElements oldSc._1).get
-            if(sc._2.length <= 3) {
+            if(sc._2.length == 3)
+              sc = (sc._1, sc._2++Array(0L, 0L))
+            if(sc._2.length == 4)
               sc = (sc._1, sc._2++Array(0L))
-            }
+            if(oldSc._2.length == 4)
+              sc = (sc._1, sc._2.updated(3, oldSc._2(3)))
+            if(oldSc._2.length == 5)
+              sc = (sc._1, sc._2.updated(3, oldSc._2(3)).updated(4, oldSc._2(4)))
             logger.info("Miner address: " + memberList.cValue.filter(m => Address.create(m._2).getErgoAddress.script.bytes sameElements sc._1).head._2)
             logger.info("Subpool to be placed in: " + metadataBox.getSubpoolId)
             logger.info("Consensus values: " + sc._2.mkString("Array(", ", ", ")"))
@@ -47,13 +59,14 @@ class SubpoolSelector() {
             val storedPayout = oldSc._2(2)
             val oldMemberList = metadataBox.getMemberList
             val oldEpochLeft = if (oldSc._2.length > 3) oldSc._2(3) else 0L
+            val oldMinerTag = if (oldSc._2.length > 4) oldSc._2(4) else 0L
             if(storedPayout > MIN_PAYMENT_THRESHOLD / 10 && oldEpochLeft <= EPOCH_LEFT_LIMIT) {
               val memberVal = oldMemberList.cValue.filter(m => m._1 sameElements oldSc._1).head
 
-              var sc = (oldSc._1, Array(0, oldSc._2(1), oldSc._2(2), oldEpochLeft))
+              var sc = (oldSc._1, Array(0, oldSc._2(1), oldSc._2(2), oldEpochLeft, oldMinerTag))
               if (oldEpochLeft == EPOCH_LEFT_LIMIT) {
                 logger.info("Miner last connected 5 epochs ago, flushing out payments.")
-                sc = (oldSc._1, Array(0, MIN_PAYMENT_THRESHOLD / 10, oldSc._2(2), oldEpochLeft))
+                sc = (oldSc._1, Array(0, MIN_PAYMENT_THRESHOLD / 10, oldSc._2(2), oldEpochLeft, oldMinerTag))
               }
               logger.info(s"${memberVal._2} is not in current consensus.")
               logger.info(s"Assigning share value of 0 with oldEpochLeft = $oldEpochLeft}")
@@ -95,9 +108,12 @@ class SubpoolSelector() {
 
     logger.info("Now adding remaining members to existing subpools.")
 
-    var openSubpools = boxToShare.keys.filter(m => boxToShare(m).cValue.length < SHARE_CONSENSUS_LIMIT).toArray.sortBy(m => m.getSubpoolId)
-
-    //openSubpools = metadataInputs
+    var openSubpools = metadataInputs
+      .filter(m => boxToShare.contains(m))
+      .filter(m => boxToShare(m).cValue.length < SHARE_CONSENSUS_LIMIT)
+      .sortBy(m => m.getSubpoolId)
+    if(openSubpools.length == 0)
+      openSubpools = metadataInputs
 
     var currentSubpool = 0
     logger.info(s"There are a total of ${openSubpools.length} open subpools")
@@ -107,13 +123,18 @@ class SubpoolSelector() {
       logger.info("Current open subpool to add to: " + metadataBox.getSubpoolId)
       val memberVal = memberList.cValue.filter(m => m._1 sameElements sc._1).head
       logger.info("Member being added to open subpool: " + memberVal._2)
+      var newConsensusVal = sc
 
-      addMemberToSubpool(metadataBox, sc, memberVal)
+      if(sc._2.length == 3)
+        newConsensusVal = (sc._1, sc._2++Array(0L, 0L))
+      if(sc._2.length == 4)
+        newConsensusVal = (sc._1, sc._2++Array(0L))
+      addMemberToSubpool(metadataBox, newConsensusVal, memberVal)
 
       if(boxToShare(metadataBox).cValue.length == SHARE_CONSENSUS_LIMIT){
         currentSubpool = currentSubpool + 1
       }
-      consensusAdded = consensusAdded ++ Array(sc)
+      consensusAdded = consensusAdded ++ Array(newConsensusVal)
       membersAdded = membersAdded ++ Array(memberVal)
     }
 
@@ -137,6 +158,72 @@ class SubpoolSelector() {
       boxToShare = boxToShare ++ Map((metadataBox, newShareConsensus))
       boxToMember = boxToMember ++ Map((metadataBox, newMemberList))
     }
+  }
+
+  def selectWithEventPools(normalPools: Array[MetadataInputBox], eventPools: Array[MetadataInputBox], shareConsensus: ShareConsensus, memberList: MemberList): (Array[(Array[Byte], Array[Long])], Array[(Array[Byte], String)]) = {
+    var normalConsensus = ShareConsensus.convert(shareConsensus.cValue.filter(c => c._2(4) == 0))
+    var eventConsensus = ShareConsensus.convert(shareConsensus.cValue.filter(c => c._2(4) != 0))
+    for(sc <- eventConsensus.cValue){
+      val oldPool = normalPools.find(m => m.getShareConsensus.cValue.exists(cons => cons._1 sameElements sc._1))
+      if(oldPool.isDefined){
+        val oldCons = oldPool.get.getShareConsensus.cValue.find(cons => cons._1 sameElements sc._1)
+        if(oldCons.get._2(2) > 0){
+          val memberEntry = memberList.cValue.filter(mem => mem._1 sameElements oldCons.get._1).head
+          logger.info(s"Removing ${memberEntry._2} from eventConsensus due to having stored payout. Now forcing min payout to be 0.01")
+          val newCons = (oldCons.get._1, oldCons.get._2.updated(1, MIN_PAYMENT_THRESHOLD / 10).updated(4, 0L))
+          eventConsensus = ShareConsensus.convert(eventConsensus.cValue.filter(eventCons => !(eventCons._1 sameElements newCons._1)))
+          normalConsensus = ShareConsensus.convert(normalConsensus.cValue ++ Array(newCons))
+        }
+      }else{
+        val memIndex = eventConsensus.cValue.indexOf(sc)
+        eventConsensus = ShareConsensus.convert(eventConsensus.cValue.updated(memIndex, (sc._1, sc._2.updated(1, MIN_PAYMENT_THRESHOLD / 10))))
+      }
+    }
+    val eventPoolsList = eventPools.sortBy(e => e.getSubpoolId)
+    val normalMembers = MemberList.convert(memberList.cValue.filter(m => normalConsensus.cValue.exists(c => c._1 sameElements m._1)))
+    val eventMembers = MemberList.convert(memberList.cValue.filter(m => eventConsensus.cValue.exists(c => c._1 sameElements m._1)))
+    var minersLeft = selectDefaultSubpools(normalPools, normalConsensus, normalMembers)
+    var slicedEventPools = Array(eventPoolsList.slice(0, 3), eventPoolsList.slice(3, 6), eventPoolsList.slice(6, 10))
+    val ngoFees: Array[PoolFees] = config.getParameters.getEventFees.asScala.map{
+      f =>
+        val address = Address.create(f._1)
+        PoolFees.convert(Array((address.getErgoAddress.script.bytes, (f._2 * 10).toInt)))
+    }.toArray
+    if(eventPoolsList.forall(m => m.getPoolInfo.getTag.isEmpty)){
+      for(pool <- slicedEventPools(0)) {
+        boxToInfo = boxToInfo + (pool -> pool.getPoolInfo.setTag(Some(BoxTag.NGO_1.longTag)))
+        boxToPoolFees = boxToPoolFees + (pool -> ngoFees(0))
+      }
+      for(pool <- slicedEventPools(1)){
+        boxToInfo = boxToInfo + (pool -> pool.getPoolInfo.setTag(Some(BoxTag.NGO_2.longTag)))
+        boxToPoolFees = boxToPoolFees + (pool -> ngoFees(1))
+      }
+      for(pool <- slicedEventPools(2)){
+        boxToInfo = boxToInfo + (pool -> pool.getPoolInfo.setTag(Some(BoxTag.NGO_3.longTag)))
+        boxToPoolFees = boxToPoolFees + (pool -> ngoFees(2))
+      }
+    }else{
+      for(pool <- eventPoolsList){
+        boxToInfo = boxToInfo + (pool -> pool.getPoolInfo)
+        boxToPoolFees = boxToPoolFees + (pool -> pool.getPoolFees)
+      }
+      slicedEventPools = Array(
+        boxToInfo.filter(b => BoxTag.NGO_1.longTag == b._2.getTag.get).keys.toArray,
+        boxToInfo.filter(b => BoxTag.NGO_2.longTag == b._2.getTag.get).keys.toArray,
+        boxToInfo.filter(b => BoxTag.NGO_3.longTag == b._2.getTag.get).keys.toArray
+      )
+    }
+    logger.info(s"Current boxToInfo for eventPools: ${boxToInfo.values.toArray.mkString("Array(", ", ", ")")}")
+    for (pools <- slicedEventPools) {
+      if(pools.length > 0) {
+        logger.info(s"Selecting for event pools ${pools.map(p => p.getSubpoolId).mkString("Array(", ", ", ")")}")
+        val filteredConsensus = ShareConsensus.convert(eventConsensus.cValue.filter(c => c._2(4) == boxToInfo(pools.head).getTag.get))
+        val filteredMembers = MemberList.convert(eventMembers.cValue.filter(m => filteredConsensus.cValue.exists(c => c._1 sameElements m._1)))
+        val newMinersLeft = selectDefaultSubpools(pools, filteredConsensus, filteredMembers)
+        minersLeft = (minersLeft._1 ++ newMinersLeft._1, minersLeft._2 ++ newMinersLeft._2)
+      }
+    }
+    minersLeft
   }
 
 }

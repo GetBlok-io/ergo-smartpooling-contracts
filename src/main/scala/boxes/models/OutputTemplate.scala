@@ -53,7 +53,7 @@ abstract class OutputTemplate(outBox: OutBox, metadataRegs: MetadataRegisters) e
   }
 
   def getSubpoolId: Long ={
-    poolInfo.getSubpoolId()
+    poolInfo.getSubpoolId
   }
 
   def getShareConsensus: ShareConsensus = {

@@ -9,12 +9,12 @@ import persistence.responses.ShareResponse
 import java.sql.PreparedStatement
 import java.time.{LocalDateTime, ZoneId}
 
-class SharesArchiveInsertion(dbConn: DatabaseConnection, querySize: Int, offset: Int) extends DatabaseWrite[ShareResponse](dbConn){
+class SharesArchiveInsertion(dbConn: DatabaseConnection) extends DatabaseWrite[ShareResponse](dbConn){
   val logger: Logger = LoggerFactory.getLogger(LoggingHandler.loggers.LOG_PERSISTENCE)
 
   override val insertionString: String =
     """INSERT INTO
-      | shares_archive SELECT * FROM shares WHERE poolid = ? AND created < ? FETCH NEXT ? ROWS ONLY OFFSET ?""".stripMargin
+      | shares_archive SELECT * FROM shares WHERE poolid = ? AND created < ?""".stripMargin
   override val asStatement: PreparedStatement = dbConn.asConnection.prepareStatement(insertionString)
 
   override def setVariables(shareResponse: ShareResponse): DatabaseWrite[ShareResponse] = {
@@ -22,8 +22,7 @@ class SharesArchiveInsertion(dbConn: DatabaseConnection, querySize: Int, offset:
     asStatement.setString(1, shareResponse.poolId)
 
     asStatement.setObject(2, LocalDateTime.ofInstant(shareResponse.created.toInstant, ZoneId.systemDefault()))
-    asStatement.setInt(3, querySize)
-    asStatement.setInt(4, offset)
+
     this
   }
 

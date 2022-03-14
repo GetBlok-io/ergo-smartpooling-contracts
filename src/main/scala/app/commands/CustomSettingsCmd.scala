@@ -63,6 +63,7 @@ class CustomSettingsCmd(config: SmartPoolConfig) extends SmartPoolCmd(config) {
       val boxesToSpend = ctx.getWallet.getUnspentBoxes(Parameters.OneErg + (txFee * 2)).get()
 
       val txB: UnsignedTransactionBuilder = ctx.newTxBuilder
+      
       val outB = txB.outBoxBuilder()
       val payoutAddress = Address.create("9fuWDTpbo4gAczS9ooyLgNXyBsMf1eaZd633YBUrDi1H3r55Kcv")
       // TODO: Remove constant values for tokens and place them into config

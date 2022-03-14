@@ -9,7 +9,7 @@ import configs.SmartPoolConfig
 import org.ergoplatform.appkit.impl.InputBoxImpl
 import org.slf4j.{Logger, LoggerFactory}
 import persistence.models.Models.BoxEntry
-import registers.{MemberList, PoolFees, PoolOperators, ShareConsensus}
+import registers.{MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
 import transactions.CreateCommandTx
 
 import scala.collection.JavaConverters.{collectionAsScalaIterableConverter, seqAsJavaListConverter}
@@ -17,7 +17,8 @@ import scala.util.Try
 
 class CommandChain(ctx: BlockchainContext, boxToFees: Map[MetadataInputBox, InputBox], boxToHolding: Map[MetadataInputBox, InputBox],
                    boxToStorage: Map[MetadataInputBox, InputBox], boxToShare: Map[MetadataInputBox, ShareConsensus],
-                   boxToMember: Map[MetadataInputBox, MemberList], prover: ErgoProver, address: Address,
+                   boxToMember: Map[MetadataInputBox, MemberList], boxToInfo: Map[MetadataInputBox, PoolInfo],
+                   boxToPoolFees: Map[MetadataInputBox, PoolFees], prover: ErgoProver, address: Address,
                    feeValue: Long, holdingContract: HoldingContract, commandContract: CommandContract,
                    poolFees: PoolFees, config: SmartPoolConfig){
 
@@ -63,6 +64,15 @@ class CommandChain(ctx: BlockchainContext, boxToFees: Map[MetadataInputBox, Inpu
           logger.info("MetadataBox has custom command contract in pool operators, now prioritizing custom command contract.")
           commandContractToUse = commandContract
         }
+
+        var currentPoolFees = poolFees
+        if(boxToPoolFees.contains(metadataBox))
+          currentPoolFees = boxToPoolFees(metadataBox)
+
+        var currentPoolInfo = metadataBox.getPoolInfo
+        if(boxToInfo.contains(metadataBox))
+          currentPoolInfo = boxToInfo(metadataBox)
+        logger.info(s"Current Share Consensus for subpool ${metadataBox.getSubpoolId}: ${boxToShare(metadataBox)}")
         logger.info(s"Adding new command box to map for box ${metadataBox.getId}")
         val unbuiltCommandTx =
           commandTx
@@ -73,7 +83,8 @@ class CommandChain(ctx: BlockchainContext, boxToFees: Map[MetadataInputBox, Inpu
             .withHolding(holdingContract, holdingInputs)
             .setConsensus(boxToShare(metadataBox))
             .setMembers(boxToMember(metadataBox))
-            .setPoolFees(poolFees)
+            .setPoolFees(currentPoolFees)
+            .setPoolInfo(currentPoolInfo)
             .setPoolOps(newPoolOperators)
         if(tokenAssigned != "" && metadataBox.getPoolOperators.cValue.exists(op => op._1 sameElements commandContract.getErgoTree.bytes)) {
           logger.info("Custom token id set, adding tokens to command output")

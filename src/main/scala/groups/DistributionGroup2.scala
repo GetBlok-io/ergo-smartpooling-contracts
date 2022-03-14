@@ -11,8 +11,9 @@ import logging.LoggingHandler
 import org.ergoplatform.appkit.impl.{ErgoTreeContract, InputBoxImpl}
 import org.ergoplatform.appkit._
 import org.slf4j.{Logger, LoggerFactory}
-import persistence.{BoxIndex, BoxStatus}
-import registers.{MemberList, PoolFees, PoolOperators, ShareConsensus}
+import persistence.BoxIndex
+import persistence.models.Models.BoxStatus
+import registers.{MemberList, PoolFees, PoolInfo, PoolOperators, ShareConsensus}
 import sigmastate.Values.ErgoTree
 import transactions.{CreateCommandTx, DistributionTx}
 
@@ -35,12 +36,15 @@ class DistributionGroup2(ctx: BlockchainContext, boxIndex: BoxIndex, prover: Erg
   private val holdConf = config.getParameters.getHoldingConf
 
   private var metadataInputs: Array[MetadataInputBox] = Array()
+  private var eventInputs: Array[MetadataInputBox] = Array()
 
   private var boxToHolding = Map.empty[MetadataInputBox, InputBox]
   private var boxToStorage = Map.empty[MetadataInputBox, InputBox]
 
-  private var boxToShare = Map.empty[MetadataInputBox, ShareConsensus]
-  private var boxToMember = Map.empty[MetadataInputBox, MemberList]
+  private var boxToShare    = Map.empty[MetadataInputBox, ShareConsensus]
+  private var boxToMember   = Map.empty[MetadataInputBox, MemberList]
+  private var boxToInfo     = Map.empty[MetadataInputBox, PoolInfo]
+  private var boxToPoolFees = Map.empty[MetadataInputBox, PoolFees]
 
 
   private var boxToFees = Map.empty[MetadataInputBox, InputBox]
@@ -54,13 +58,20 @@ class DistributionGroup2(ctx: BlockchainContext, boxIndex: BoxIndex, prover: Erg
   override def buildGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
     logger.info("Now building DistributionGroup")
     if(!isFailureAttempt) {
-      require(boxIndex.boxes.forall(b => b._2.status == BoxStatus.INITIATED), "Not all boxes were initiated!")
+      require(boxIndex.boxes.forall(b => b._2.boxStatus == BoxStatus.INITIATED), "Not all boxes were initiated!")
       logger.info("Now grabbing inputs, holding, and storage boxes from context")
-      metadataInputs = boxIndex.grabFromContext(ctx)
+      metadataInputs = boxIndex.getNormal.grabFromContext(ctx)
+      if(config.getParameters.eventsEnabled()) {
+        eventInputs = boxIndex.getSpecial.grabFromContext(ctx)
+      }
       boxToHolding = boxIndex.getHoldingBoxes(ctx)
       boxToStorage = boxIndex.getStorageBoxes(ctx)
     }else{
-      metadataInputs = boxIndex.getUsed.grabFromContext(ctx)
+      metadataInputs = boxIndex.getNormal.getUsed.grabFromContext(ctx)
+      if(config.getParameters.eventsEnabled()) {
+        eventInputs = boxIndex.getSpecial.getUsed.grabFromContext(ctx)
+      }
+
       val tryGetHolding = Try{ boxIndex.getUsed.getSuccessful.getHoldingBoxes(ctx) ++ boxIndex.getUsed.getFailed.getHoldingBoxes(ctx) }
       boxToStorage = boxIndex.getUsed.getSuccessful.getStorageBoxes(ctx) ++ boxIndex.getUsed.getFailed.getStorageBoxes(ctx)
       if(tryGetHolding.isSuccess){
@@ -72,15 +83,23 @@ class DistributionGroup2(ctx: BlockchainContext, boxIndex: BoxIndex, prover: Erg
       }
     }
 
-    logger.info(s"Using ${metadataInputs.length} metadata boxes, with ${shareConsensus.cValue.length} consensus vals")
-    val subpoolSelector = new SubpoolSelector
-    val membersLeft = subpoolSelector.selectDefaultSubpools(metadataInputs, shareConsensus, memberList)._2
-    boxToShare = subpoolSelector.shareMap
-    boxToMember = subpoolSelector.memberMap
-
+    logger.info(s"Using ${metadataInputs.length} metadata boxes, ${eventInputs.length} event boxes with ${shareConsensus.cValue.length} consensus vals")
+    val subpoolSelector = new SubpoolSelector(config)
+    var membersLeft: Array[(Array[Byte], String)] = Array.empty[(Array[Byte], String)]
+    if(!config.getParameters.eventsEnabled()) {
+      membersLeft = subpoolSelector.selectDefaultSubpools(metadataInputs, shareConsensus, memberList)._2
+      boxToShare = subpoolSelector.shareMap
+      boxToMember = subpoolSelector.memberMap
+    }else{
+      membersLeft = subpoolSelector.selectWithEventPools(metadataInputs, eventInputs, shareConsensus, memberList)._2
+      boxToShare = subpoolSelector.shareMap
+      boxToMember = subpoolSelector.memberMap
+      boxToInfo = subpoolSelector.infoMap
+      boxToPoolFees = subpoolSelector.poolFeeMap
+    }
     if(isFailureAttempt){
       for(box <- boxToShare.keys){
-        if(boxIndex(box.getSubpoolId.toInt).status == BoxStatus.CONFIRMED){
+        if(boxIndex(box.getSubpoolId.toInt).boxStatus == BoxStatus.CONFIRMED){
           removeFromMaps(box)
         }
       }
@@ -128,8 +147,8 @@ class DistributionGroup2(ctx: BlockchainContext, boxIndex: BoxIndex, prover: Erg
   override def executeGroup: TransactionGroup[Map[MetadataInputBox, String]] = {
 
     val commandChain = new CommandChain(ctx, boxToFees, boxToHolding, boxToStorage, boxToShare, boxToMember,
-                                        prover, address, STANDARD_FEE, holdingContract, commandContract,
-                                        poolFees, config)
+                                        boxToInfo, boxToPoolFees, prover, address, STANDARD_FEE,
+                                        holdingContract, commandContract, poolFees, config)
     boxToCommand = commandChain.executeChain.result
     commandChain.failed.foreach(m => removeFromMaps(m._1))
 
@@ -260,12 +279,14 @@ class DistributionGroup2(ctx: BlockchainContext, boxIndex: BoxIndex, prover: Erg
   }
 
   def removeFromMaps(metadataInputBox: MetadataInputBox): Unit = {
-    boxToShare = boxToShare--List(metadataInputBox)
-    boxToMember = boxToMember--List(metadataInputBox)
-    boxToHolding = boxToHolding--List(metadataInputBox)
-    boxToStorage = boxToStorage--List(metadataInputBox)
-    boxToCommand = boxToCommand--List(metadataInputBox)
-    boxToFees = boxToFees--List(metadataInputBox)
+    boxToShare    = boxToShare--List(metadataInputBox)
+    boxToMember   = boxToMember--List(metadataInputBox)
+    boxToHolding  = boxToHolding--List(metadataInputBox)
+    boxToStorage  = boxToStorage--List(metadataInputBox)
+    boxToCommand  = boxToCommand--List(metadataInputBox)
+    boxToFees     = boxToFees--List(metadataInputBox)
+    boxToInfo     = boxToInfo--List(metadataInputBox)
+    boxToPoolFees = boxToPoolFees--List(metadataInputBox)
   }
 
 }
